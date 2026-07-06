@@ -4,7 +4,7 @@ A browser-based **3D physics shooting game**. Aim with the mouse and fire projec
 destructible targets — a barrel pyramid, a house of cards, a medieval fortress, or a ruined
 colosseum — with realistic rigid-body physics, synthesized sound effects, and a score counter.
 
-**▶️ Play it: https://freaxnx01.github.io/game-barrel-shooter/**
+**▶️ Play it: https://github.freaxnx01.ch/game-barrel-shooter/**
 
 ## How to Play
 
