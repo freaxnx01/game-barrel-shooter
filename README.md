@@ -58,6 +58,8 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
+Or just open the local `index.html` in your browser of choice. No python or web server needed.
+
 ## Credits
 
 Built by [Claude](https://claude.com/claude-code). Published as-is from the design handoff package.
