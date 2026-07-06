@@ -6,6 +6,10 @@ colosseum — with realistic rigid-body physics, synthesized sound effects, and 
 
 **▶️ Play it: https://github.freaxnx01.ch/game-barrel-shooter/**
 
+## Demo
+
+https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
+
 ## How to Play
 
 | Action | Control |
