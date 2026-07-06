@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barrel Blast</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1611; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+  #c { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  .hud {
+    position: fixed; top: 20px; left: 20px; color: #f5efe4; user-select: none;
+    display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+  }
+  .hud .score { font-size: 42px; font-weight: 700; letter-spacing: -1px; }
+  .hud .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; }
+  .hud .balls { font-size: 16px; opacity: 0.85; }
+  .hint {
+    position: fixed; bottom: 28px; right: 24px; max-width: 300px;
+    color: #f5efe4; opacity: 0.55; font-size: 13px; letter-spacing: 0.5px; line-height: 1.6;
+    user-select: none; pointer-events: none; text-align: right;
+  }
+  #power {
+    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    width: 220px; height: 10px; border-radius: 5px; background: rgba(245,239,228,0.15);
+    overflow: hidden; opacity: 0; transition: opacity 0.15s;
+  }
+  #power .fill { height: 100%; width: 0%; background: oklch(0.72 0.17 55); border-radius: 5px; }
+  #reset { position: fixed; top: 20px; right: 20px; }
+  #reset, .target button {
+    padding: 10px 20px; font-size: 14px;
+    background: rgba(245,239,228,0.1); color: #f5efe4; border: 1px solid rgba(245,239,228,0.3);
+    border-radius: 6px; cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
+    font-family: inherit;
+  }
+  #reset:hover, .target button:hover { background: rgba(245,239,228,0.22); }
+  .target { position: fixed; top: 20px; right: 130px; display: flex; gap: 8px; }
+  .target button.sel { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
+  .ammo {
+    position: fixed; bottom: 24px; left: 24px; display: flex; gap: 8px; user-select: none;
+  }
+  .ammo button {
+    padding: 10px 16px; font-size: 13px; font-family: inherit; letter-spacing: 0.5px;
+    background: rgba(245,239,228,0.08); color: #f5efe4; border: 1px solid rgba(245,239,228,0.25);
+    border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  }
+  .ammo button:hover { background: rgba(245,239,228,0.18); }
+  .ammo button.sel { background: rgba(245,239,228,0.22); border-color: rgba(245,239,228,0.7); }
+  .ammo .dot { width: 14px; height: 14px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="label" id="scoreLabel">Barrels down</div>
+  <div class="score" id="score">0<span style="opacity:0.4">/21</span></div>
+  <div class="balls" id="balls">Balls: ∞</div>
+</div>
+<div id="power"><div class="fill" id="powerFill"></div></div>
+<div class="ammo" id="ammo">
+  <button data-type="basketball" class="sel"><span class="dot" style="background:#d4712c"></span>Basketball <span style="opacity:0.5">1</span></button>
+  <button data-type="cannonball"><span class="dot" style="background:#585c63"></span>Cannonball <span style="opacity:0.5">2</span></button>
+  <button data-type="bomb"><span class="dot" style="background:#1c1c20;border:2px solid #e0483a;box-sizing:border-box"></span>Bomb <span style="opacity:0.5">3</span></button>
+  <button data-type="tennisball"><span class="dot" style="background:#cde04a"></span>Tennis <span style="opacity:0.5">4</span></button>
+  <button data-type="bowlingball"><span class="dot" style="background:#232a4d"></span>Bowling <span style="opacity:0.5">5</span></button>
+  <button data-type="spear"><span class="dot" style="background:#8a6a3c;border-radius:2px"></span>Spear <span style="opacity:0.5">6</span></button>
+  <button data-type="wrecking"><span class="dot" style="background:#3a3d42;border:2px solid #74787e;box-sizing:border-box"></span>Wrecking ball <span style="opacity:0.5">7</span></button>
+  <button data-type="catapult"><span class="dot" style="background:#7d7568;border-radius:4px"></span>Catapult <span style="opacity:0.5">8</span></button>
+  <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
+  <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
+</div>
+<div class="hint">Aim with mouse, click to fire · Right-drag to orbit<br>1–9 ammo · R to reset</div>
+<button id="reset">Reset</button>
+<div class="target" id="target">
+  <button data-mode="barrels" class="sel">Barrels</button>
+  <button data-mode="cards">Cards</button>
+  <button data-mode="fortress">Fortress</button>
+  <button data-mode="colosseum">Colosseum</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+
+// ---------- Renderer / scene ----------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#20242e');
+scene.fog = new THREE.Fog('#20242e', 45, 140);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
+
+// Lights
+scene.add(new THREE.HemisphereLight('#b8c4d8', '#3a3128', 0.7));
+const sun = new THREE.DirectionalLight('#ffe8c4', 1.6);
+sun.position.set(8, 14, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
+sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28;
+scene.add(sun);
+
+// ---------- Physics ----------
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
+
+const groundMat = new CANNON.Material('ground');
+const barrelMat = new CANNON.Material('barrel');
+const ballMat = new CANNON.Material('ball');
+const heavyMat = new CANNON.Material('heavy');
+world.addContactMaterial(new CANNON.ContactMaterial(heavyMat, groundMat, { friction: 0.6, restitution: 0.15 }));
+world.addContactMaterial(new CANNON.ContactMaterial(heavyMat, barrelMat, { friction: 0.4, restitution: 0.1 }));
+world.addContactMaterial(new CANNON.ContactMaterial(groundMat, barrelMat, { friction: 0.5, restitution: 0.15 }));
+world.addContactMaterial(new CANNON.ContactMaterial(barrelMat, barrelMat, { friction: 0.45, restitution: 0.1 }));
+world.addContactMaterial(new CANNON.ContactMaterial(ballMat, groundMat, { friction: 0.4, restitution: 0.75 }));
+world.addContactMaterial(new CANNON.ContactMaterial(ballMat, barrelMat, { friction: 0.3, restitution: 0.4 }));
+const cardMat = new CANNON.Material('card');
+world.addContactMaterial(new CANNON.ContactMaterial(cardMat, groundMat, { friction: 0.9, restitution: 0.0 }));
+world.addContactMaterial(new CANNON.ContactMaterial(cardMat, cardMat, { friction: 0.8, restitution: 0.0 }));
+world.addContactMaterial(new CANNON.ContactMaterial(cardMat, ballMat, { friction: 0.4, restitution: 0.1 }));
+const stoneMat = new CANNON.Material('stone');
+world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, groundMat, { friction: 0.8, restitution: 0.0 }));
+world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, stoneMat, { friction: 0.7, restitution: 0.0 }));
+world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, ballMat, { friction: 0.4, restitution: 0.2 }));
+world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, heavyMat, { friction: 0.5, restitution: 0.05 }));
+
+// Ground
+const groundBody = new CANNON.Body({ mass: 0, material: groundMat, shape: new CANNON.Plane() });
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(groundBody);
+
+const groundMesh = new THREE.Mesh(
+  new THREE.CircleGeometry(60, 48),
+  new THREE.MeshStandardMaterial({ color: '#5a5348', roughness: 0.95 })
+);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// Platform the barrels sit on
+const platW = 8, platH = 0.5, platD = 3;
+const platBody = new CANNON.Body({ mass: 0, material: groundMat,
+  shape: new CANNON.Box(new CANNON.Vec3(platW/2, platH/2, platD/2)),
+  position: new CANNON.Vec3(0, platH/2, -6) });
+world.addBody(platBody);
+const platMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(platW, platH, platD),
+  new THREE.MeshStandardMaterial({ color: '#3d4653', roughness: 0.8 })
+);
+platMesh.position.copy(platBody.position);
+platMesh.castShadow = platMesh.receiveShadow = true;
+scene.add(platMesh);
+
+// ---------- Barrel factory (55-gal steel drums) ----------
+const BARREL_R = 0.45, BARREL_H = 1.1;
+const drumColors = ['#2456a8', '#b8362a', '#3a7d3a', '#c8a12e', '#4a4f56'];
+const drumTexCache = {};
+const barrels = []; // {body, mesh, home:Vec3, down:boolean}
+
+function makeDrumTexture(color) {
+  if (drumTexCache[color]) return drumTexCache[color];
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = color;
+  g.fillRect(0, 0, 512, 256);
+  // subtle vertical grime streaks
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * 512;
+    g.fillStyle = 'rgba(0,0,0,' + (Math.random() * 0.08) + ')';
+    g.fillRect(x, Math.random() * 100, 2 + Math.random() * 4, 80 + Math.random() * 176);
+  }
+  // rust patches
+  for (let i = 0; i < 10; i++) {
+    g.fillStyle = 'rgba(110,60,25,' + (0.1 + Math.random() * 0.2) + ')';
+    g.beginPath();
+    g.ellipse(Math.random() * 512, Math.random() * 256, 8 + Math.random() * 22, 5 + Math.random() * 12, Math.random() * 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  // stencil label band
+  g.fillStyle = 'rgba(240,235,220,0.85)';
+  g.font = 'bold 34px monospace';
+  g.textAlign = 'center';
+  g.fillText('OIL', 128, 140);
+  g.fillText('OIL', 384, 140);
+  g.font = 'bold 16px monospace';
+  g.fillText('FLAMMABLE · 55 GAL', 128, 168);
+  g.fillText('FLAMMABLE · 55 GAL', 384, 168);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  drumTexCache[color] = tex;
+  return tex;
+}
+
+// straight steel drum with two rolling hoops
+const drumGeo = new THREE.CylinderGeometry(BARREL_R, BARREL_R, BARREL_H, 24, 1, false);
+const hoopGeo = new THREE.TorusGeometry(BARREL_R + 0.018, 0.026, 8, 28);
+const rimGeo = new THREE.TorusGeometry(BARREL_R - 0.005, 0.022, 8, 28);
+const steelMatl = new THREE.MeshStandardMaterial({ color: '#c9ccd1', roughness: 0.35, metalness: 0.85 });
+const capGeo = new THREE.CircleGeometry(BARREL_R * 0.98, 24);
+const bungGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.02, 12);
+
+function createBarrel(x, y, z, colorIdx) {
+  const body = new CANNON.Body({
+    mass: 8,
+    material: barrelMat,
+    shape: new CANNON.Cylinder(BARREL_R * 1.05, BARREL_R * 1.05, BARREL_H, 12),
+    position: new CANNON.Vec3(x, y, z),
+    sleepSpeedLimit: 0.3, sleepTimeLimit: 0.6,
+  });
+  world.addBody(body);
+
+  const group = new THREE.Group();
+  const color = drumColors[colorIdx % drumColors.length];
+  const paint = new THREE.MeshStandardMaterial({
+    map: makeDrumTexture(color), roughness: 0.45, metalness: 0.55,
+  });
+  const drum = new THREE.Mesh(drumGeo, paint);
+  drum.castShadow = drum.receiveShadow = true;
+  group.add(drum);
+  // rolling hoops (ribs)
+  for (const by of [-0.18, 0.18]) {
+    const hoop = new THREE.Mesh(hoopGeo, paint);
+    hoop.rotation.x = Math.PI / 2;
+    hoop.position.y = by * BARREL_H;
+    hoop.castShadow = true;
+    group.add(hoop);
+  }
+  // chime rims top & bottom
+  for (const by of [-0.5, 0.5]) {
+    const rim = new THREE.Mesh(rimGeo, steelMatl);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = by * BARREL_H;
+    rim.castShadow = true;
+    group.add(rim);
+  }
+  const capTop = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.6 }));
+  capTop.rotation.x = -Math.PI / 2; capTop.position.y = BARREL_H / 2 - 0.001;
+  group.add(capTop);
+  const bung = new THREE.Mesh(bungGeo, steelMatl);
+  bung.position.set(BARREL_R * 0.55, BARREL_H / 2 + 0.008, 0);
+  group.add(bung);
+  scene.add(group);
+
+  barrels.push({ body, mesh: group, home: new CANNON.Vec3(x, y, z), homeQ: new CANNON.Quaternion(0, 0, 0, 1), down: false });
+}
+
+function setupBarrels() {
+  // 6-5-4-3-2-1 pyramid on the platform
+  const baseY = platH + BARREL_H / 2 + 0.01;
+  const z = -6;
+  const gap = BARREL_R * 2.3;
+  let ci = 0;
+  const rows = [6, 5, 4, 3, 2, 1];
+  rows.forEach((count, row) => {
+    const y = baseY + row * (BARREL_H + 0.02);
+    const x0 = -((count - 1) * gap) / 2;
+    for (let i = 0; i < count; i++) {
+      createBarrel(x0 + i * gap, y, z, ci++);
+    }
+  });
+}
+
+// ---------- House of cards ----------
+const CARD_H = 1.0, CARD_W = 0.62, CARD_T = 0.03, CARD_TILT = 0.32;
+const cardFaceMatl = new THREE.MeshStandardMaterial({ color: '#f2efe6', roughness: 0.7 });
+const cardGeoLean = new THREE.BoxGeometry(CARD_T, CARD_H, CARD_W);
+const PAIR_S = 1.1;
+const bridgeLen = PAIR_S * 0.92;
+const cardGeoFlat = new THREE.BoxGeometry(bridgeLen, CARD_T, CARD_W);
+
+function addCard(shapeHalf, geo, x, y, z, rotZ) {
+  const body = new CANNON.Body({
+    mass: 0.3,
+    type: CANNON.Body.STATIC, // frozen until first projectile impact — unfreezeCards()
+    material: cardMat,
+    shape: new CANNON.Box(shapeHalf),
+    position: new CANNON.Vec3(x, y, z),
+    linearDamping: 0.2, angularDamping: 0.4,
+    sleepSpeedLimit: 0.25, sleepTimeLimit: 0.4,
+  });
+  body.quaternion.setFromEuler(0, 0, rotZ);
+  world.addBody(body);
+  const mesh = new THREE.Mesh(geo, cardFaceMatl);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+  barrels.push({
+    body, mesh,
+    home: new CANNON.Vec3(x, y, z),
+    homeQ: body.quaternion.clone(),
+    down: false,
+  });
+}
+
+function setupCards() {
+  const z = -6;
+  const Heff = CARD_H * Math.cos(CARD_TILT);
+  const dx = (CARD_H / 2) * Math.sin(CARD_TILT) + 0.015; // small apex gap so pairs don't spawn interpenetrating
+  const leanHalf = new CANNON.Vec3(CARD_T / 2, CARD_H / 2, CARD_W / 2);
+  const flatHalf = new CANNON.Vec3(bridgeLen / 2, CARD_T / 2, CARD_W / 2);
+  for (let level = 0; level < 6; level++) {
+    const n = 6 - level;
+    // +0.018 per level: tilted cards' bottom corners dip (T/2)*sin(tilt) below baseY \u2014 keep them clear of the bridge underneath
+    const baseY = platH + level * (Heff + CARD_T + 0.018) + 0.008;
+    const cy = baseY + Heff / 2;
+    const x0 = -((n - 1) * PAIR_S) / 2;
+    for (let j = 0; j < n; j++) {
+      const px = x0 + j * PAIR_S;
+      addCard(leanHalf, cardGeoLean, px - dx, cy, z, -CARD_TILT);
+      addCard(leanHalf, cardGeoLean, px + dx, cy, z, CARD_TILT);
+    }
+    // bridges on top of this level (skip after topmost)
+    if (n > 1) {
+      const by = baseY + Heff + CARD_T / 2 + 0.012;
+      for (let j = 0; j < n - 1; j++) {
+        addCard(flatHalf, cardGeoFlat, x0 + PAIR_S / 2 + j * PAIR_S, by, z, 0);
+      }
+    }
+  }
+}
+
+// wake the whole house of cards into dynamic bodies on first real impact
+function unfreezeCards() {
+  for (const b of barrels) {
+    if (b.body.type !== CANNON.Body.STATIC) continue;
+    b.body.type = CANNON.Body.DYNAMIC;
+    b.body.mass = b.body._mass || 0.3;
+    b.body.updateMassProperties();
+    b.body.wakeUp();
+  }
+}
+
+// ---------- Stone structures (fortress / colosseum) ----------
+const unitBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+const stoneMatls = ['#a39a88', '#968d7c', '#ada393'].map(c =>
+  new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
+
+function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
+  const body = new CANNON.Body({
+    mass,
+    type: CANNON.Body.STATIC, // frozen until first impact
+    material: stoneMat,
+    shape: new CANNON.Box(new CANNON.Vec3(hx, hy, hz)),
+    position: new CANNON.Vec3(x, y, z),
+    linearDamping: 0.15, angularDamping: 0.3,
+    sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+  });
+  body.quaternion.setFromEuler(0, ry, rz);
+  body._mass = mass;
+  world.addBody(body);
+  const mesh = new THREE.Mesh(unitBoxGeo, matl3);
+  mesh.scale.set(hx * 2, hy * 2, hz * 2);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+  barrels.push({ body, mesh, home: new CANNON.Vec3(x, y, z), homeQ: body.quaternion.clone(), down: false });
+}
+
+function setupFortress() {
+  const F = 3, zC = -8, S = 2.2 * F;
+  const BL = 1.1 * F, BH = 0.5 * F, BD = 0.42 * F;
+  const courses = 4;
+  let mi = 0;
+  const m = () => stoneMatls[mi++ % stoneMatls.length];
+  const xs = [-1.65 * F, -0.55 * F, 0.55 * F, 1.65 * F];
+  for (let c = 0; c < courses; c++) {
+    const y = BH / 2 + c * (BH + 0.02);
+    // front wall (+z) with gate opening + lintel
+    for (let j = 0; j < 4; j++) {
+      const mid = j === 1 || j === 2;
+      if (mid && c < 3) continue; // gate opening (lintel replaces course 2)
+      addBlock(BL / 2, BH / 2, BD / 2, m(), 60, xs[j], y, zC + S, 0, 0);
+    }
+    if (c === 2) addBlock(1.65 * F, BH / 2, BD / 2, m(), 90, 0, y, zC + S, 0, 0);
+    // back, left, right walls
+    for (let j = 0; j < 4; j++) {
+      addBlock(BL / 2, BH / 2, BD / 2, m(), 60, xs[j], y, zC - S, 0, 0);
+      addBlock(BL / 2, BH / 2, BD / 2, m(), 60, -S, y, zC + xs[j], Math.PI / 2, 0);
+      addBlock(BL / 2, BH / 2, BD / 2, m(), 60, S, y, zC + xs[j], Math.PI / 2, 0);
+    }
+  }
+  // battlements: cubes on wall tops, every other brick
+  const topY = courses * (BH + 0.02) + 0.45 + 0.02;
+  for (const p of [-1.65 * F, 0.55 * F]) {
+    addBlock(0.45, 0.45, 0.45, m(), 12, p, topY, zC + S, 0, 0);
+    addBlock(0.45, 0.45, 0.45, m(), 12, p, topY, zC - S, 0, 0);
+    addBlock(0.45, 0.45, 0.45, m(), 12, -S, topY, zC + p, 0, 0);
+    addBlock(0.45, 0.45, 0.45, m(), 12, S, topY, zC + p, 0, 0);
+  }
+  // corner towers
+  for (const [tx, tz] of [[-S - 1.2, -S - 1.2], [S + 1.2, -S - 1.2], [-S - 1.2, S + 1.2], [S + 1.2, S + 1.2]]) {
+    for (let k = 0; k < 4; k++) {
+      addBlock(1.5, 1.08, 1.5, m(), 100, tx, 1.08 + k * (2.16 + 0.02), zC + tz, 0, 0);
+    }
+    addBlock(0.78, 0.78, 0.78, m(), 30, tx, 4 * (2.16 + 0.02) + 0.78 + 0.03, zC + tz, Math.PI / 4, 0);
+  }
+}
+
+function setupColosseum() {
+  const F = 3, zC = -8, N = 16;
+  const pH = 0.8 * F, pW = 0.34 * F, lH = 0.26 * F, lD = 0.5 * F;
+  // ruined amphitheatre: full arcade at ground level, partial arcs above
+  const levels = [{ R: 3.3 * F, frac: 1 }, { R: 3.15 * F, frac: 0.62 }, { R: 3.0 * F, frac: 0.4 }];
+  let mi = 0;
+  const m = () => stoneMatls[mi++ % stoneMatls.length];
+  levels.forEach((lv, li) => {
+    const count = Math.max(3, Math.round(N * lv.frac));
+    const base = li * (pH + lH + 0.04);
+    const yP = base + pH / 2 + 0.02;
+    const yL = base + pH + lH / 2 + 0.04;
+    const step = 2 * Math.PI / N;
+    const a0 = Math.PI - ((count - 1) * step) / 2; // ruin opens toward the camera
+    const chord = 2 * lv.R * Math.sin(step / 2);
+    for (let j = 0; j < count; j++) {
+      const a = a0 + j * step;
+      addBlock(pW / 2, pH / 2, pW / 2, m(), 45, lv.R * Math.sin(a), yP, zC + lv.R * Math.cos(a), a, 0);
+      if (j < count - 1 || count === N) {
+        const am = a + step / 2;
+        addBlock(chord / 2 + 0.2, lH / 2, lD / 2, m(), 35, lv.R * Math.sin(am), yL, zC + lv.R * Math.cos(am), am, 0);
+      }
+    }
+  });
+}
+
+// platform only makes sense under barrels / cards; stone structures stand on the ground
+let platformOn = true;
+function setPlatform(on) {
+  if (on === platformOn) return;
+  platformOn = on;
+  if (on) { world.addBody(platBody); scene.add(platMesh); }
+  else { world.removeBody(platBody); scene.remove(platMesh); }
+}
+
+// ---------- Target mode ----------
+let targetMode = 'barrels';
+const targetEl = document.getElementById('target');
+function clearTargets() {
+  for (const b of barrels) { world.removeBody(b.body); scene.remove(b.mesh); }
+  barrels.length = 0;
+}
+function buildTargets() {
+  clearTargets();
+  const big = targetMode === 'fortress' || targetMode === 'colosseum';
+  setPlatform(!big);
+  // pull the camera back for the big stone structures
+  orbit.radius = big ? 34 : 15.5;
+  orbit.target.set(0, big ? 5 : 2.8, big ? -8 : -6);
+  updateCamera();
+  if (targetMode === 'barrels') setupBarrels();
+  else if (targetMode === 'cards') setupCards();
+  else if (targetMode === 'fortress') setupFortress();
+  else setupColosseum();
+  document.getElementById('scoreLabel').textContent =
+    { barrels: 'Barrels down', cards: 'Cards down', fortress: 'Blocks down', colosseum: 'Blocks down' }[targetMode];
+}
+targetEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.dataset.mode === targetMode) return;
+  targetMode = btn.dataset.mode;
+  for (const b of targetEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.mode === targetMode);
+  reset();
+});
+setupBarrels();
+
+// ---------- Projectiles ----------
+const BALL_R = 0.32;
+const ballGeo = new THREE.SphereGeometry(BALL_R, 24, 18);
+const ballTex = makeBasketballTexture();
+const basketMatl = new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.7 });
+const cannonMatl = new THREE.MeshStandardMaterial({ color: '#43474d', roughness: 0.35, metalness: 0.9 });
+const bombMatl = new THREE.MeshStandardMaterial({ color: '#17171b', roughness: 0.4, metalness: 0.3 });
+const tennisMatl = new THREE.MeshStandardMaterial({ color: '#cde04a', roughness: 0.9 });
+const bowlingMatl = new THREE.MeshStandardMaterial({ color: '#232a4d', roughness: 0.15, metalness: 0.2 });
+const shaftMatl = new THREE.MeshStandardMaterial({ color: '#8a6a3c', roughness: 0.8 });
+const tipMatl = new THREE.MeshStandardMaterial({ color: '#b9bec6', roughness: 0.3, metalness: 0.9 });
+const wreckMatl = new THREE.MeshStandardMaterial({ color: '#33363b', roughness: 0.45, metalness: 0.85 });
+const chainMatl = new THREE.MeshStandardMaterial({ color: '#6e737a', roughness: 0.4, metalness: 0.9 });
+const chainGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6);
+const rockGeo = new THREE.DodecahedronGeometry(0.42, 0);
+const rockMatl = new THREE.MeshStandardMaterial({ color: '#7d7568', roughness: 0.95, flatShading: true });
+const pelletMatl = new THREE.MeshStandardMaterial({ color: '#9a938a', roughness: 0.6 });
+const SPEAR_LEN = 1.7, SPEAR_R = 0.045;
+const shaftGeo = new THREE.CylinderGeometry(SPEAR_R, SPEAR_R, SPEAR_LEN, 10);
+const tipGeo = new THREE.ConeGeometry(0.09, 0.28, 10);
+const fuseGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.14, 8);
+const fuseMatl = new THREE.MeshStandardMaterial({ color: '#8a7040', roughness: 0.9 });
+const balls = []; // {body, mesh, born, type, exploded}
+
+let ammoType = 'basketball';
+const ammoEl = document.getElementById('ammo');
+function setAmmo(type) {
+  ammoType = type;
+  for (const b of ammoEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.type === type);
+}
+ammoEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (btn) setAmmo(btn.dataset.type);
+});
+
+function makeBasketballTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#d4712c';
+  g.fillRect(0, 0, 256, 128);
+  g.strokeStyle = '#3a2415';
+  g.lineWidth = 4;
+  // horizontal seam
+  g.beginPath(); g.moveTo(0, 64); g.lineTo(256, 64); g.stroke();
+  // vertical seams
+  for (const x of [0, 128, 256]) {
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 128); g.stroke();
+  }
+  // curved seams
+  g.beginPath(); g.ellipse(64, 64, 40, 62, 0, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.ellipse(192, 64, 40, 62, 0, 0, Math.PI * 2); g.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function shootBall(dir, power) {
+  const type = ammoType;
+  const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
+  const cfg = {
+    basketball:  { mass: 2.4, r: BALL_R },
+    cannonball:  { mass: 9,   r: BALL_R * 0.9 },
+    bomb:        { mass: 6,   r: BALL_R },
+    tennisball:  { mass: 0.6, r: 0.16 },
+    bowlingball: { mass: 12,  r: 0.36 },
+    spear:       { mass: 3,   r: SPEAR_R },
+    wrecking:    { mass: 22,  r: 0.55 },
+    catapult:    { mass: 10,  r: 0.4 },
+    slingshot:   { mass: 0.4, r: 0.12 },
+    f16:         { mass: 4,   r: 0.12 },
+  }[type];
+  const shape = (type === 'spear' || type === 'f16')
+    ? new CANNON.Cylinder(type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 1.2 : SPEAR_LEN, 8)
+    : new CANNON.Sphere(cfg.r);
+  const body = new CANNON.Body({
+    mass: cfg.mass,
+    material: (type === 'basketball' || type === 'tennisball') ? ballMat : heavyMat,
+    shape,
+    position: new CANNON.Vec3(start.x, start.y, start.z),
+  });
+  let speed = 18 + power * 22; // fast & flat
+  let vdir = dir;
+  if (type === 'catapult') {
+    // high lobbed arc
+    vdir = dir.clone().add(new THREE.Vector3(0, 0.65, 0)).normalize();
+    speed = 13 + power * 12;
+  } else if (type === 'slingshot') {
+    speed = 30 + power * 15;
+  } else if (type === 'f16') {
+    speed = 28 + power * 15;
+  }
+  body.velocity.set(vdir.x * speed, vdir.y * speed, vdir.z * speed);
+  if (type === 'spear' || type === 'f16') {
+    body.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), new CANNON.Vec3(dir.x, dir.y, dir.z));
+    body.angularDamping = 0.9;
+  } else {
+    body.angularVelocity.set(Math.random() * 4 - 2, 0, Math.random() * 4 - 2);
+  }
+  world.addBody(body);
+
+  // wrecking ball hangs from a fixed point above the targets
+  let constraint = null, chainMesh = null, anchorPos = null;
+  if (type === 'wrecking') {
+    anchorPos = new CANNON.Vec3(0, (targetMode === 'fortress' || targetMode === 'colosseum') ? 20 : 10, targetMode === 'barrels' || targetMode === 'cards' ? -6 : -8);
+    const anchor = new CANNON.Body({ mass: 0, position: anchorPos.clone() });
+    world.addBody(anchor);
+    // chain just long enough that the bottom of the swing sweeps through the targets
+    const len = anchorPos.y - 0.75;
+    const toBall = body.position.vsub(anchorPos);
+    toBall.normalize();
+    body.position.set(
+      anchorPos.x + toBall.x * len,
+      anchorPos.y + toBall.y * len,
+      anchorPos.z + toBall.z * len
+    );
+    constraint = new CANNON.DistanceConstraint(body, anchor, len);
+    world.addConstraint(constraint);
+    chainMesh = new THREE.Mesh(chainGeo, chainMatl);
+    chainMesh.castShadow = true;
+    scene.add(chainMesh);
+    constraint._anchorBody = anchor;
+  }
+
+  let mesh;
+  if (type === 'basketball') {
+    mesh = new THREE.Mesh(ballGeo, basketMatl);
+  } else if (type === 'cannonball') {
+    mesh = new THREE.Mesh(ballGeo, cannonMatl);
+    mesh.scale.setScalar(0.9);
+  } else if (type === 'tennisball') {
+    mesh = new THREE.Mesh(ballGeo, tennisMatl);
+    mesh.scale.setScalar(0.16 / BALL_R);
+  } else if (type === 'bowlingball') {
+    mesh = new THREE.Mesh(ballGeo, bowlingMatl);
+    mesh.scale.setScalar(0.36 / BALL_R);
+  } else if (type === 'spear') {
+    mesh = new THREE.Group();
+    const shaft = new THREE.Mesh(shaftGeo, shaftMatl);
+    shaft.castShadow = true;
+    mesh.add(shaft);
+    const tip = new THREE.Mesh(tipGeo, tipMatl);
+    tip.position.y = SPEAR_LEN / 2 + 0.12;
+    tip.castShadow = true;
+    mesh.add(tip);
+  } else if (type === 'wrecking') {
+    mesh = new THREE.Mesh(ballGeo, wreckMatl);
+    mesh.scale.setScalar(0.55 / BALL_R);
+  } else if (type === 'catapult') {
+    mesh = new THREE.Mesh(rockGeo, rockMatl);
+  } else if (type === 'slingshot') {
+    mesh = new THREE.Mesh(ballGeo, pelletMatl);
+    mesh.scale.setScalar(0.12 / BALL_R);
+  } else if (type === 'f16') {
+    // mini jet built along +Y (flight axis), matching the spear alignment logic
+    mesh = new THREE.Group();
+    const jetMatl = new THREE.MeshStandardMaterial({ color: '#8b939c', roughness: 0.4, metalness: 0.6 });
+    const darkMatl = new THREE.MeshStandardMaterial({ color: '#2c3138', roughness: 0.5, metalness: 0.4 });
+    const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.0, 10), jetMatl);
+    fus.castShadow = true;
+    mesh.add(fus);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 10), darkMatl);
+    nose.position.y = 0.66; nose.castShadow = true;
+    mesh.add(nose);
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), darkMatl);
+    canopy.position.set(0, 0.25, 0.07);
+    canopy.scale.set(0.8, 1.6, 0.7);
+    mesh.add(canopy);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.34, 0.025), jetMatl);
+    wing.position.y = -0.12; wing.castShadow = true;
+    mesh.add(wing);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.02), jetMatl);
+    tail.position.y = -0.45; tail.castShadow = true;
+    mesh.add(tail);
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.26, 0.24), jetMatl);
+    fin.position.set(0, -0.42, 0.15); fin.castShadow = true;
+    mesh.add(fin);
+  } else {
+    mesh = new THREE.Mesh(ballGeo, bombMatl);
+    const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
+    fuse.position.y = BALL_R + 0.05;
+    mesh.add(fuse);
+  }
+  mesh.castShadow = true;
+  scene.add(mesh);
+  const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos };
+  // sounds: launch now, clank/bounce on collision
+  playShoot(power);
+  body.addEventListener('collide', (e) => {
+    if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
+    if (type === 'spear' || type === 'f16') rec.hit = true;
+    const v = e.contact.getImpactVelocityAlongNormal();
+    if (Math.abs(v) < 1.5) return;
+    const other = e.body === body ? e.target : e.body;
+    if (other.material === cardMat || other.material === stoneMat) unfreezeCards();
+    if (other.material === barrelMat) playClank(Math.abs(v));
+    else playBounce(Math.abs(v));
+  });
+  balls.push(rec);
+  shots++;
+  updateHud();
+}
+
+// ---------- Explosion ----------
+const explosions = []; // {mesh, born, particles}
+function explode(rec) {
+  rec.exploded = true;
+  unfreezeCards();
+  const p = rec.body.position.clone();
+  // radial impulse on all dynamic bodies
+  const RADIUS = 3, STRENGTH = 80;
+  for (const body of world.bodies) {
+    if (body.mass <= 0 || body === rec.body) continue;
+    const d = body.position.vsub(p);
+    const dist = Math.max(d.length(), 0.5);
+    if (dist > RADIUS) continue;
+    d.normalize();
+    const falloff = 1 - dist / RADIUS;
+    const imp = STRENGTH * falloff;
+    body.wakeUp();
+    body.applyImpulse(new CANNON.Vec3(d.x * imp, d.y * imp + imp * 0.3, d.z * imp), body.position);
+  }
+  // remove bomb
+  world.removeBody(rec.body);
+  scene.remove(rec.mesh);
+  const i = balls.indexOf(rec);
+  if (i >= 0) balls.splice(i, 1);
+
+  // visual: flash sphere + debris particles
+  const flash = new THREE.Mesh(
+    new THREE.SphereGeometry(0.4, 16, 12),
+    new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.95 })
+  );
+  flash.position.copy(p);
+  scene.add(flash);
+  const pGeo = new THREE.BufferGeometry();
+  const N = 60;
+  const pos = new Float32Array(N * 3), vel = [];
+  for (let j = 0; j < N; j++) {
+    pos[j * 3] = p.x; pos[j * 3 + 1] = p.y; pos[j * 3 + 2] = p.z;
+    const th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1);
+    const s = 4 + Math.random() * 7;
+    vel.push(new THREE.Vector3(Math.sin(ph) * Math.cos(th) * s, Math.cos(ph) * s + 2, Math.sin(ph) * Math.sin(th) * s));
+  }
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: '#ff8c42', size: 0.12, transparent: true, opacity: 1 }));
+  scene.add(pts);
+  explosions.push({ flash, pts, vel, born: performance.now() });
+  // camera shake
+  shake = 0.35;
+  playExplosion();
+}
+
+function playExplosion() {
+  const ac = ctx(), t = ac.currentTime;
+  // deep boom
+  const o = ac.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(110, t);
+  o.frequency.exponentialRampToValueAtTime(28, t + 0.6);
+  const og = ac.createGain();
+  og.gain.setValueAtTime(0.9, t);
+  og.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+  o.connect(og).connect(ac.destination);
+  o.start(t); o.stop(t + 0.9);
+  // noise blast
+  const dur = 0.7;
+  const buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(3000, t);
+  f.frequency.exponentialRampToValueAtTime(200, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.7, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(t);
+}
+
+// ---------- Sound (Web Audio, synthesized) ----------
+let audioCtx = null;
+function ctx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playShoot(power) {
+  const ac = ctx(), t = ac.currentTime;
+  // whoosh: filtered noise sweep
+  const dur = 0.35;
+  const buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(400, t);
+  f.frequency.exponentialRampToValueAtTime(2500, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.25 + power * 0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(t);
+}
+function playClank(impact) {
+  const ac = ctx(), t = ac.currentTime;
+  const vol = Math.min(impact / 14, 1) * 0.5;
+  // metallic: a few inharmonic partials, fast decay
+  const base = 180 + Math.random() * 80;
+  for (const [ratio, amp] of [[1, 1], [2.76, 0.6], [5.4, 0.35], [8.9, 0.2]]) {
+    const o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = base * ratio;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol * amp, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28 + Math.random() * 0.15);
+    o.connect(g).connect(ac.destination);
+    o.start(t); o.stop(t + 0.5);
+  }
+  // impact thud
+  const o = ac.createOscillator();
+  o.type = 'sine'; o.frequency.setValueAtTime(90, t);
+  o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol * 0.8, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+  o.connect(g).connect(ac.destination);
+  o.start(t); o.stop(t + 0.2);
+}
+function playBounce(impact) {
+  const ac = ctx(), t = ac.currentTime;
+  const vol = Math.min(impact / 12, 1) * 0.35;
+  if (vol < 0.02) return;
+  const o = ac.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(160, t);
+  o.frequency.exponentialRampToValueAtTime(60, t + 0.1);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+  o.connect(g).connect(ac.destination);
+  o.start(t); o.stop(t + 0.2);
+}
+
+// ---------- Camera orbit (right-drag) ----------
+const orbit = { theta: 0, phi: 0.24, radius: 15.5, target: new THREE.Vector3(0, 2.8, -6) };
+let orbiting = false, lastX = 0, lastY = 0;
+
+function updateCamera() {
+  const { theta, phi, radius, target } = orbit;
+  camera.position.set(
+    target.x + radius * Math.sin(theta) * Math.cos(phi),
+    target.y + radius * Math.sin(phi),
+    target.z + radius * Math.cos(theta) * Math.cos(phi)
+  );
+  camera.lookAt(target);
+}
+updateCamera();
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---------- Aiming ----------
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2(0, 0);
+let charging = false, chargeStart = 0;
+const powerEl = document.getElementById('power');
+const powerFill = document.getElementById('powerFill');
+
+function aimDir() {
+  raycaster.setFromCamera(mouseNDC, camera);
+  return raycaster.ray.direction.clone().normalize();
+}
+
+canvas.addEventListener('pointermove', (e) => {
+  mouseNDC.x = (e.clientX / innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / innerHeight) * 2 + 1;
+  if (orbiting) {
+    orbit.theta -= (e.clientX - lastX) * 0.005;
+    orbit.phi = Math.min(Math.max(orbit.phi + (e.clientY - lastY) * 0.004, 0.02), 1.35);
+    lastX = e.clientX; lastY = e.clientY;
+    updateCamera();
+  }
+});
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button === 2) {
+    orbiting = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (e.button !== 0) return;
+  charging = true;
+  chargeStart = performance.now();
+  powerEl.style.opacity = 1;
+});
+addEventListener('pointerup', (e) => {
+  if (e.button === 2) { orbiting = false; return; }
+  if (!charging) return;
+  charging = false;
+  powerEl.style.opacity = 0;
+  const t = Math.min((performance.now() - chargeStart) / 1200, 1);
+  shootBall(aimDir(), t);
+});
+canvas.addEventListener('wheel', (e) => {
+  orbit.radius = Math.min(Math.max(orbit.radius + e.deltaY * 0.01, 5), 30);
+  updateCamera();
+}, { passive: true });
+
+// ---------- Score / reset ----------
+let shots = 0;
+const scoreEl = document.getElementById('score');
+const ballsEl = document.getElementById('balls');
+
+function updateHud() {
+  const down = barrels.filter(b => b.down).length;
+  scoreEl.innerHTML = down + '<span style="opacity:0.4">/' + barrels.length + '</span>';
+  ballsEl.textContent = 'Shots: ' + shots;
+  if (down === barrels.length && !scoreEl.dataset.won) {
+    scoreEl.dataset.won = '1';
+    scoreEl.style.color = 'oklch(0.8 0.17 145)';
+  }
+}
+updateHud();
+
+function removeProjectile(b) {
+  if (b.constraint) {
+    world.removeConstraint(b.constraint);
+    world.removeBody(b.constraint._anchorBody);
+  }
+  if (b.chainMesh) { scene.remove(b.chainMesh); }
+  world.removeBody(b.body); scene.remove(b.mesh);
+}
+
+function reset() {
+  for (const b of balls) removeProjectile(b);
+  balls.length = 0;
+  buildTargets(); // full rebuild — restores frozen state for cards
+  shots = 0;
+  delete scoreEl.dataset.won;
+  scoreEl.style.color = '';
+  updateHud();
+}
+document.getElementById('reset').addEventListener('click', reset);
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'r') reset();
+  if (k === '1') setAmmo('basketball');
+  if (k === '2') setAmmo('cannonball');
+  if (k === '3') setAmmo('bomb');
+  if (k === '4') setAmmo('tennisball');
+  if (k === '5') setAmmo('bowlingball');
+  if (k === '6') setAmmo('spear');
+  if (k === '7') setAmmo('wrecking');
+  if (k === '8') setAmmo('catapult');
+  if (k === '9') setAmmo('slingshot');
+  if (k === '0') setAmmo('f16');
+});
+
+// ---------- Loop ----------
+const clock = new THREE.Clock();
+const up = new CANNON.Vec3(0, 1, 0);
+const bodyUp = new CANNON.Vec3();
+let shake = 0;
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  if (canvas.width !== w * renderer.getPixelRatio() || canvas.height !== h * renderer.getPixelRatio()) {
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  resize();
+  const dt = Math.min(clock.getDelta(), 1 / 30);
+  world.step(1 / 240, dt, 10); // small fixed step so fast projectiles don't tunnel through
+
+  // charge bar
+  if (charging) {
+    const t = Math.min((performance.now() - chargeStart) / 1200, 1);
+    powerFill.style.width = (t * 100) + '%';
+  }
+
+  // sync barrels + detect knocked-over
+  let changed = false;
+  for (const b of barrels) {
+    b.mesh.position.copy(b.body.position);
+    b.mesh.quaternion.copy(b.body.quaternion);
+    if (!b.down) {
+      // deviation from home orientation, or displaced from home spot
+      const qd = Math.abs(
+        b.body.quaternion.x * b.homeQ.x + b.body.quaternion.y * b.homeQ.y +
+        b.body.quaternion.z * b.homeQ.z + b.body.quaternion.w * b.homeQ.w
+      );
+      const moved = b.body.position.vsub(b.home).length() > 0.45;
+      if (qd < 0.93 || moved) { b.down = true; changed = true; }
+    }
+  }
+  if (changed) updateHud();
+
+  // sync balls, cull old ones
+  const now = performance.now();
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+    // spear flies point-first until it hits something
+    if ((b.type === 'spear' || b.type === 'f16') && !b.hit && b.body.velocity.lengthSquared() > 4) {
+      const v = b.body.velocity.clone(); v.normalize();
+      b.body.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), v);
+      b.body.angularVelocity.setZero();
+    }
+    b.mesh.position.copy(b.body.position);
+    b.mesh.quaternion.copy(b.body.quaternion);
+    // stretch chain between anchor and wrecking ball
+    if (b.chainMesh) {
+      const a = b.anchorPos, p = b.body.position;
+      const mid = new THREE.Vector3((a.x + p.x) / 2, (a.y + p.y) / 2, (a.z + p.z) / 2);
+      const dir3 = new THREE.Vector3(p.x - a.x, p.y - a.y, p.z - a.z);
+      const len = dir3.length();
+      b.chainMesh.position.copy(mid);
+      b.chainMesh.scale.set(1, len, 1);
+      b.chainMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir3.normalize());
+    }
+    const cullTime = b.type === 'wrecking' ? 25000 : 12000;
+    if (now - b.born > cullTime || b.body.position.y < -5) {
+      removeProjectile(b);
+      balls.splice(i, 1);
+    }
+  }
+
+  // explosion visuals
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    const ex = explosions[i];
+    const age = (now - ex.born) / 1000;
+    if (age > 1.1) {
+      scene.remove(ex.flash); scene.remove(ex.pts);
+      ex.flash.geometry.dispose(); ex.pts.geometry.dispose();
+      explosions.splice(i, 1);
+      continue;
+    }
+    ex.flash.scale.setScalar(1 + age * 9);
+    ex.flash.material.opacity = Math.max(0.95 - age * 2.2, 0);
+    const pos = ex.pts.geometry.attributes.position;
+    for (let j = 0; j < ex.vel.length; j++) {
+      ex.vel[j].y -= 9.82 * dt;
+      pos.array[j * 3] += ex.vel[j].x * dt;
+      pos.array[j * 3 + 1] += ex.vel[j].y * dt;
+      pos.array[j * 3 + 2] += ex.vel[j].z * dt;
+    }
+    pos.needsUpdate = true;
+    ex.pts.material.opacity = Math.max(1 - age, 0);
+  }
+
+  // camera shake
+  if (shake > 0.001) {
+    updateCamera();
+    camera.position.x += (Math.random() - 0.5) * shake;
+    camera.position.y += (Math.random() - 0.5) * shake;
+    shake *= Math.pow(0.001, dt);
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
