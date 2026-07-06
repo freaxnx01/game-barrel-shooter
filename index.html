@@ -15,9 +15,9 @@
   .hud .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; }
   .hud .balls { font-size: 16px; opacity: 0.85; }
   .hint {
-    position: fixed; bottom: 28px; right: 24px; max-width: 300px;
-    color: #f5efe4; opacity: 0.55; font-size: 13px; letter-spacing: 0.5px; line-height: 1.6;
-    user-select: none; pointer-events: none; text-align: right;
+    position: fixed; top: 120px; left: 22px; max-width: 260px;
+    color: #f5efe4; opacity: 0.5; font-size: 13px; letter-spacing: 0.5px; line-height: 1.6;
+    user-select: none; pointer-events: none; text-align: left; z-index: 5;
   }
   #power {
     position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
@@ -33,19 +33,25 @@
     font-family: inherit;
   }
   #reset:hover, .target button:hover { background: rgba(245,239,228,0.22); }
-  .target { position: fixed; top: 20px; right: 130px; display: flex; gap: 8px; }
+  .target { position: fixed; top: 20px; right: 130px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 420px; }
+  .target button { padding: 8px 14px; }
   .target button.sel { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
   .ammo {
-    position: fixed; bottom: 24px; left: 24px; display: flex; gap: 8px; user-select: none;
+    position: fixed; bottom: 24px; left: 24px; display: flex; gap: 16px; align-items: flex-end; user-select: none;
+  }
+  .ammo-group { display: flex; flex-direction: column; gap: 5px; }
+  .ammo-group .glabel {
+    font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase;
+    opacity: 0.4; padding-left: 3px; margin-bottom: 1px;
   }
   .ammo button {
-    padding: 10px 16px; font-size: 13px; font-family: inherit; letter-spacing: 0.5px;
+    padding: 8px 14px; font-size: 13px; font-family: inherit; letter-spacing: 0.5px;
     background: rgba(245,239,228,0.08); color: #f5efe4; border: 1px solid rgba(245,239,228,0.25);
     border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px;
   }
   .ammo button:hover { background: rgba(245,239,228,0.18); }
   .ammo button.sel { background: rgba(245,239,228,0.22); border-color: rgba(245,239,228,0.7); }
-  .ammo .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .ammo .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
 </style>
 </head>
 <body>
@@ -57,24 +63,56 @@
 </div>
 <div id="power"><div class="fill" id="powerFill"></div></div>
 <div class="ammo" id="ammo">
-  <button data-type="basketball" class="sel"><span class="dot" style="background:#d4712c"></span>Basketball <span style="opacity:0.5">1</span></button>
-  <button data-type="cannonball"><span class="dot" style="background:#585c63"></span>Cannonball <span style="opacity:0.5">2</span></button>
-  <button data-type="bomb"><span class="dot" style="background:#1c1c20;border:2px solid #e0483a;box-sizing:border-box"></span>Bomb <span style="opacity:0.5">3</span></button>
-  <button data-type="tennisball"><span class="dot" style="background:#cde04a"></span>Tennis <span style="opacity:0.5">4</span></button>
-  <button data-type="bowlingball"><span class="dot" style="background:#232a4d"></span>Bowling <span style="opacity:0.5">5</span></button>
-  <button data-type="spear"><span class="dot" style="background:#8a6a3c;border-radius:2px"></span>Spear <span style="opacity:0.5">6</span></button>
-  <button data-type="wrecking"><span class="dot" style="background:#3a3d42;border:2px solid #74787e;box-sizing:border-box"></span>Wrecking ball <span style="opacity:0.5">7</span></button>
-  <button data-type="catapult"><span class="dot" style="background:#7d7568;border-radius:4px"></span>Catapult <span style="opacity:0.5">8</span></button>
-  <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
-  <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
+  <div class="ammo-group">
+    <div class="glabel">Balls</div>
+    <button data-type="basketball" class="sel"><span class="dot" style="background:#d4712c"></span>Basketball <span style="opacity:0.5">1</span></button>
+    <button data-type="soccerball"><span class="dot" style="background:#f2f2f0;border:2px solid #1a1a1a;box-sizing:border-box"></span>Soccerball <span style="opacity:0.5">S</span></button>
+    <button data-type="tennisball"><span class="dot" style="background:#cde04a"></span>Tennis <span style="opacity:0.5">4</span></button>
+    <button data-type="bowlingball"><span class="dot" style="background:#232a4d"></span>Bowling <span style="opacity:0.5">5</span></button>
+    <button data-type="cannonball"><span class="dot" style="background:#585c63"></span>Cannonball <span style="opacity:0.5">2</span></button>
+  </div>
+  <div class="ammo-group">
+    <div class="glabel">Explosives</div>
+    <button data-type="bomb"><span class="dot" style="background:#1c1c20;border:2px solid #e0483a;box-sizing:border-box"></span>Bomb <span style="opacity:0.5">3</span></button>
+    <button data-type="grenade"><span class="dot" style="background:#4a5a34;border-radius:3px"></span>Grenade <span style="opacity:0.5">G</span></button>
+    <button data-type="paintball"><span class="dot" style="background:#e23b3b"></span>Paintball <span style="opacity:0.5">P</span></button>
+  </div>
+  <div class="ammo-group">
+    <div class="glabel">Heavy &amp; melee</div>
+    <button data-type="wrecking"><span class="dot" style="background:#3a3d42;border:2px solid #74787e;box-sizing:border-box"></span>Wrecking ball <span style="opacity:0.5">7</span></button>
+    <button data-type="hammer"><span class="dot" style="background:#4a4e55;border-radius:2px"></span>Hammer <span style="opacity:0.5">H</span></button>
+    <button data-type="spear"><span class="dot" style="background:#8a6a3c;border-radius:2px"></span>Spear <span style="opacity:0.5">6</span></button>
+  </div>
+  <div class="ammo-group">
+    <div class="glabel">Launchers</div>
+    <button data-type="catapult"><span class="dot" style="background:#7d7568;border-radius:4px"></span>Catapult <span style="opacity:0.5">8</span></button>
+    <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
+    <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
+  </div>
+  <div class="ammo-group">
+    <div class="glabel">Powers</div>
+    <button data-type="lightning"><span class="dot" style="background:#bfe0ff;box-shadow:0 0 6px #bfe0ff"></span>Lightning <span style="opacity:0.5">L</span></button>
+    <button data-type="hurricane"><span class="dot" style="background:#8fa6ad;border:2px solid #c3d4d9;box-sizing:border-box"></span>Hurricane <span style="opacity:0.5">U</span></button>
+    <button data-type="magneto"><span class="dot" style="background:#a0304a;border:2px solid #e0607a;box-sizing:border-box"></span>Magneto <span style="opacity:0.5">M</span></button>
+  </div>
 </div>
-<div class="hint">Aim with mouse, click to fire · Right-drag to orbit<br>1–9 ammo · R to reset</div>
+<div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · R to reset</div>
 <button id="reset">Reset</button>
 <div class="target" id="target">
   <button data-mode="barrels" class="sel">Barrels</button>
   <button data-mode="cards">Cards</button>
   <button data-mode="fortress">Fortress</button>
   <button data-mode="colosseum">Colosseum</button>
+  <button data-mode="pyramid">Pyramid</button>
+  <button data-mode="towergate">Tower Gate</button>
+  <button data-mode="gate">Gate</button>
+  <button data-mode="spiral">Spiral Stair</button>
+  <button data-mode="poletower">Pole Tower</button>
+  <button data-mode="octagon">Octagon</button>
+  <button data-mode="crosses">Crosses</button>
+  <button data-mode="eiffel">Eiffel</button>
+  <button data-mode="bowling">Bowling</button>
+  <button data-mode="cylinder">Cylinder</button>
 </div>
 
 <script type="importmap">
@@ -343,12 +381,128 @@ function unfreezeCards() {
   }
 }
 
+// wake only the STATIC pieces near an impact so a single hit doesn't detonate the whole structure
+function wakeNear(center, radius) {
+  for (const b of barrels) {
+    if (b.body.type !== CANNON.Body.STATIC) continue;
+    if (b.body.position.distanceTo(center) > radius) continue;
+    b.body.type = CANNON.Body.DYNAMIC;
+    b.body.mass = b.body._mass || 0.3;
+    b.body.updateMassProperties();
+    b.body.wakeUp();
+  }
+}
+
+// Once a structure has been disturbed, any still-frozen (static OR sleeping) piece
+// that has lost the support beneath it must fall — otherwise shooting out the base
+// leaves the upper part hanging in mid-air. A piece counts as supported only if its
+// lowest corners actually rest on the ground or on another frozen piece (tight
+// oriented-box test, not loose AABBs), and that support must trace back to the
+// ground — so mutually-leaning airborne clusters can't hold each other up.
+function collapseUnsupported() {
+  const frozen = [], movers = [];
+  let anyDynamic = false;
+  for (const b of barrels) {
+    if (b.body.material !== stoneMat) continue; // stone buildings only (not drums/cards)
+    if (b.body.type === CANNON.Body.STATIC) { frozen.push(b.body); continue; }
+    anyDynamic = true;
+    if (b.body.sleepState === CANNON.Body.SLEEPING) frozen.push(b.body); // asleep mid-air = frozen
+    else if (b.body.velocity.lengthSquared() > 0.8) movers.push(b.body);
+  }
+  if (!anyDynamic || frozen.length === 0) return; // structure untouched so far
+  for (const b of frozen) b.updateAABB();
+  for (const m of movers) m.updateAABB();
+  const S = TSCALE, GROUND_EPS = 0.35 * S, DROP = 0.4 * S, PAD = 0.08 * S, BPAD = 0.06 * S;
+  const wake = (body) => {
+    if (body.type === CANNON.Body.STATIC) {
+      body.type = CANNON.Body.DYNAMIC;
+      body.mass = body._mass || 0.3;
+      body.updateMassProperties();
+    }
+    body.wakeUp();
+  };
+  // 1) bump-wake: moving debris knocks any frozen piece it touches live
+  const bumped = new Set();
+  for (const b of frozen) {
+    const a = b.aabb;
+    for (const m of movers) {
+      const o = m.aabb;
+      if (o.upperBound.x < a.lowerBound.x - BPAD || o.lowerBound.x > a.upperBound.x + BPAD) continue;
+      if (o.upperBound.y < a.lowerBound.y - BPAD || o.lowerBound.y > a.upperBound.y + BPAD) continue;
+      if (o.upperBound.z < a.lowerBound.z - BPAD || o.lowerBound.z > a.upperBound.z + BPAD) continue;
+      wake(b); bumped.add(b); break;
+    }
+  }
+  // 2) support graph on the remaining frozen pieces
+  const lp = new CANNON.Vec3(), wp = new CANNON.Vec3(), cq = new CANNON.Quaternion();
+  const E = PAD + DROP / 2; // uniform expansion for the resting test
+  const info = [];
+  for (const b of frozen) {
+    if (bumped.has(b)) continue;
+    const sh = b.shapes[0];
+    const he = sh.halfExtents || new CANNON.Vec3(
+      (b.aabb.upperBound.x - b.aabb.lowerBound.x) / 2,
+      (b.aabb.upperBound.y - b.aabb.lowerBound.y) / 2,
+      (b.aabb.upperBound.z - b.aabb.lowerBound.z) / 2);
+    const corners = [];
+    let minY = Infinity, maxY = -Infinity;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      lp.set(he.x * sx, he.y * sy, he.z * sz);
+      b.quaternion.vmult(lp, wp);
+      const c = new CANNON.Vec3(b.position.x + wp.x, b.position.y + wp.y, b.position.z + wp.z);
+      corners.push(c);
+      if (c.y < minY) minY = c.y;
+      if (c.y > maxY) maxY = c.y;
+    }
+    const band = minY + Math.max((maxY - minY) * 0.25, 0.06 * S);
+    info.push({ b, he, feet: corners.filter(c => c.y <= band), grounded: minY <= GROUND_EPS });
+  }
+  const contains = (rec, px, py, pz) => { // point inside rec's expanded oriented box?
+    lp.set(px - rec.b.position.x, py - rec.b.position.y, pz - rec.b.position.z);
+    rec.b.quaternion.conjugate(cq);
+    cq.vmult(lp, wp);
+    return Math.abs(wp.x) <= rec.he.x + E && Math.abs(wp.y) <= rec.he.y + E && Math.abs(wp.z) <= rec.he.z + E;
+  };
+  const dependents = new Map(); // supporter -> pieces resting on it
+  for (const rec of info) {
+    if (rec.grounded) continue;
+    for (const other of info) {
+      if (other === rec) continue;
+      const oa = other.b.aabb;
+      let rests = false;
+      for (const f of rec.feet) {
+        const px = f.x, py = f.y - DROP / 2, pz = f.z;
+        if (px < oa.lowerBound.x - E || px > oa.upperBound.x + E) continue;
+        if (py < oa.lowerBound.y - E || py > oa.upperBound.y + E) continue;
+        if (pz < oa.lowerBound.z - E || pz > oa.upperBound.z + E) continue;
+        if (contains(other, px, py, pz)) { rests = true; break; }
+      }
+      if (rests) {
+        if (!dependents.has(other)) dependents.set(other, []);
+        dependents.get(other).push(rec);
+      }
+    }
+  }
+  // 3) only pieces whose support chain reaches the ground stay frozen
+  const held = new Set(), queue = [];
+  for (const rec of info) if (rec.grounded) { held.add(rec); queue.push(rec); }
+  while (queue.length) {
+    const deps = dependents.get(queue.pop());
+    if (!deps) continue;
+    for (const d of deps) if (!held.has(d)) { held.add(d); queue.push(d); }
+  }
+  for (const rec of info) if (!held.has(rec)) wake(rec.b);
+}
+
 // ---------- Stone structures (fortress / colosseum) ----------
 const unitBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+let TSCALE = 1; // per-mode size multiplier (set in buildTargets)
 const stoneMatls = ['#a39a88', '#968d7c', '#ada393'].map(c =>
   new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
 
 function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
+  const S = TSCALE;
+  hx *= S; hy *= S; hz *= S; x *= S; y *= S; z *= S;
   const body = new CANNON.Body({
     mass,
     type: CANNON.Body.STATIC, // frozen until first impact
@@ -434,6 +588,270 @@ function setupColosseum() {
   });
 }
 
+// ---------- New buildings (all stand on the ground, brick/stone blocks) ----------
+// Generic straight brick wall centered at (cx,cz), extending along 'x' or 'z'.
+// door (optional): { c0, c1, rows } carves a rectangular opening (columns c0..c1, bottom `rows` courses).
+function brickWall(cx, cz, along, cols, rows, bw, bh, bd, gap, m, mass, door) {
+  const ry = along === 'z' ? Math.PI / 2 : 0;
+  for (let r = 0; r < rows; r++) {
+    const y = bh / 2 + r * (bh + gap);
+    for (let c = 0; c < cols; c++) {
+      if (door && c >= door.c0 && c <= door.c1 && r < door.rows) continue;
+      const off = (c - (cols - 1) / 2) * (bw + gap);
+      const x = along === 'x' ? cx + off : cx;
+      const z = along === 'x' ? cz : cz + off;
+      addBlock(bw / 2, bh / 2, bd / 2, m(), mass, x, y, z, ry, 0);
+    }
+  }
+}
+
+function setupPyramid() {
+  const b = 1.1, gap = 0.02, zC = -6, levels = 8;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  for (let i = 0; i < levels; i++) {
+    const n = levels - i;            // blocks per side, shrinks each step
+    const y = b / 2 + i * (b + gap);
+    const half = (n - 1) / 2;
+    for (let a = 0; a < n; a++) {
+      for (let c = 0; c < n; c++) {
+        const edge = a === 0 || a === n - 1 || c === 0 || c === n - 1;
+        if (n > 1 && !edge) continue; // hollow ring, solid single cube on top
+        addBlock(b / 2, b / 2, b / 2, m(), 45, (a - half) * (b + gap), y, zC + (c - half) * (b + gap), 0, 0);
+      }
+    }
+  }
+}
+
+function setupTowerGate() {
+  const bw = 0.72, bh = 0.5, bd = 0.5, gap = 0.02, zC = -6, cols = 6, rows = 8;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  const S = (cols * (bw + gap)) / 2;
+  const door = { c0: 2, c1: 3, rows: 4 };
+  brickWall(0, zC + S, 'x', cols, rows, bw, bh, bd, gap, m, 30, door);       // front (gate)
+  brickWall(0, zC - S, 'x', cols, rows, bw, bh, bd, gap, m, 30, door);       // back (gate)
+  brickWall(-S, zC, 'z', cols, rows, bw, bh, bd, gap, m, 30, door);         // left (gate)
+  brickWall(S, zC, 'z', cols, rows, bw, bh, bd, gap, m, 30, door);          // right (gate)
+  // crenellations around the top
+  const topY = rows * (bh + gap) + 0.35;
+  for (let c = 0; c < cols; c += 2) {
+    const off = (c - (cols - 1) / 2) * (bw + gap);
+    addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC + S, 0, 0);
+    addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC - S, 0, 0);
+    addBlock(0.35, 0.35, 0.35, m(), 10, -S, topY, zC + off, 0, 0);
+    addBlock(0.35, 0.35, 0.35, m(), 10, S, topY, zC + off, 0, 0);
+  }
+}
+
+function setupGate() {
+  const bw = 0.72, bh = 0.5, bd = 1.5, gap = 0.02, zC = -6, cols = 6, rows = 9;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  // single deep wall: two pillars + a spanning lintel (top 2 courses solid)
+  brickWall(0, zC, 'x', cols, rows, bw, bh, bd, gap, m, 40, { c0: 2, c1: 3, rows: rows - 2 });
+}
+
+function setupSpiral() {
+  const zC = -6, steps = 20, rise = 0.32, R = 1.7, rP = 2.15;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  // spiral treads
+  for (let i = 0; i < steps; i++) {
+    const a = i * (Math.PI * 2 / 12);
+    const y = rise / 2 + i * rise;
+    addBlock(R / 2, rise / 2, 0.45, m(), 8, Math.cos(a) * (R / 2), y, zC + Math.sin(a) * (R / 2), -a, 0);
+  }
+  const topY = steps * rise;
+  // central column
+  const cn = Math.ceil(topY / 0.7);
+  for (let k = 0; k < cn; k++) addBlock(0.28, 0.35, 0.28, m(), 14, 0, 0.35 + k * 0.7, zC, 0, 0);
+  // 4 corner posts
+  const corners = [[rP, rP], [-rP, rP], [rP, -rP], [-rP, -rP]];
+  for (const [px, pz] of corners) {
+    for (let k = 0; k < cn; k++) addBlock(0.22, 0.35, 0.22, m(), 12, px, 0.35 + k * 0.7, zC + pz, 0, 0);
+  }
+  // top frame beams linking the posts
+  for (const [ax, az, ry] of [[0, rP, 0], [0, -rP, 0], [rP, 0, Math.PI / 2], [-rP, 0, Math.PI / 2]]) {
+    addBlock(rP + 0.22, 0.18, 0.22, m(), 10, ax, topY + 0.2, zC + az, ry, 0);
+  }
+}
+
+function setupPoleTower() {
+  const zC = -6, b = 0.9, gap = 0.04;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  // clustered legs: 3x3 ring, then 2x2, then a stub column, then a tall pole
+  const ring = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]];
+  for (const [gx, gz] of ring) addBlock(b / 2, b / 2, b / 2, m(), 30, gx * (b + gap), b / 2, zC + gz * (b + gap), 0, 0);
+  const quad = [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]];
+  for (const [gx, gz] of quad) addBlock(b / 2, b / 2, b / 2, m(), 24, gx * (b + gap), b + gap + b / 2, zC + gz * (b + gap), 0, 0);
+  // stub column
+  for (let k = 0; k < 2; k++) addBlock(b / 2, b / 2, b / 2, m(), 18, 0, 2 * (b + gap) + b / 2 + k * (b + gap), zC, 0, 0);
+  // tall pole
+  addBlock(0.32, 2.2, 0.32, m(), 20, 0, 4 * (b + gap) + 2.2, zC, 0, 0);
+}
+
+function setupOctagon() {
+  const zC = -6, N = 8, R = 1.9, floors = 5, fh = 1.15, colW = 0.28;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  const step = 2 * Math.PI / N;
+  const chord = 2 * R * Math.sin(step / 2);
+  for (let j = 0; j < N; j++) {
+    const a = j * step;
+    const cx = R * Math.sin(a), cz = zC + R * Math.cos(a);
+    // column (stacked so it can shatter)
+    for (let f = 0; f < floors; f++) addBlock(colW, fh / 2, colW, m(), 22, cx, fh / 2 + f * fh, cz, a, 0);
+    // ring beams at each floor top
+    const am = a + step / 2;
+    for (let f = 1; f <= floors; f++) {
+      addBlock(chord / 2, 0.14, 0.22, m(), 14, R * Math.sin(am), f * fh, zC + R * Math.cos(am), am, 0);
+    }
+  }
+}
+
+function setupCrosses() {
+  const zC = -6, levels = 14, bl = 2.4, bw = 0.32, bh = 0.28, span = 1.5;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  for (let i = 0; i < levels; i++) {
+    const y = bh / 2 + i * (bh + 0.01);
+    if (i % 2 === 0) {
+      addBlock(bl / 2, bh / 2, bw / 2, m(), 10, 0, y, zC - span / 2, 0, 0);
+      addBlock(bl / 2, bh / 2, bw / 2, m(), 10, 0, y, zC + span / 2, 0, 0);
+    } else {
+      addBlock(bl / 2, bh / 2, bw / 2, m(), 10, -span / 2, y, zC, Math.PI / 2, 0);
+      addBlock(bl / 2, bh / 2, bw / 2, m(), 10, span / 2, y, zC, Math.PI / 2, 0);
+    }
+  }
+}
+
+// ---------- More buildings: Eiffel (matchsticks), bowling pins, cylindrical tower ----------
+// generic static-until-hit body with a custom shape + pre-sized mesh
+function addTargetBody(shape, mesh, mass, pos, quat) {
+  const body = new CANNON.Body({
+    mass, type: CANNON.Body.STATIC, material: stoneMat, shape,
+    position: new CANNON.Vec3(pos[0], pos[1], pos[2]),
+    linearDamping: 0.15, angularDamping: 0.3, sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+  });
+  if (quat) body.quaternion.copy(quat);
+  body._mass = mass;
+  world.addBody(body);
+  mesh.position.copy(body.position);
+  mesh.quaternion.copy(body.quaternion);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+  barrels.push({ body, mesh, home: new CANNON.Vec3(pos[0], pos[1], pos[2]), homeQ: body.quaternion.clone(), down: false });
+}
+
+const matchMatl = new THREE.MeshStandardMaterial({ color: '#d9b166', roughness: 0.85, flatShading: true });
+// place a thin wooden matchstick between two points p1,p2
+function addStick(p1, p2, thick, mass) {
+  const S = TSCALE;
+  p1 = [p1[0] * S, p1[1] * S, p1[2] * S];
+  p2 = [p2[0] * S, p2[1] * S, p2[2] * S];
+  thick *= S;
+  const dx = p2[0] - p1[0], dy = p2[1] - p1[1], dz = p2[2] - p1[2];
+  const len = Math.hypot(dx, dy, dz);
+  const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2];
+  const q = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize());
+  const cq = new CANNON.Quaternion(q.x, q.y, q.z, q.w);
+  const mesh = new THREE.Mesh(unitBoxGeo, matchMatl);
+  mesh.scale.set(thick, len, thick);
+  addTargetBody(new CANNON.Box(new CANNON.Vec3(thick / 2, len / 2, thick / 2)), mesh, mass, mid, cq);
+}
+
+function setupEiffel() {
+  const zC = -6, th = 0.1, mass = 3;
+  const Y = [0, 2.0, 3.6, 4.8, 6.0];
+  const R = [2.3, 1.35, 0.78, 0.46, 0.32];
+  // 4 corner offsets (x,z)
+  const cor = (r) => [[r, r], [-r, r], [-r, -r], [r, -r]];
+  const node = (level, k) => {
+    const c = cor(R[level])[k];
+    return [c[0], Y[level], zC + c[1]];
+  };
+  for (let i = 0; i < Y.length - 1; i++) {
+    const bc = cor(R[i]), tc = cor(R[i + 1]);
+    for (let k = 0; k < 4; k++) {
+      const bA = [bc[k][0], Y[i], zC + bc[k][1]];
+      const tA = [tc[k][0], Y[i + 1], zC + tc[k][1]];
+      addStick(bA, tA, th, mass);                              // leg
+      // horizontal ring on top of this segment
+      const kn = (k + 1) % 4;
+      const tB = [tc[kn][0], Y[i + 1], zC + tc[kn][1]];
+      addStick(tA, tB, th * 0.85, mass * 0.7);                 // platform edge
+      // face cross-brace (X)
+      const bB = [bc[kn][0], Y[i], zC + bc[kn][1]];
+      addStick(bA, tB, th * 0.7, mass * 0.6);
+      addStick(bB, tA, th * 0.7, mass * 0.6);
+    }
+  }
+  // ground ring
+  const g = cor(R[0]);
+  for (let k = 0; k < 4; k++) {
+    const kn = (k + 1) % 4;
+    addStick([g[k][0], 0, zC + g[k][1]], [g[kn][0], 0, zC + g[kn][1]], th, mass);
+  }
+  // spire
+  const top = Y[Y.length - 1];
+  addStick([0, top, zC], [0, top + 2.3, zC], th * 1.1, mass);
+}
+
+// bowling pin: smooth lathe profile + red neck stripes, geometry created once
+const PIN_H = 1.08;
+const pinPts = [
+  [0.00, 0.00], [0.115, 0.00], [0.125, 0.05], [0.137, 0.15], [0.145, 0.26],
+  [0.140, 0.35], [0.118, 0.49], [0.090, 0.61], [0.076, 0.70], [0.079, 0.78],
+  [0.070, 0.86], [0.057, 0.92], [0.076, 0.99], [0.066, 1.035], [0.0, 1.08],
+].map(p => new THREE.Vector2(p[0], p[1]));
+const pinGeo = new THREE.LatheGeometry(pinPts, 32);
+pinGeo.translate(0, -PIN_H / 2, 0);
+pinGeo.computeVertexNormals();
+const pinMatl = new THREE.MeshStandardMaterial({ color: '#f6f3ec', roughness: 0.3, metalness: 0.02 });
+const pinRedMatl = new THREE.MeshStandardMaterial({ color: '#c0392b', roughness: 0.3, metalness: 0.02 });
+const stripeGeo1 = new THREE.CylinderGeometry(0.077, 0.079, 0.05, 32, 1, true);
+const stripeGeo2 = new THREE.CylinderGeometry(0.064, 0.068, 0.045, 32, 1, true);
+function makePin() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(pinGeo, pinMatl);
+  body.castShadow = body.receiveShadow = true;
+  g.add(body);
+  const s1 = new THREE.Mesh(stripeGeo1, pinRedMatl); s1.position.y = 0.80 - PIN_H / 2; g.add(s1);
+  const s2 = new THREE.Mesh(stripeGeo2, pinRedMatl); s2.position.y = 0.885 - PIN_H / 2; g.add(s2);
+  return g;
+}
+
+function setupBowling() {
+  const zC = -5.2, s = 0.62, rowGap = 0.58, S = TSCALE;
+  for (let r = 0; r < 4; r++) {
+    for (let i = 0; i <= r; i++) {
+      const x = (i - r / 2) * s;
+      const z = zC - r * rowGap;      // apex (head pin) toward the camera
+      const mesh = makePin();
+      mesh.scale.setScalar(S);
+      addTargetBody(new CANNON.Cylinder(0.14 * S, 0.14 * S, PIN_H * S, 12), mesh, 1.8, [x * S, PIN_H / 2 * S, z * S], null);
+    }
+  }
+}
+
+function setupCylinder() {
+  const zC = -6, N = 18, R = 2.4, courses = 10, bh = 0.5, gap = 0.02;
+  let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  const step = 2 * Math.PI / N;
+  const chord = 2 * R * Math.sin(step / 2);
+  for (let c = 0; c < courses; c++) {
+    const y = bh / 2 + c * (bh + gap);
+    for (let j = 0; j < N; j++) {
+      const a = j * step + (c % 2) * (step / 2);   // stagger like brickwork
+      if (Math.cos(a) > 0.9 && c < 3) continue;    // doorway at the front
+      if (c >= 4 && c <= 6 && j % 4 === 0) continue; // window band
+      addBlock(chord / 2, bh / 2, 0.4, m(), 35, R * Math.sin(a), y, zC + R * Math.cos(a), a, 0);
+    }
+  }
+  // crown ring
+  const topY = bh / 2 + courses * (bh + gap);
+  for (let j = 0; j < N; j++) {
+    const a = j * step;
+    addBlock(chord / 2, 0.28, 0.5, m(), 20, R * Math.sin(a), topY, zC + R * Math.cos(a), a, 0);
+  }
+}
+
 // platform only makes sense under barrels / cards; stone structures stand on the ground
 let platformOn = true;
 function setPlatform(on) {
@@ -449,21 +867,39 @@ const targetEl = document.getElementById('target');
 function clearTargets() {
   for (const b of barrels) { world.removeBody(b.body); scene.remove(b.mesh); }
   barrels.length = 0;
+  for (const s of paintSplats) scene.remove(s);
+  paintSplats.length = 0;
 }
+const camCfg = {
+  barrels:   { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupBarrels },
+  cards:     { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupCards },
+  fortress:  { r: 34,   ty: 5,   tz: -8, plat: false, build: setupFortress },
+  colosseum: { r: 34,   ty: 5,   tz: -8, plat: false, build: setupColosseum },
+  pyramid:   { r: 22,   ty: 4,   tz: -6, plat: false, build: setupPyramid },
+  towergate: { r: 18,   ty: 3,   tz: -6, plat: false, build: setupTowerGate },
+  gate:      { r: 18,   ty: 3,   tz: -6, plat: false, build: setupGate },
+  spiral:    { r: 20,   ty: 3.5, tz: -6, plat: false, build: setupSpiral },
+  poletower: { r: 18,   ty: 3.5, tz: -6, plat: false, build: setupPoleTower },
+  octagon:   { r: 20,   ty: 3.5, tz: -6, plat: false, build: setupOctagon },
+  crosses:   { r: 18,   ty: 2.8, tz: -6, plat: false, build: setupCrosses },
+  eiffel:    { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupEiffel },
+  bowling:   { r: 13,   ty: 1.5, tz: -6, plat: false, build: setupBowling },
+  cylinder:  { r: 22,   ty: 3.5, tz: -6, plat: false, build: setupCylinder },
+};
 function buildTargets() {
   clearTargets();
-  const big = targetMode === 'fortress' || targetMode === 'colosseum';
-  setPlatform(!big);
-  // pull the camera back for the big stone structures
-  orbit.radius = big ? 34 : 15.5;
-  orbit.target.set(0, big ? 5 : 2.8, big ? -8 : -6);
+  for (const h of hurricanes) scene.remove(h.group);
+  hurricanes.length = 0;
+  const cfg = camCfg[targetMode];
+  TSCALE = ['barrels', 'cards', 'fortress', 'colosseum'].includes(targetMode) ? 1 : 2;
+  const camScale = TSCALE === 1 ? 1 : 1.5;
+  setPlatform(cfg.plat);
+  orbit.radius = cfg.r * camScale;
+  orbit.target.set(0, cfg.ty * TSCALE, cfg.tz * TSCALE);
   updateCamera();
-  if (targetMode === 'barrels') setupBarrels();
-  else if (targetMode === 'cards') setupCards();
-  else if (targetMode === 'fortress') setupFortress();
-  else setupColosseum();
+  cfg.build();
   document.getElementById('scoreLabel').textContent =
-    { barrels: 'Barrels down', cards: 'Cards down', fortress: 'Blocks down', colosseum: 'Blocks down' }[targetMode];
+    targetMode === 'barrels' ? 'Barrels down' : targetMode === 'cards' ? 'Cards down' : targetMode === 'bowling' ? 'Pins down' : 'Blocks down';
 }
 targetEl.addEventListener('click', (e) => {
   const btn = e.target.closest('button');
@@ -479,6 +915,8 @@ const BALL_R = 0.32;
 const ballGeo = new THREE.SphereGeometry(BALL_R, 24, 18);
 const ballTex = makeBasketballTexture();
 const basketMatl = new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.7 });
+const soccerTex = makeSoccerballTexture();
+const soccerMatl = new THREE.MeshStandardMaterial({ map: soccerTex, roughness: 0.55 });
 const cannonMatl = new THREE.MeshStandardMaterial({ color: '#43474d', roughness: 0.35, metalness: 0.9 });
 const bombMatl = new THREE.MeshStandardMaterial({ color: '#17171b', roughness: 0.4, metalness: 0.3 });
 const tennisMatl = new THREE.MeshStandardMaterial({ color: '#cde04a', roughness: 0.9 });
@@ -496,6 +934,17 @@ const shaftGeo = new THREE.CylinderGeometry(SPEAR_R, SPEAR_R, SPEAR_LEN, 10);
 const tipGeo = new THREE.ConeGeometry(0.09, 0.28, 10);
 const fuseGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.14, 8);
 const fuseMatl = new THREE.MeshStandardMaterial({ color: '#8a7040', roughness: 0.9 });
+// new ammo materials + geometries
+const paintMatl = new THREE.MeshStandardMaterial({ color: '#e23b3b', roughness: 0.55 });
+const paintSplatMatl = new THREE.MeshStandardMaterial({ color: '#d62828', roughness: 0.7 });
+const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
+const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
+const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
+const hammerHandleMatl = new THREE.MeshStandardMaterial({ color: '#8a5a34', roughness: 0.8 });
+const splatGeo = new THREE.SphereGeometry(0.28, 12, 10);
+const paintSplats = [];
+const bolts = [];
+const hurricanes = [];
 const balls = []; // {body, mesh, born, type, exploded}
 
 let ammoType = 'basketball';
@@ -531,11 +980,46 @@ function makeBasketballTexture() {
   return tex;
 }
 
+function makeSoccerballTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f2f2f0';
+  g.fillRect(0, 0, 512, 256);
+  const pent = (cx, cy, r, rot) => {
+    g.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = rot + i * (Math.PI * 2 / 5) - Math.PI / 2;
+      const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+      i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+    }
+    g.closePath();
+    g.fillStyle = '#161616'; g.fill();
+    g.strokeStyle = '#050505'; g.lineWidth = 2; g.stroke();
+  };
+  // staggered rows of black pentagons over the white ground (wraps around U)
+  const rows = [
+    { y: 40, xs: [40, 168, 296, 424], r: 30, rot: 0.2 },
+    { y: 128, xs: [104, 232, 360, 488, -24], r: 32, rot: Math.PI / 5 },
+    { y: 216, xs: [40, 168, 296, 424], r: 30, rot: 0.5 },
+  ];
+  for (const row of rows) for (const x of row.xs) pent(x, row.y, row.r, row.rot);
+  // faint seam lines linking them
+  g.strokeStyle = 'rgba(120,120,118,0.5)'; g.lineWidth = 3;
+  for (let x = 40; x < 512; x += 128) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 64, 256); g.stroke(); }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function shootBall(dir, power) {
   const type = ammoType;
+  if (type === 'lightning') { strikeLightning(); shots++; updateHud(); return; }
+  if (type === 'hurricane') { spawnHurricane(); shots++; updateHud(); return; }
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
+    soccerball:  { mass: 0.9, r: BALL_R },
     cannonball:  { mass: 9,   r: BALL_R * 0.9 },
     bomb:        { mass: 6,   r: BALL_R },
     tennisball:  { mass: 0.6, r: 0.16 },
@@ -545,13 +1029,21 @@ function shootBall(dir, power) {
     catapult:    { mass: 10,  r: 0.4 },
     slingshot:   { mass: 0.4, r: 0.12 },
     f16:         { mass: 4,   r: 0.12 },
+    paintball:   { mass: 0.5, r: 0.15 },
+    grenade:     { mass: 1.6, r: 0.18 },
+    hammer:      { mass: 5,   r: 0.2 },
   }[type];
-  const shape = (type === 'spear' || type === 'f16')
-    ? new CANNON.Cylinder(type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 1.2 : SPEAR_LEN, 8)
-    : new CANNON.Sphere(cfg.r);
+  let shape;
+  if (type === 'spear' || type === 'f16') {
+    shape = new CANNON.Cylinder(type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 1.2 : SPEAR_LEN, 8);
+  } else if (type === 'hammer') {
+    shape = new CANNON.Box(new CANNON.Vec3(0.12, 0.34, 0.12));
+  } else {
+    shape = new CANNON.Sphere(cfg.r);
+  }
   const body = new CANNON.Body({
     mass: cfg.mass,
-    material: (type === 'basketball' || type === 'tennisball') ? ballMat : heavyMat,
+    material: (type === 'basketball' || type === 'soccerball' || type === 'tennisball') ? ballMat : heavyMat,
     shape,
     position: new CANNON.Vec3(start.x, start.y, start.z),
   });
@@ -565,11 +1057,22 @@ function shootBall(dir, power) {
     speed = 30 + power * 15;
   } else if (type === 'f16') {
     speed = 28 + power * 15;
+  } else if (type === 'grenade') {
+    // tossed with a slight arc
+    vdir = dir.clone().add(new THREE.Vector3(0, 0.28, 0)).normalize();
+    speed = 14 + power * 14;
+  } else if (type === 'hammer') {
+    speed = 16 + power * 18;
   }
   body.velocity.set(vdir.x * speed, vdir.y * speed, vdir.z * speed);
   if (type === 'spear' || type === 'f16') {
     body.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), new CANNON.Vec3(dir.x, dir.y, dir.z));
     body.angularDamping = 0.9;
+  } else if (type === 'hammer') {
+    // tumble end-over-end about a horizontal axis perpendicular to flight
+    const ax = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    body.angularVelocity.set(ax.x * 22, ax.y * 22, ax.z * 22);
+    body.angularDamping = 0.05;
   } else {
     body.angularVelocity.set(Math.random() * 4 - 2, 0, Math.random() * 4 - 2);
   }
@@ -578,7 +1081,7 @@ function shootBall(dir, power) {
   // wrecking ball hangs from a fixed point above the targets
   let constraint = null, chainMesh = null, anchorPos = null;
   if (type === 'wrecking') {
-    anchorPos = new CANNON.Vec3(0, (targetMode === 'fortress' || targetMode === 'colosseum') ? 20 : 10, targetMode === 'barrels' || targetMode === 'cards' ? -6 : -8);
+    { const cfg = camCfg[targetMode]; anchorPos = new CANNON.Vec3(0, (cfg.plat ? 10 : 18) * TSCALE, cfg.tz * TSCALE); }
     const anchor = new CANNON.Body({ mass: 0, position: anchorPos.clone() });
     world.addBody(anchor);
     // chain just long enough that the bottom of the swing sweeps through the targets
@@ -601,6 +1104,8 @@ function shootBall(dir, power) {
   let mesh;
   if (type === 'basketball') {
     mesh = new THREE.Mesh(ballGeo, basketMatl);
+  } else if (type === 'soccerball') {
+    mesh = new THREE.Mesh(ballGeo, soccerMatl);
   } else if (type === 'cannonball') {
     mesh = new THREE.Mesh(ballGeo, cannonMatl);
     mesh.scale.setScalar(0.9);
@@ -651,6 +1156,26 @@ function shootBall(dir, power) {
     const fin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.26, 0.24), jetMatl);
     fin.position.set(0, -0.42, 0.15); fin.castShadow = true;
     mesh.add(fin);
+  } else if (type === 'paintball') {
+    mesh = new THREE.Mesh(ballGeo, paintMatl);
+    mesh.scale.setScalar(0.15 / BALL_R);
+  } else if (type === 'grenade') {
+    mesh = new THREE.Group();
+    const bodyM = new THREE.Mesh(grenadeGeo, grenadeMatl);
+    bodyM.castShadow = true;
+    mesh.add(bodyM);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.08, 10), hammerHeadMatl);
+    cap.position.y = 0.2; mesh.add(cap);
+    const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.06), hammerHeadMatl);
+    lever.position.set(0.06, 0.19, 0); mesh.add(lever);
+  } else if (type === 'hammer') {
+    mesh = new THREE.Group();
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.62, 10), hammerHandleMatl);
+    handle.castShadow = true;
+    mesh.add(handle);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.4), hammerHeadMatl);
+    head.position.y = 0.34; head.castShadow = true;
+    mesh.add(head);
   } else {
     mesh = new THREE.Mesh(ballGeo, bombMatl);
     const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
@@ -664,11 +1189,13 @@ function shootBall(dir, power) {
   playShoot(power);
   body.addEventListener('collide', (e) => {
     if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
+    if (type === 'paintball' && !rec.hit) { paintSplat(rec, e); return; }
     if (type === 'spear' || type === 'f16') rec.hit = true;
     const v = e.contact.getImpactVelocityAlongNormal();
     if (Math.abs(v) < 1.5) return;
     const other = e.body === body ? e.target : e.body;
-    if (other.material === cardMat || other.material === stoneMat) unfreezeCards();
+    if (other.material === cardMat) unfreezeCards();
+    else if (other.material === stoneMat) wakeNear(rec.body.position, 2.6 * TSCALE);
     if (other.material === barrelMat) playClank(Math.abs(v));
     else playBounce(Math.abs(v));
   });
@@ -681,10 +1208,10 @@ function shootBall(dir, power) {
 const explosions = []; // {mesh, born, particles}
 function explode(rec) {
   rec.exploded = true;
-  unfreezeCards();
   const p = rec.body.position.clone();
   // radial impulse on all dynamic bodies
   const RADIUS = 3, STRENGTH = 80;
+  wakeNear(new CANNON.Vec3(p.x, p.y, p.z), RADIUS + 0.5); // only pieces in blast radius react
   for (const body of world.bodies) {
     if (body.mass <= 0 || body === rec.body) continue;
     const d = body.position.vsub(p);
@@ -725,6 +1252,148 @@ function explode(rec) {
   // camera shake
   shake = 0.35;
   playExplosion();
+}
+
+// ---------- Paintball: turn hit pieces red + leave a splat ----------
+function paintSplat(rec, e) {
+  rec.hit = true;
+  const other = e.body === rec.body ? e.target : e.body;
+  const tgt = barrels.find(b => b.body === other);
+  if (tgt) tgt.mesh.traverse(o => { if (o.isMesh) o.material = paintMatl; });
+  // splat blob at the impact spot
+  const splat = new THREE.Mesh(splatGeo, paintSplatMatl);
+  const p = rec.body.position;
+  splat.position.set(p.x, p.y, p.z);
+  splat.scale.set(1 + Math.random() * 0.5, 0.35, 1 + Math.random() * 0.5);
+  splat.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+  scene.add(splat);
+  paintSplats.push(splat);
+  // remove the paintball itself
+  world.removeBody(rec.body);
+  scene.remove(rec.mesh);
+  const i = balls.indexOf(rec);
+  if (i >= 0) balls.splice(i, 1);
+  playBounce(6);
+}
+
+// ---------- Lightning: strike from the sky at the aim point ----------
+function strikeLightning() {
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(barrels.map(b => b.mesh), true);
+  let point;
+  if (hits.length) {
+    point = hits[0].point.clone();
+  } else {
+    const r = raycaster.ray;
+    const t = r.direction.y !== 0 ? -r.origin.y / r.direction.y : 30;
+    point = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.max(t, 1)));
+  }
+  const c = new CANNON.Vec3(point.x, point.y, point.z);
+  const R = 4 * TSCALE;
+  wakeNear(c, R);
+  for (const b of barrels) {
+    const d = b.body.position.distanceTo(c);
+    if (d > R) continue;
+    b.body.wakeUp();
+    const f = (1 - d / R) * 110;
+    b.body.applyImpulse(new CANNON.Vec3((Math.random() - 0.5) * f, f * 0.5, (Math.random() - 0.5) * f), b.body.position);
+  }
+  spawnBolt(point);
+  shake = 0.45;
+  playThunder();
+}
+
+function spawnBolt(point) {
+  const segs = 16, pts = [];
+  const topY = point.y + 24;
+  for (let i = 0; i <= segs; i++) {
+    const f = i / segs;
+    const y = topY + (point.y - topY) * f;
+    const j = (1 - f) * 1.6;
+    pts.push(new THREE.Vector3(point.x + (Math.random() - 0.5) * j, y, point.z + (Math.random() - 0.5) * j));
+  }
+  pts[pts.length - 1].set(point.x, point.y, point.z);
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#dbeeff', transparent: true, opacity: 1 }));
+  scene.add(line);
+  const light = new THREE.PointLight('#cfe6ff', 9, 40);
+  light.position.set(point.x, point.y + 2, point.z);
+  scene.add(light);
+  bolts.push({ line, light, born: performance.now() });
+}
+
+// ---------- Hurricane: a wandering tornado at the aim point ----------
+function spawnHurricane() {
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(barrels.map(b => b.mesh), true);
+  let point;
+  if (hits.length) {
+    point = hits[0].point.clone();
+  } else {
+    const r = raycaster.ray;
+    const t = r.direction.y !== 0 ? -r.origin.y / r.direction.y : 30;
+    point = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.max(t, 1)));
+  }
+  const S = TSCALE, H = 10 * S;
+  const group = new THREE.Group();
+  const outerM = new THREE.MeshBasicMaterial({ color: '#a89f90', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+  const outer = new THREE.Mesh(new THREE.ConeGeometry(2.4 * S, H, 24, 6, true), outerM);
+  outer.position.y = H / 2; outer.scale.y = -1; // funnel: narrow at the ground
+  group.add(outer);
+  const innerM = new THREE.MeshBasicMaterial({ color: '#8b8274', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+  const inner = new THREE.Mesh(new THREE.ConeGeometry(1.3 * S, H * 0.82, 20, 5, true), innerM);
+  inner.position.y = H * 0.41; inner.scale.y = -1;
+  group.add(inner);
+  const dustM = new THREE.MeshBasicMaterial({ color: '#9a8f7c', transparent: true, opacity: 0, depthWrite: false });
+  const dust = new THREE.Mesh(new THREE.CircleGeometry(1.9 * S, 24), dustM);
+  dust.rotation.x = -Math.PI / 2; dust.position.y = 0.06;
+  group.add(dust);
+  group.position.set(point.x, 0, point.z);
+  scene.add(group);
+  const a = Math.random() * Math.PI * 2;
+  hurricanes.push({
+    group, outer, inner, dust,
+    born: performance.now(), dur: 6000,
+    home: new THREE.Vector2(point.x, point.z),
+    vel: new THREE.Vector2(Math.cos(a), Math.sin(a)).multiplyScalar(1.4 * S),
+  });
+  playWind(6);
+}
+
+function playWind(dur) {
+  const ac = ctx(), t = ac.currentTime;
+  const buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 0.6;
+  f.frequency.setValueAtTime(240, t);
+  f.frequency.linearRampToValueAtTime(700, t + dur * 0.4);
+  f.frequency.linearRampToValueAtTime(160, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.45, t + 0.6);
+  g.gain.setValueAtTime(0.45, t + Math.max(dur - 1, 1));
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(t);
+}
+
+function playThunder() {
+  const ac = ctx(), t = ac.currentTime;
+  const dur = 0.7;
+  const buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(1800, t);
+  f.frequency.exponentialRampToValueAtTime(120, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.8, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(t);
 }
 
 function playExplosion() {
@@ -866,16 +1535,18 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button !== 0) return;
+  if (ammoType === 'magneto') { magnetoActive = true; return; }
   charging = true;
   chargeStart = performance.now();
   powerEl.style.opacity = 1;
 });
 addEventListener('pointerup', (e) => {
   if (e.button === 2) { orbiting = false; return; }
+  if (magnetoActive) { magnetoActive = false; return; }
   if (!charging) return;
   charging = false;
   powerEl.style.opacity = 0;
-  const t = Math.min((performance.now() - chargeStart) / 1200, 1);
+  const t = Math.min((performance.now() - chargeStart) / 400, 1);
   shootBall(aimDir(), t);
 });
 canvas.addEventListener('wheel', (e) => {
@@ -911,6 +1582,8 @@ function removeProjectile(b) {
 function reset() {
   for (const b of balls) removeProjectile(b);
   balls.length = 0;
+  for (const h of hurricanes) scene.remove(h.group);
+  hurricanes.length = 0;
   buildTargets(); // full rebuild — restores frozen state for cards
   shots = 0;
   delete scoreEl.dataset.won;
@@ -931,6 +1604,17 @@ addEventListener('keydown', (e) => {
   if (k === '8') setAmmo('catapult');
   if (k === '9') setAmmo('slingshot');
   if (k === '0') setAmmo('f16');
+  if (k === 'p') setAmmo('paintball');
+  if (k === 'l') setAmmo('lightning');
+  if (k === 'u') setAmmo('hurricane');
+  if (k === 'm') setAmmo('magneto');
+  if (k === 'g') setAmmo('grenade');
+  if (k === 's') setAmmo('soccerball');
+  if (k === 'h') setAmmo('hammer');
+  if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
+});
+addEventListener('keyup', (e) => {
+  if (e.key === 'Shift') quakeActive = false;
 });
 
 // ---------- Loop ----------
@@ -938,6 +1622,8 @@ const clock = new THREE.Clock();
 const up = new CANNON.Vec3(0, 1, 0);
 const bodyUp = new CANNON.Vec3();
 let shake = 0;
+let magnetoActive = false;
+let quakeActive = false, quakeStart = 0;
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -948,15 +1634,20 @@ function resize() {
   }
 }
 
+let lastCollapseCheck = 0;
 function animate() {
   requestAnimationFrame(animate);
   resize();
   const dt = Math.min(clock.getDelta(), 1 / 30);
+  const now = performance.now();
   world.step(1 / 240, dt, 10); // small fixed step so fast projectiles don't tunnel through
+
+  // after any disturbance, drop blocks that lost their support (~every 120ms)
+  if (now - lastCollapseCheck > 120) { lastCollapseCheck = now; collapseUnsupported(); }
 
   // charge bar
   if (charging) {
-    const t = Math.min((performance.now() - chargeStart) / 1200, 1);
+    const t = Math.min((performance.now() - chargeStart) / 400, 1);
     powerFill.style.width = (t * 100) + '%';
   }
 
@@ -977,10 +1668,114 @@ function animate() {
   }
   if (changed) updateHud();
 
+  // Magneto: while held, lift every piece and gather it toward the aim point ("led by thoughts")
+  if (magnetoActive) {
+    raycaster.setFromCamera(mouseNDC, camera);
+    const r = raycaster.ray;
+    const dist = Math.max((orbit.target.z - r.origin.z) / (r.direction.z || -1), 6);
+    const tp = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.min(dist, 40)));
+    const target = new CANNON.Vec3(tp.x, Math.max(tp.y, 2), tp.z);
+    for (const b of barrels) {
+      if (b.body.type === CANNON.Body.STATIC) {
+        b.body.type = CANNON.Body.DYNAMIC;
+        b.body.mass = b.body._mass || 0.3;
+        b.body.updateMassProperties();
+      }
+      b.body.wakeUp();
+      const toP = target.vsub(b.body.position);
+      const d = Math.max(toP.length(), 0.3); toP.normalize();
+      const F = Math.min(d, 6) * 16;
+      const m = b.body.mass || 1;
+      b.body.applyForce(new CANNON.Vec3(toP.x * F * m, toP.y * F * m + 9.82 * m, toP.z * F * m), b.body.position);
+      b.body.velocity.scale(0.9, b.body.velocity);
+    }
+  }
+
+  // Earthquake while Shift held: rattle every piece; intensity builds toward the middle of the shake
+  if (quakeActive) {
+    const el = (now - quakeStart) / 1000;
+    const intensity = Math.min(el / 1.2, 1);
+    for (const b of barrels) {
+      if (b.body.type === CANNON.Body.STATIC) {
+        b.body.type = CANNON.Body.DYNAMIC;
+        b.body.mass = b.body._mass || 0.3;
+        b.body.updateMassProperties();
+      }
+      b.body.wakeUp();
+      const m = b.body.mass || 1;
+      const q = 26 * intensity * m;
+      b.body.applyForce(new CANNON.Vec3((Math.random() - 0.5) * q, (Math.random() - 0.2) * q * 0.5, (Math.random() - 0.5) * q), b.body.position);
+    }
+    shake = Math.max(shake, 0.18 * intensity);
+  }
+
+  // hurricanes: swirl, lift, and drag pieces around a wandering funnel
+  for (let i = hurricanes.length - 1; i >= 0; i--) {
+    const h = hurricanes[i];
+    const age = (now - h.born) / 1000, life = h.dur / 1000;
+    if (age > life) { scene.remove(h.group); hurricanes.splice(i, 1); continue; }
+    const S = TSCALE, R = 4.5 * S, HH = 11 * S;
+    // wander, but stay near where it touched down
+    const gp = h.group.position;
+    const away = new THREE.Vector2(gp.x - h.home.x, gp.z - h.home.y);
+    if (away.length() > 6 * S) h.vel.copy(away.normalize().multiplyScalar(-1.4 * S));
+    gp.x += h.vel.x * dt; gp.z += h.vel.y * dt;
+    h.group.rotation.y -= 9 * dt;
+    h.inner.rotation.y += 6 * dt;
+    const fade = age < 0.5 ? age / 0.5 : age > life - 1 ? Math.max(life - age, 0) : 1;
+    h.outer.material.opacity = 0.2 * fade;
+    h.inner.material.opacity = 0.28 * fade;
+    h.dust.material.opacity = 0.16 * fade;
+    // unfreeze frozen pieces the funnel reaches
+    for (const b of barrels) {
+      if (b.body.type !== CANNON.Body.STATIC) continue;
+      if (Math.hypot(b.body.position.x - gp.x, b.body.position.z - gp.z) > R * 0.8) continue;
+      if (b.body.position.y > HH) continue;
+      b.body.type = CANNON.Body.DYNAMIC;
+      b.body.mass = b.body._mass || 0.3;
+      b.body.updateMassProperties();
+      b.body.wakeUp();
+    }
+    // swirl every dynamic body in reach
+    for (const body of world.bodies) {
+      if (body.mass <= 0 || body.type === CANNON.Body.STATIC) continue;
+      const dx = body.position.x - gp.x, dz = body.position.z - gp.z;
+      const d2 = Math.hypot(dx, dz);
+      if (d2 > R || body.position.y > HH) continue;
+      body.wakeUp();
+      const f = (1 - d2 / R) * fade;
+      const inv = d2 > 0.001 ? 1 / d2 : 0;
+      const rx = dx * inv, rz = dz * inv;   // radial out
+      const tx = -rz, tz = rx;              // tangential
+      const sw = 40 * f, pull = 15 * f, lift = (24 + Math.random() * 10) * f;
+      const m = body.mass;
+      body.applyImpulse(new CANNON.Vec3(
+        (tx * sw - rx * pull) * m * dt,
+        lift * m * dt,
+        (tz * sw - rz * pull) * m * dt
+      ), body.position);
+    }
+  }
+
+  // lightning bolts fade out
+  for (let i = bolts.length - 1; i >= 0; i--) {
+    const bo = bolts[i];
+    const age = (now - bo.born) / 350;
+    if (age >= 1) {
+      scene.remove(bo.line); scene.remove(bo.light);
+      bo.line.geometry.dispose();
+      bolts.splice(i, 1);
+      continue;
+    }
+    bo.line.material.opacity = 1 - age;
+    bo.light.intensity = 9 * (1 - age);
+  }
+
   // sync balls, cull old ones
-  const now = performance.now();
   for (let i = balls.length - 1; i >= 0; i--) {
     const b = balls[i];
+    // grenade cooks off after a short fuse
+    if (b.type === 'grenade' && !b.exploded && now - b.born > 1500) { explode(b); continue; }
     // spear flies point-first until it hits something
     if ((b.type === 'spear' || b.type === 'f16') && !b.hit && b.body.velocity.lengthSquared() > 4) {
       const v = b.body.velocity.clone(); v.normalize();
@@ -1040,6 +1835,7 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+
 </script>
 </body>
 </html>
