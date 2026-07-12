@@ -92,7 +92,7 @@
     <button data-type="catapult"><span class="dot" style="background:#7d7568;border-radius:4px"></span>Catapult <span style="opacity:0.5">8</span></button>
     <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
     <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
-    <button data-type="harpoon"><span class="dot" style="background:#c0632e;border-radius:2px"></span>Harpoon <span style="opacity:0.5">J</span></button>
+    <button data-type="harpoon"><span class="dot" style="background:#cfd4da;border-radius:2px"></span>Harpoon <span style="opacity:0.5">J</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Powers</div>
@@ -104,7 +104,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · Harpoon sticks — click to reel it in, click again to cut the line · R to reset</div>
+<div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · Harpoon sticks — hold click to reel the barrel in · R to reset</div>
 <button id="reset">Reset</button>
 <div class="target" id="target">
   <button data-mode="barrels" class="sel">Barrels</button>
@@ -304,8 +304,6 @@ const woodProfilePts = [
   new THREE.Vector2(BARREL_R * 0.82, BARREL_H / 2),
 ];
 const woodLatheGeo = new THREE.LatheGeometry(woodProfilePts, 24);
-const woodHoopGeo = new THREE.TorusGeometry(BARREL_R * 1.16, 0.028, 8, 28);
-const ironHoopMatl = new THREE.MeshStandardMaterial({ color: '#2b2b2e', roughness: 0.5, metalness: 0.8 });
 const woodCapGeo = new THREE.CircleGeometry(BARREL_R * 0.84, 24);
 const woodCapMatl = new THREE.MeshStandardMaterial({ color: '#7d4f26', roughness: 0.9, metalness: 0.05 });
 
@@ -317,6 +315,7 @@ function createWoodBarrel(x, y, z) {
     position: new CANNON.Vec3(x, y, z),
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.6,
   });
+  body._wood = true;   // hits sound like wood, not steel
   world.addBody(body);
 
   const group = new THREE.Group();
@@ -324,14 +323,6 @@ function createWoodBarrel(x, y, z) {
   const barrelMesh = new THREE.Mesh(woodLatheGeo, staveMatl);
   barrelMesh.castShadow = barrelMesh.receiveShadow = true;
   group.add(barrelMesh);
-  // 3 dark iron hoops: near top, belly, near bottom
-  for (const by of [-0.36, 0, 0.36]) {
-    const hoop = new THREE.Mesh(woodHoopGeo, ironHoopMatl);
-    hoop.rotation.x = Math.PI / 2;
-    hoop.position.y = by * BARREL_H;
-    hoop.castShadow = true;
-    group.add(hoop);
-  }
   for (const by of [-0.5, 0.5]) {
     const cap = new THREE.Mesh(woodCapGeo, woodCapMatl);
     cap.rotation.x = by < 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -343,8 +334,7 @@ function createWoodBarrel(x, y, z) {
   barrels.push({ body, mesh: group, home: new CANNON.Vec3(x, y, z), homeQ: new CANNON.Quaternion(0, 0, 0, 1), down: false });
 }
 
-function createBarrel(x, y, z, colorIdx, wood) {
-  if (wood) { createWoodBarrel(x, y, z); return; }
+function createBarrel(x, y, z, colorIdx) {
   const body = new CANNON.Body({
     mass: 8,
     material: barrelMat,
@@ -399,7 +389,7 @@ function setupBarrels() {
     const y = baseY + row * (BARREL_H + 0.02);
     const x0 = -((count - 1) * gap) / 2;
     for (let i = 0; i < count; i++) {
-      createBarrel(x0 + i * gap, y, z, ci, ci % 3 === 2);   // every 3rd is a wooden barrel
+      createBarrel(x0 + i * gap, y, z, ci);   // oil drums only — wooden have their own mode
       ci++;
     }
   });
@@ -1330,17 +1320,36 @@ function shootBall(dir, power) {
     const arms = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 8, 16, Math.PI), anchMatl);
     arms.position.y = -0.4; arms.rotation.z = Math.PI; mesh.add(arms);
   } else if (type === 'crt') {
+    // beige CRT monitor: front bezel, domed glass, tapered tube hump, stand foot
     mesh = new THREE.Group();
     const caseMatl = new THREE.MeshStandardMaterial({ color: '#d8d2c2', roughness: 0.8 });
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.56, 0.6), caseMatl);
-    box.castShadow = true; mesh.add(box);
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.4), new THREE.MeshStandardMaterial({ color: '#20303a', roughness: 0.3, metalness: 0.4 }));
-    screen.position.z = 0.31; mesh.add(screen);
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.56, 0.22), caseMatl);
+    bezel.position.set(0, 0.06, 0.19); bezel.castShadow = true; mesh.add(bezel);
+    // slightly bulging glass, inset in the bezel
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14),
+      new THREE.MeshStandardMaterial({ color: '#1c2f28', roughness: 0.25, metalness: 0.3 }));
+    glass.scale.set(0.26, 0.21, 0.06);
+    glass.position.set(0, 0.06, 0.28); mesh.add(glass);
+    // rear tube: frustum narrowing toward the back
+    const tubeGeo = new THREE.CylinderGeometry(0.36, 0.2, 0.36, 4, 1);
+    tubeGeo.rotateY(Math.PI / 4);
+    tubeGeo.rotateX(Math.PI / 2);
+    const tube = new THREE.Mesh(tubeGeo, caseMatl);
+    tube.position.set(0, 0.06, -0.1); tube.castShadow = true; mesh.add(tube);
+    // stand: neck + swivel base
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.2), caseMatl);
+    neck.position.set(0, -0.235, 0.05); mesh.add(neck);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.04, 0.36), caseMatl);
+    foot.position.set(0, -0.26, 0.05); foot.castShadow = true; mesh.add(foot);
+    // power button on the lower bezel
+    const btn = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.02),
+      new THREE.MeshStandardMaterial({ color: '#6e6a5e', roughness: 0.6 }));
+    btn.position.set(0.22, -0.16, 0.3); mesh.add(btn);
   } else if (type === 'harpoon') {
     mesh = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(SPEAR_R, SPEAR_R, 1.3, 8), new THREE.MeshStandardMaterial({ color: '#9a5a2a', roughness: 0.6, metalness: 0.4 }));
+    const tipMat = new THREE.MeshStandardMaterial({ color: '#cfd4da', roughness: 0.3, metalness: 0.85 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(SPEAR_R, SPEAR_R, 1.3, 8), tipMat);
     shaft.castShadow = true; mesh.add(shaft);
-    const tipMat = new THREE.MeshStandardMaterial({ color: '#cfd4da', roughness: 0.3, metalness: 0.8 });
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 8), tipMat);
     tip.position.y = 0.75; tip.castShadow = true; mesh.add(tip);
     for (const s of [-1, 1]) {
@@ -1372,7 +1381,7 @@ function shootBall(dir, power) {
     const other = e.body === body ? e.target : e.body;
     if (other.material === cardMat) unfreezeCards();
     else if (other.material === stoneMat) wakeNear(rec.body.position, 2.6 * TSCALE);
-    if (other.material === barrelMat) playClank(Math.abs(v));
+    if (other.material === barrelMat) (other._wood ? playWoodKnock : playClank)(Math.abs(v));
     else playBounce(Math.abs(v));
   });
   balls.push(rec);
@@ -1577,7 +1586,7 @@ function harpoonStick(rec, e) {
   // thick rope mesh: a unit-height cylinder we reposition/orient/scale every frame
   const rope = new THREE.Mesh(
     new THREE.CylinderGeometry(0.045, 0.045, 1, 8, 1, true),
-    new THREE.MeshStandardMaterial({ color: '#c9b18a', roughness: 0.9, metalness: 0.0 }));
+    new THREE.MeshStandardMaterial({ color: '#c9b18a', roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide }));
   scene.add(rope);
   harpoonLink = { rec, barrel: other, constraint, rope };
   playBounce(6);
@@ -1745,6 +1754,36 @@ function playClank(impact) {
   o.connect(g).connect(ac.destination);
   o.start(t); o.stop(t + 0.2);
 }
+function playWoodKnock(impact) {
+  const ac = ctx(), t = ac.currentTime;
+  const vol = Math.min(impact / 12, 1) * 0.55;
+  if (vol < 0.02) return;
+  // hollow cask knock: low resonant thump + a couple of quickly-damped woody partials
+  const base = 95 + Math.random() * 35;
+  for (const [ratio, amp, dec] of [[1, 1, 0.18], [2.15, 0.5, 0.1], [3.4, 0.22, 0.06]]) {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(base * ratio, t);
+    o.frequency.exponentialRampToValueAtTime(base * ratio * 0.85, t + dec);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol * amp, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dec);
+    o.connect(g).connect(ac.destination);
+    o.start(t); o.stop(t + dec + 0.05);
+  }
+  // dry surface click (no metallic ring)
+  const dur = 0.05;
+  const buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1100;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol * 0.6, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(t);
+}
 function playBounce(impact) {
   const ac = ctx(), t = ac.currentTime;
   const vol = Math.min(impact / 12, 1) * 0.35;
@@ -1781,7 +1820,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2(0, 0);
 let charging = false, chargeStart = 0;
-let harpoonLink = null, pulling = false;   // a harpoon stuck in a barrel; click to toggle reeling it in
+let harpoonLink = null, pulling = false;   // a harpoon stuck in a barrel; hold click to reel it in
 const powerEl = document.getElementById('power');
 const powerFill = document.getElementById('powerFill');
 
@@ -1810,8 +1849,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   if (ammoType === 'magneto') { magnetoActive = true; return; }
   if (harpoonLink && ammoType === 'harpoon') {
-    if (pulling) detachHarpoon();      // second click cuts the line
-    else pulling = true;               // first click starts reeling
+    pulling = true;                    // hold to reel — the barrel gets dragged toward you
     return;
   }
   charging = true;
@@ -1821,6 +1859,7 @@ canvas.addEventListener('pointerdown', (e) => {
 addEventListener('pointerup', (e) => {
   if (e.button === 2) { orbiting = false; return; }
   if (magnetoActive) { magnetoActive = false; return; }
+  if (pulling) { pulling = false; return; }
   if (!charging) return;
   charging = false;
   powerEl.style.opacity = 0;
@@ -1931,7 +1970,9 @@ function animate() {
 
   // Harpoon tether: keep the rope drawn, and reel the barrel in while the player pulls.
   if (harpoonLink) {
-    const rec = harpoonLink.rec, b = harpoonLink.barrel, from = camera.position;
+    const rec = harpoonLink.rec, b = harpoonLink.barrel;
+    // rope starts at a launcher point low-right in view — from the camera itself it's edge-on and invisible
+    const from = new THREE.Vector3(0.6, -0.55, -1.4).applyMatrix4(camera.matrixWorld);
     const to = new THREE.Vector3(rec.body.position.x, rec.body.position.y, rec.body.position.z);
     const seg = to.clone().sub(from);
     const dist3 = seg.length();
