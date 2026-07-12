@@ -104,7 +104,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · Harpoon sticks — hold click to reel the barrel in · R to reset</div>
+<div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</div>
 <button id="reset">Reset</button>
 <div class="target" id="target">
   <button data-mode="barrels" class="sel">Barrels</button>
@@ -1572,6 +1572,39 @@ function disruptorBlast() {
   shake = 0.3;
 }
 
+// braided hemp-rope texture: two brown strand tones twisting diagonally
+let ropeTexCache = null;
+function makeRopeTexture() {
+  if (ropeTexCache) return ropeTexCache;
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#6e4a22';
+  g.fillRect(0, 0, 64, 64);
+  // diagonal strands (pattern wraps at the canvas edges)
+  for (let i = -6; i < 12; i++) {
+    g.strokeStyle = i % 2 ? '#8f6432' : '#553818';
+    g.lineWidth = 7;
+    g.beginPath();
+    g.moveTo(-8, i * 11);
+    g.lineTo(72, i * 11 - 40);
+    g.stroke();
+  }
+  // fiber highlights along the strands
+  g.strokeStyle = 'rgba(210,170,110,0.35)';
+  g.lineWidth = 1.5;
+  for (let i = -6; i < 12; i++) {
+    g.beginPath();
+    g.moveTo(-8, i * 11 - 3);
+    g.lineTo(72, i * 11 - 43);
+    g.stroke();
+  }
+  ropeTexCache = new THREE.CanvasTexture(c);
+  ropeTexCache.wrapS = ropeTexCache.wrapT = THREE.RepeatWrapping;
+  ropeTexCache.colorSpace = THREE.SRGBColorSpace;
+  return ropeTexCache;
+}
+
 // ---------- Harpoon: embed in the struck barrel; the player then reels it in ----------
 function harpoonStick(rec, e) {
   rec.hit = true;
@@ -1583,10 +1616,10 @@ function harpoonStick(rec, e) {
   rec.body.angularVelocity.setZero();
   const constraint = new CANNON.LockConstraint(rec.body, other);
   world.addConstraint(constraint);
-  // thick rope mesh: a unit-height cylinder we reposition/orient/scale every frame
+  // thin braided rope: a unit-height cylinder we reposition/orient/scale every frame
   const rope = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.045, 0.045, 1, 8, 1, true),
-    new THREE.MeshStandardMaterial({ color: '#c9b18a', roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide }));
+    new THREE.CylinderGeometry(0.02, 0.02, 1, 8, 1, true),
+    new THREE.MeshStandardMaterial({ map: makeRopeTexture(), roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide }));
   scene.add(rope);
   harpoonLink = { rec, barrel: other, constraint, rope };
   playBounce(6);
@@ -1820,7 +1853,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2(0, 0);
 let charging = false, chargeStart = 0;
-let harpoonLink = null, pulling = false;   // a harpoon stuck in a barrel; hold click to reel it in
+let harpoonLink = null, pulling = false;   // a harpoon stuck in a barrel; hold Space to reel it in
 const powerEl = document.getElementById('power');
 const powerFill = document.getElementById('powerFill');
 
@@ -1848,10 +1881,6 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (e.button !== 0) return;
   if (ammoType === 'magneto') { magnetoActive = true; return; }
-  if (harpoonLink && ammoType === 'harpoon') {
-    pulling = true;                    // hold to reel — the barrel gets dragged toward you
-    return;
-  }
   charging = true;
   chargeStart = performance.now();
   powerEl.style.opacity = 1;
@@ -1859,7 +1888,6 @@ canvas.addEventListener('pointerdown', (e) => {
 addEventListener('pointerup', (e) => {
   if (e.button === 2) { orbiting = false; return; }
   if (magnetoActive) { magnetoActive = false; return; }
-  if (pulling) { pulling = false; return; }
   if (!charging) return;
   charging = false;
   powerEl.style.opacity = 0;
@@ -1937,9 +1965,11 @@ addEventListener('keydown', (e) => {
   if (k === 'x') setAmmo('laser');
   if (k === 'v') setAmmo('disruptor');
   if (k === 'q') setAmmo('sniper');
+  if (e.key === ' ' && harpoonLink) { pulling = true; e.preventDefault(); }  // hold Space = elephant pull
   if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
 });
 addEventListener('keyup', (e) => {
+  if (e.key === ' ') pulling = false;
   if (e.key === 'Shift') quakeActive = false;
 });
 
@@ -1981,14 +2011,15 @@ function animate() {
       harpoonLink.rope.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), seg.clone().normalize());
     }
     harpoonLink.rope.scale.set(1, dist3, 1);
+    harpoonLink.rope.material.map.repeat.set(1, Math.max(1, Math.round(dist3 * 2)));  // braid stays fine-grained, doesn't stretch
     if (b.position.y < -5) { detachHarpoon(); }        // barrel fell off the world
     else if (pulling) {
       const d = new CANNON.Vec3(from.x - b.position.x, from.y - b.position.y, from.z - b.position.z);
       const dist = d.length(); d.normalize();
       b.wakeUp(); rec.body.wakeUp();
-      const F = 55 * b.mass;
+      const F = 220 * b.mass;                           // elephant-grade pull
       b.applyForce(new CANNON.Vec3(d.x * F, d.y * F + 9.82 * b.mass, d.z * F), b.position);
-      b.velocity.scale(0.85, b.velocity);
+      b.velocity.scale(0.92, b.velocity);
       if (dist < 4) detachHarpoon();                    // reeled in close → let go
     }
   }
