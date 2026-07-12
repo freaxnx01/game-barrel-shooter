@@ -70,30 +70,39 @@
     <button data-type="tennisball"><span class="dot" style="background:#cde04a"></span>Tennis <span style="opacity:0.5">4</span></button>
     <button data-type="bowlingball"><span class="dot" style="background:#232a4d"></span>Bowling <span style="opacity:0.5">5</span></button>
     <button data-type="cannonball"><span class="dot" style="background:#585c63"></span>Cannonball <span style="opacity:0.5">2</span></button>
+    <button data-type="medball"><span class="dot" style="background:#7a2e2e"></span>Medicine ball <span style="opacity:0.5">E</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Explosives</div>
     <button data-type="bomb"><span class="dot" style="background:#1c1c20;border:2px solid #e0483a;box-sizing:border-box"></span>Bomb <span style="opacity:0.5">3</span></button>
     <button data-type="grenade"><span class="dot" style="background:#4a5a34;border-radius:3px"></span>Grenade <span style="opacity:0.5">G</span></button>
     <button data-type="paintball"><span class="dot" style="background:#e23b3b"></span>Paintball <span style="opacity:0.5">P</span></button>
+    <button data-type="dynamite"><span class="dot" style="background:#d23f2a;border-radius:2px"></span>Dynamite <span style="opacity:0.5">D</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Heavy &amp; melee</div>
     <button data-type="wrecking"><span class="dot" style="background:#3a3d42;border:2px solid #74787e;box-sizing:border-box"></span>Wrecking ball <span style="opacity:0.5">7</span></button>
     <button data-type="hammer"><span class="dot" style="background:#4a4e55;border-radius:2px"></span>Hammer <span style="opacity:0.5">H</span></button>
     <button data-type="spear"><span class="dot" style="background:#8a6a3c;border-radius:2px"></span>Spear <span style="opacity:0.5">6</span></button>
+    <button data-type="anchor"><span class="dot" style="background:#8a8f98;border:2px solid #cfd4da;box-sizing:border-box"></span>Ship anchor <span style="opacity:0.5">A</span></button>
+    <button data-type="crt"><span class="dot" style="background:#3a4650;border-radius:2px"></span>Tube monitor <span style="opacity:0.5">C</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Launchers</div>
     <button data-type="catapult"><span class="dot" style="background:#7d7568;border-radius:4px"></span>Catapult <span style="opacity:0.5">8</span></button>
     <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
     <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
+    <button data-type="harpoon"><span class="dot" style="background:#c0632e;border-radius:2px"></span>Harpoon <span style="opacity:0.5">J</span></button>
+    <button data-type="woodbarrel"><span class="dot" style="background:#9a6a2f;border-radius:3px"></span>Wooden barrel <span style="opacity:0.5">B</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Powers</div>
     <button data-type="lightning"><span class="dot" style="background:#bfe0ff;box-shadow:0 0 6px #bfe0ff"></span>Lightning <span style="opacity:0.5">L</span></button>
     <button data-type="hurricane"><span class="dot" style="background:#8fa6ad;border:2px solid #c3d4d9;box-sizing:border-box"></span>Hurricane <span style="opacity:0.5">U</span></button>
     <button data-type="magneto"><span class="dot" style="background:#a0304a;border:2px solid #e0607a;box-sizing:border-box"></span>Magneto <span style="opacity:0.5">M</span></button>
+    <button data-type="laser"><span class="dot" style="background:#ff3b6b;box-shadow:0 0 6px #ff3b6b"></span>Laser <span style="opacity:0.5">X</span></button>
+    <button data-type="disruptor"><span class="dot" style="background:#37d6e0;box-shadow:0 0 6px #37d6e0"></span>Disruptor <span style="opacity:0.5">V</span></button>
+    <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
 <div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · R to reset</div>
@@ -952,6 +961,9 @@ const ammoEl = document.getElementById('ammo');
 function setAmmo(type) {
   ammoType = type;
   for (const b of ammoEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.type === type);
+  // Sniper lens zooms the view for precision; other ammo restores the default FOV.
+  const fov = type === 'sniper' ? 26 : 55;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 ammoEl.addEventListener('click', (e) => {
   const btn = e.target.closest('button');
@@ -1016,6 +1028,8 @@ function shootBall(dir, power) {
   const type = ammoType;
   if (type === 'lightning') { strikeLightning(); shots++; updateHud(); return; }
   if (type === 'hurricane') { spawnHurricane(); shots++; updateHud(); return; }
+  if (type === 'laser') { fireLaser(); shots++; updateHud(); return; }
+  if (type === 'disruptor') { disruptorBlast(); shots++; updateHud(); return; }
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
@@ -1032,12 +1046,25 @@ function shootBall(dir, power) {
     paintball:   { mass: 0.5, r: 0.15 },
     grenade:     { mass: 1.6, r: 0.18 },
     hammer:      { mass: 5,   r: 0.2 },
+    medball:     { mass: 8,   r: BALL_R * 1.05 },
+    dynamite:    { mass: 3,   r: BALL_R * 0.7 },
+    anchor:      { mass: 20,  r: 0.5 },
+    crt:         { mass: 9,   r: 0.4 },
+    harpoon:     { mass: 3,   r: SPEAR_R },
+    woodbarrel:  { mass: 5,   r: 0.42 },
+    sniper:      { mass: 6,   r: 0.14 },
   }[type];
   let shape;
-  if (type === 'spear' || type === 'f16') {
-    shape = new CANNON.Cylinder(type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 0.14 : SPEAR_R, type === 'f16' ? 1.2 : SPEAR_LEN, 8);
+  if (type === 'spear' || type === 'f16' || type === 'harpoon') {
+    const rr = type === 'f16' ? 0.14 : SPEAR_R;
+    const len = type === 'f16' ? 1.2 : (type === 'harpoon' ? 1.3 : SPEAR_LEN);
+    shape = new CANNON.Cylinder(rr, rr, len, 8);
   } else if (type === 'hammer') {
     shape = new CANNON.Box(new CANNON.Vec3(0.12, 0.34, 0.12));
+  } else if (type === 'crt') {
+    shape = new CANNON.Box(new CANNON.Vec3(0.34, 0.28, 0.3));
+  } else if (type === 'woodbarrel') {
+    shape = new CANNON.Cylinder(0.34, 0.34, 0.84, 12);
   } else {
     shape = new CANNON.Sphere(cfg.r);
   }
@@ -1063,9 +1090,13 @@ function shootBall(dir, power) {
     speed = 14 + power * 14;
   } else if (type === 'hammer') {
     speed = 16 + power * 18;
+  } else if (type === 'sniper') {
+    speed = 42 + power * 18;   // fast, flat precision round
+  } else if (type === 'harpoon') {
+    speed = 30 + power * 12;
   }
   body.velocity.set(vdir.x * speed, vdir.y * speed, vdir.z * speed);
-  if (type === 'spear' || type === 'f16') {
+  if (type === 'spear' || type === 'f16' || type === 'harpoon') {
     body.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), new CANNON.Vec3(dir.x, dir.y, dir.z));
     body.angularDamping = 0.9;
   } else if (type === 'hammer') {
@@ -1176,6 +1207,61 @@ function shootBall(dir, power) {
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.4), hammerHeadMatl);
     head.position.y = 0.34; head.castShadow = true;
     mesh.add(head);
+  } else if (type === 'medball') {
+    mesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: '#8a3030', roughness: 0.85 }));
+    mesh.scale.setScalar(1.05);
+  } else if (type === 'dynamite') {
+    mesh = new THREE.Group();
+    const dynMatl = new THREE.MeshStandardMaterial({ color: '#c0392b', roughness: 0.7 });
+    for (let s = -1; s <= 1; s++) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.44, 8), dynMatl);
+      stick.position.x = s * 0.12; stick.castShadow = true;
+      mesh.add(stick);
+    }
+    const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
+    fuse.position.y = 0.26; mesh.add(fuse);
+  } else if (type === 'anchor') {
+    mesh = new THREE.Group();
+    const anchMatl = new THREE.MeshStandardMaterial({ color: '#8a8f98', roughness: 0.4, metalness: 0.85 });
+    const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 10), anchMatl);
+    shank.castShadow = true; mesh.add(shank);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.03, 8, 16), anchMatl);
+    ring.position.y = 0.46; mesh.add(ring);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.05), anchMatl);
+    stock.position.y = 0.3; mesh.add(stock);
+    const arms = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 8, 16, Math.PI), anchMatl);
+    arms.position.y = -0.4; arms.rotation.z = Math.PI; mesh.add(arms);
+  } else if (type === 'crt') {
+    mesh = new THREE.Group();
+    const caseMatl = new THREE.MeshStandardMaterial({ color: '#d8d2c2', roughness: 0.8 });
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.56, 0.6), caseMatl);
+    box.castShadow = true; mesh.add(box);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.4), new THREE.MeshStandardMaterial({ color: '#20303a', roughness: 0.3, metalness: 0.4 }));
+    screen.position.z = 0.31; mesh.add(screen);
+  } else if (type === 'harpoon') {
+    mesh = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(SPEAR_R, SPEAR_R, 1.3, 8), new THREE.MeshStandardMaterial({ color: '#9a5a2a', roughness: 0.6, metalness: 0.4 }));
+    shaft.castShadow = true; mesh.add(shaft);
+    const tipMat = new THREE.MeshStandardMaterial({ color: '#cfd4da', roughness: 0.3, metalness: 0.8 });
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 8), tipMat);
+    tip.position.y = 0.75; tip.castShadow = true; mesh.add(tip);
+    for (const s of [-1, 1]) {
+      const barb = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 6), tipMat);
+      barb.position.set(s * 0.08, 0.6, 0); barb.rotation.z = s * 0.9; mesh.add(barb);
+    }
+  } else if (type === 'woodbarrel') {
+    mesh = new THREE.Group();
+    const woodMatl = new THREE.MeshStandardMaterial({ color: '#9a6a2f', roughness: 0.85 });
+    const bodyM = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.84, 14), woodMatl);
+    bodyM.castShadow = true; mesh.add(bodyM);
+    const hoopMatl = new THREE.MeshStandardMaterial({ color: '#5a3d1c', roughness: 0.6, metalness: 0.3 });
+    for (const y of [-0.32, 0.32]) {
+      const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.03, 8, 20), hoopMatl);
+      hoop.position.y = y; hoop.rotation.x = Math.PI / 2; mesh.add(hoop);
+    }
+  } else if (type === 'sniper') {
+    mesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: '#c9a94a', roughness: 0.3, metalness: 0.9 }));
+    mesh.scale.setScalar(0.14 / BALL_R);
   } else {
     mesh = new THREE.Mesh(ballGeo, bombMatl);
     const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
@@ -1189,8 +1275,10 @@ function shootBall(dir, power) {
   playShoot(power);
   body.addEventListener('collide', (e) => {
     if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
+    if (type === 'dynamite' && !rec.exploded) { explode(rec, 4.5, 150); return; }
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, e); return; }
-    if (type === 'spear' || type === 'f16') rec.hit = true;
+    if (type === 'harpoon' && !rec.hit) harpoonPull(rec, e);
+    if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
     const v = e.contact.getImpactVelocityAlongNormal();
     if (Math.abs(v) < 1.5) return;
     const other = e.body === body ? e.target : e.body;
@@ -1206,11 +1294,10 @@ function shootBall(dir, power) {
 
 // ---------- Explosion ----------
 const explosions = []; // {mesh, born, particles}
-function explode(rec) {
+function explode(rec, RADIUS = 3, STRENGTH = 80) {
   rec.exploded = true;
   const p = rec.body.position.clone();
   // radial impulse on all dynamic bodies
-  const RADIUS = 3, STRENGTH = 80;
   wakeNear(new CANNON.Vec3(p.x, p.y, p.z), RADIUS + 0.5); // only pieces in blast radius react
   for (const body of world.bodies) {
     if (body.mass <= 0 || body === rec.body) continue;
@@ -1223,11 +1310,14 @@ function explode(rec) {
     body.wakeUp();
     body.applyImpulse(new CANNON.Vec3(d.x * imp, d.y * imp + imp * 0.3, d.z * imp), body.position);
   }
-  // remove bomb
-  world.removeBody(rec.body);
-  scene.remove(rec.mesh);
-  const i = balls.indexOf(rec);
-  if (i >= 0) balls.splice(i, 1);
+  // remove the projectile — deferred out of the collide/step callback so we
+  // never remove a body mid-narrowphase (which corrupts cannon-es' contacts)
+  setTimeout(() => {
+    world.removeBody(rec.body);
+    scene.remove(rec.mesh);
+    const i = balls.indexOf(rec);
+    if (i >= 0) balls.splice(i, 1);
+  }, 0);
 
   // visual: flash sphere + debris particles
   const flash = new THREE.Mesh(
@@ -1318,6 +1408,91 @@ function spawnBolt(point) {
   scene.add(line);
   const light = new THREE.PointLight('#cfe6ff', 9, 40);
   light.position.set(point.x, point.y + 2, point.z);
+  scene.add(light);
+  bolts.push({ line, light, born: performance.now() });
+}
+
+// ---------- Laser: instant beam along the aim ray ----------
+function fireLaser() {
+  raycaster.setFromCamera(mouseNDC, camera);
+  const ray = raycaster.ray;
+  const origin = ray.origin.clone().add(ray.direction.clone().multiplyScalar(1.0));
+  const end = ray.origin.clone().add(ray.direction.clone().multiplyScalar(120));
+  const dir = new CANNON.Vec3(ray.direction.x, ray.direction.y, ray.direction.z);
+  for (const body of world.bodies) {
+    if (body.mass <= 0) continue;
+    const bp = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
+    const t = bp.clone().sub(ray.origin).dot(ray.direction);
+    if (t < 0 || t > 120) continue;
+    const closest = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
+    if (bp.distanceTo(closest) > 1.1 * TSCALE) continue;
+    body.wakeUp();
+    body.applyImpulse(new CANNON.Vec3(dir.x * 60, dir.y * 60 + 12, dir.z * 60), body.position);
+  }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([origin, end]),
+    new THREE.LineBasicMaterial({ color: '#ff3b6b', transparent: true, opacity: 1 }));
+  scene.add(line);
+  const light = new THREE.PointLight('#ff5b7b', 6, 30);
+  light.position.copy(origin.clone().add(ray.direction.clone().multiplyScalar(10)));
+  scene.add(light);
+  bolts.push({ line, light, born: performance.now() });
+  shake = 0.25;
+}
+
+// ---------- Disruptor: shockwave that scatters barrels from the aim point ----------
+function disruptorBlast() {
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(barrels.map(b => b.mesh), true);
+  let point;
+  if (hits.length) point = hits[0].point.clone();
+  else {
+    const r = raycaster.ray;
+    const t = r.direction.y !== 0 ? -r.origin.y / r.direction.y : 30;
+    point = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.max(t, 1)));
+  }
+  const c = new CANNON.Vec3(point.x, point.y, point.z);
+  const R = 6 * TSCALE;
+  wakeNear(c, R);
+  for (const body of world.bodies) {
+    if (body.mass <= 0) continue;
+    const d = body.position.vsub(c);
+    const dist = Math.max(d.length(), 0.5);
+    if (dist > R) continue;
+    d.normalize();
+    const f = (1 - dist / R) * 130;
+    body.wakeUp();
+    body.applyImpulse(new CANNON.Vec3(d.x * f, d.y * f * 0.4 + 6, d.z * f), body.position);
+  }
+  const segs = 40, ringPts = [];
+  for (let i = 0; i <= segs; i++) { const a = i / segs * Math.PI * 2; ringPts.push(new THREE.Vector3(point.x + Math.cos(a) * 0.6, point.y + 0.1, point.z + Math.sin(a) * 0.6)); }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ringPts),
+    new THREE.LineBasicMaterial({ color: '#37d6e0', transparent: true, opacity: 1 }));
+  scene.add(line);
+  const light = new THREE.PointLight('#37d6e0', 7, 30);
+  light.position.set(point.x, point.y + 2, point.z);
+  scene.add(light);
+  bolts.push({ line, light, born: performance.now() });
+  shake = 0.3;
+}
+
+// ---------- Harpoon: reel the struck barrel back toward the shooter ----------
+function harpoonPull(rec, e) {
+  rec.hit = true;
+  const other = e.body === rec.body ? e.target : e.body;
+  if (!other || other.mass <= 0) return;
+  const from = camera.position;
+  const d = new CANNON.Vec3(from.x - other.position.x, from.y - other.position.y, from.z - other.position.z);
+  const dist = Math.max(d.length(), 0.5);
+  d.normalize();
+  const imp = Math.min(dist * 6, 120);
+  other.wakeUp();
+  other.applyImpulse(new CANNON.Vec3(d.x * imp, d.y * imp + 8, d.z * imp), other.position);
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([from.clone(), new THREE.Vector3(other.position.x, other.position.y, other.position.z)]),
+    new THREE.LineBasicMaterial({ color: '#c9b18a', transparent: true, opacity: 1 }));
+  scene.add(line);
+  const light = new THREE.PointLight('#c9b18a', 2, 12);
+  light.position.set(other.position.x, other.position.y + 1, other.position.z);
   scene.add(light);
   bolts.push({ line, light, born: performance.now() });
 }
@@ -1611,6 +1786,15 @@ addEventListener('keydown', (e) => {
   if (k === 'g') setAmmo('grenade');
   if (k === 's') setAmmo('soccerball');
   if (k === 'h') setAmmo('hammer');
+  if (k === 'e') setAmmo('medball');
+  if (k === 'd') setAmmo('dynamite');
+  if (k === 'a') setAmmo('anchor');
+  if (k === 'c') setAmmo('crt');
+  if (k === 'j') setAmmo('harpoon');
+  if (k === 'b') setAmmo('woodbarrel');
+  if (k === 'x') setAmmo('laser');
+  if (k === 'v') setAmmo('disruptor');
+  if (k === 'q') setAmmo('sniper');
   if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
 });
 addEventListener('keyup', (e) => {
