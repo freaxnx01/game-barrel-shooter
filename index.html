@@ -55,6 +55,7 @@
 </style>
 </head>
 <body>
+<script src="./version.js"></script>
 <canvas id="c"></canvas>
 <div class="hud">
   <div class="label" id="scoreLabel">Barrels down</div>
@@ -2220,6 +2221,8 @@ animate();
 
 </script>
 <nav id="game-nav" aria-label="Game navigation" style="position:fixed;right:10px;bottom:8px;z-index:2147483647;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
+  <span id="version-badge" title="Version" style="color:#5a6072"></span>
+  <span style="color:#5a6072" aria-hidden="true">·</span>
   <a href="https://github.freaxnx01.ch/games/" style="color:#8fd8e8;text-decoration:none">More Games…</a>
   <span style="color:#5a6072" aria-hidden="true">·</span>
   <a href="https://github.com/freaxnx01/game-barrel-shooter" target="_blank" rel="noopener" style="color:#8fd8e8;text-decoration:none">Source</a>
@@ -2229,5 +2232,11 @@ animate();
   <a class="github-button" href="https://github.com/freaxnx01/game-barrel-shooter" data-icon="octicon-star" data-size="small" data-show-count="true" aria-label="Star freaxnx01/game-barrel-shooter on GitHub">Star</a>
 </nav>
 <script async defer crossorigin="anonymous" src="https://buttons.github.io/buttons.js"></script>
+<script>
+  (function () {
+    var el = document.getElementById('version-badge');
+    if (el) el.textContent = 'v' + (window.GAME_VERSION || '0.0.0');
+  })();
+</script>
 </body>
 </html>
