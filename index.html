@@ -2235,7 +2235,16 @@ animate();
 <script>
   (function () {
     var el = document.getElementById('version-badge');
-    if (el) el.textContent = 'v' + (window.GAME_VERSION || '0.0.0');
+    if (!el) return;
+    var a = document.createElement('a');
+    a.href = 'https://github.com/freaxnx01/game-barrel-shooter/blob/main/CHANGELOG.md';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.title = 'Changelog';
+    a.textContent = 'v' + (window.GAME_VERSION || '0.0.0');
+    a.style.color = 'inherit';
+    a.style.textDecoration = 'none';
+    el.appendChild(a);
   })();
 </script>
 </body>
