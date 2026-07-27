@@ -1006,6 +1006,7 @@ function buildTargets() {
     targetMode === 'barrels' || targetMode === 'woodbarrels' ? 'Barrels down' : targetMode === 'cards' ? 'Cards down' : targetMode === 'bowling' ? 'Pins down' : 'Blocks down';
 }
 targetEl.addEventListener('click', (e) => {
+  if (autoPlay) return;
   const btn = e.target.closest('button');
   if (!btn || btn.dataset.mode === targetMode) return;
   targetMode = btn.dataset.mode;
@@ -1061,6 +1062,7 @@ function setAmmo(type) {
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 ammoEl.addEventListener('click', (e) => {
+  if (autoPlay) return;
   const btn = e.target.closest('button');
   if (btn) setAmmo(btn.dataset.type);
 });
@@ -1883,6 +1885,7 @@ canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     return;
   }
+  if (autoPlay) return;
   if (e.button !== 0) return;
   if (ammoType === 'magneto') { magnetoActive = true; return; }
   charging = true;
@@ -1891,6 +1894,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 addEventListener('pointerup', (e) => {
   if (e.button === 2) { orbiting = false; return; }
+  if (autoPlay) return;
   if (magnetoActive) { magnetoActive = false; return; }
   if (!charging) return;
   charging = false;
@@ -1943,6 +1947,7 @@ function reset() {
 document.getElementById('reset').addEventListener('click', reset);
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
+  if (autoPlay && k !== 'r') return;
   if (k === 'r') reset();
   if (k === '1') setAmmo('basketball');
   if (k === '2') setAmmo('cannonball');
@@ -1975,6 +1980,63 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => {
   if (e.key === ' ') pulling = false;
   if (e.key === 'Shift') quakeActive = false;
+});
+
+// ---------- Auto-play ----------
+let autoPlay = false;
+let autoPlayState = 'idle'; // 'idle' | 'aiming' | 'settling'
+let autoPlayShotAt = 0;
+const autoPlayEl = document.getElementById('autoplay');
+const AUTOPLAY_SETTLE_VELOCITY = 0.05;
+const AUTOPLAY_SHOT_TIMEOUT_MS = 5000;
+
+function nearestStandingBarrel() {
+  let best = null, bestDist = Infinity;
+  for (const b of barrels) {
+    if (b.down) continue;
+    const d = camera.position.distanceTo(b.mesh.position);
+    if (d < bestDist) { bestDist = d; best = b; }
+  }
+  return best;
+}
+
+function autoPlaySceneSettled() {
+  for (const b of balls) if (b.body.velocity.length() > AUTOPLAY_SETTLE_VELOCITY) return false;
+  for (const b of barrels) if (b.body.velocity.length() > AUTOPLAY_SETTLE_VELOCITY) return false;
+  return true;
+}
+
+function autoPlayFireNext() {
+  const target = nearestStandingBarrel();
+  if (!target) return; // win check in updateAutoPlay stops autoplay before this can happen
+  const dir = target.mesh.position.clone().sub(camera.position).normalize();
+  shootBall(dir, 1.0);
+  autoPlayState = 'settling';
+  autoPlayShotAt = performance.now();
+}
+
+function stopAutoPlay() {
+  autoPlay = false;
+  autoPlayState = 'idle';
+  autoPlayEl.classList.remove('active');
+}
+
+function updateAutoPlay(now) {
+  if (!autoPlay) return;
+  if (barrels.filter(b => b.down).length === barrels.length) { stopAutoPlay(); return; }
+  if (autoPlayState === 'settling') {
+    const timedOut = now - autoPlayShotAt > AUTOPLAY_SHOT_TIMEOUT_MS;
+    if (!autoPlaySceneSettled() && !timedOut) return;
+    autoPlayState = 'aiming';
+  }
+  if (autoPlayState === 'aiming') autoPlayFireNext();
+}
+
+autoPlayEl.addEventListener('click', () => {
+  if (autoPlay) { stopAutoPlay(); return; }
+  autoPlay = true;
+  autoPlayState = 'aiming';
+  autoPlayEl.classList.add('active');
 });
 
 // ---------- Loop ----------
@@ -2053,6 +2115,7 @@ function animate() {
     }
   }
   if (changed) updateHud();
+  updateAutoPlay(now);
 
   // Magneto: while held, lift every piece and gather it toward the aim point ("led by thoughts")
   if (magnetoActive) {
