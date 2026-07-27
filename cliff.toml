@@ -1,7 +1,18 @@
 # git-cliff configuration — Conventional Commits -> Keep a Changelog.
 [changelog]
-header = "# Changelog\n\n"
+header = """
+# Changelog
+
+All notable changes to this project are documented here, following
+[Keep a Changelog](https://keepachangelog.com) and
+[Semantic Versioning](https://semver.org).
+"""
 body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | upper_first }}
 {% for commit in commits %}
