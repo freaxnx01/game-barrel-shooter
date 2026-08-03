@@ -21,3 +21,4 @@ jobs:
       default-model: z-ai/glm-5.2
       pipeline-ref: v1
       agent: opencode
+      pre-preview: true
