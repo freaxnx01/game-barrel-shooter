@@ -2314,5 +2314,71 @@ animate();
     el.appendChild(a);
   })();
 </script>
+<!-- game-nav-fullscreen:start -->
+<script>
+// Fullscreen toggle for #game-nav (freaxnx01.github.io issue #25).
+// Self-contained: inserts a button into whatever #game-nav exists and
+// re-asserts it for 10 s, so dc bundles that replaceWith() the DOM keep it.
+(function () {
+  var d = document;
+  if (!(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
+  function fsEl() { return d.fullscreenElement || d.webkitFullscreenElement || null; }
+  function sync() {
+    var b = d.getElementById("fs-toggle");
+    if (!b) return;
+    var on = !!fsEl();
+    b.textContent = on ? "✕" : "⛶";
+    b.title = on ? "Exit fullscreen" : "Fullscreen";
+    b.setAttribute("aria-label", b.title);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  function toggle() {
+    var p;
+    try {
+      if (fsEl()) {
+        p = (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      } else {
+        var r = d.documentElement;
+        p = (r.requestFullscreen || r.webkitRequestFullscreen).call(r);
+      }
+    } catch (e) {}
+    if (p && p.catch) p.catch(function () {});
+  }
+  function sep() {
+    var s = d.createElement("span");
+    s.setAttribute("aria-hidden", "true");
+    s.style.cssText = "color:#5a6072";
+    s.textContent = "·";
+    return s;
+  }
+  function ensure() {
+    var nav = d.getElementById("game-nav");
+    if (!nav || d.getElementById("fs-toggle")) return;
+    var b = d.createElement("button");
+    b.id = "fs-toggle";
+    b.type = "button";
+    b.style.cssText = "background:none;border:0;padding:0;margin:0;cursor:pointer;color:#8fd8e8;font:inherit;line-height:1";
+    // blur(): keyboard games would otherwise re-trigger the focused button
+    // with Enter/Space and silently toggle fullscreen back.
+    b.addEventListener("click", function () { toggle(); b.blur(); });
+    var badge = d.getElementById("version-badge");
+    if (badge && badge.parentNode === nav) {
+      nav.insertBefore(b, badge.nextSibling);
+      nav.insertBefore(sep(), b);
+    } else {
+      nav.insertBefore(sep(), nav.firstChild);
+      nav.insertBefore(b, nav.firstChild);
+    }
+    sync();
+  }
+  d.addEventListener("fullscreenchange", sync);
+  d.addEventListener("webkitfullscreenchange", sync);
+  d.addEventListener("DOMContentLoaded", ensure);
+  window.addEventListener("load", ensure);
+  ensure();
+  var n = 0, iv = setInterval(function () { ensure(); if (++n >= 40) clearInterval(iv); }, 250);
+})();
+</script>
+<!-- game-nav-fullscreen:end -->
 </body>
 </html>
