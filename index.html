@@ -2380,5 +2380,49 @@ animate();
 })();
 </script>
 <!-- game-nav-fullscreen:end -->
+<!-- game-nav-buildtime:start -->
+<script>
+// Build-time tooltip for #version-badge: when this page was last deployed
+// (GitHub Pages serves the build time as Last-Modified), in the visitor's own
+// time zone, plus how long ago. Self-contained and delegated on document, so
+// the age is fresh on every hover and a badge that gets recreated keeps it.
+(function () {
+  var d = document;
+  var built = new Date(d.lastModified);
+  if (isNaN(built)) return;
+  var WORDS = {
+    en: { now: "just now", d: ["day", "days"], h: ["hour", "hours"], m: ["minute", "minutes"] },
+    de: { now: "gerade eben", d: ["Tag", "Tagen"], h: ["Stunde", "Stunden"], m: ["Minute", "Minuten"] }
+  };
+  // The two largest units: "1 day 2 hours", "1 hour 35 minutes", "35 minutes".
+  function ago(ms, lang) {
+    var w = WORDS[lang], mins = Math.floor(ms / 60000);
+    if (mins < 1) return w.now;
+    var parts = [[Math.floor(mins / 1440), w.d], [Math.floor(mins / 60) % 24, w.h], [mins % 60, w.m]];
+    while (!parts[0][0]) parts.shift();
+    var text = parts.slice(0, 2).filter(function (p) { return p[0]; }).map(function (p) {
+      return p[0] + " " + p[1][p[0] === 1 ? 0 : 1];
+    }).join(" ");
+    return lang === "de" ? "vor " + text : text + " ago";
+  }
+  function tip() {
+    var lang = window.GG_LANG === "de" || (!window.GG_LANG && /^de/i.test(navigator.language || "")) ? "de" : "en";
+    // The browser's own date format, unless the game was switched to the other language.
+    var locale = (navigator.language || "").toLowerCase().indexOf(lang) === 0 ? undefined : lang;
+    var when = built.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
+    return "Build: " + when + " (" + ago(Date.now() - built, lang) + ") · Changelog";
+  }
+  function refresh(e) {
+    var badge = e.target && e.target.closest && e.target.closest("#version-badge");
+    if (!badge) return;
+    var t = tip(), a = badge.querySelector("a");
+    badge.title = t;
+    if (a) a.title = t;
+  }
+  d.addEventListener("mouseover", refresh);
+  d.addEventListener("focusin", refresh);
+})();
+</script>
+<!-- game-nav-buildtime:end -->
 </body>
 </html>
