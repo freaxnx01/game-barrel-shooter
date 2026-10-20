@@ -172,7 +172,7 @@ function stack10Stands(phys) {
   }
   step(phys, 5);
   const topY = stack[stack.length - 1].position.y;
-  const expected = 0.5 + 9 * (1 + 0.001) + 0.5;
+  const expected = 0.5 + 9 * (1 + 0.001); // center of the top box
   cleanup(phys, [g, ...stack]);
   const pass = Math.abs(topY - expected) < 0.05;
   // Required on crashcat (the spec's core goal); informational on cannon (known instability).
