@@ -44,6 +44,11 @@ structures. The loser will be removed in a follow-up; all switch-related code
 is tagged `// engine switch (temporary, #9)`. See
 [issue #9](https://github.com/freaxnx01/game-barrel-shooter/issues/9).
 
+Tests: `node --test test/*.test.mjs` runs the pure-module tests (no
+`package.json`; `node --test test/` does not work on Node 24). The physics
+backend contract runs in the browser: serve the repo and open
+`test/harness/physics-contract.html` (title becomes `CONTRACT PASS`/`FAIL`).
+
 ## Game Content
 
 **Ammo (grouped in the bottom-left picker):**
