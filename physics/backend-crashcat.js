@@ -13,6 +13,9 @@ export function createCrashcatBackend(cc) {
 
   const settings = cc.createWorldSettings();
   settings.gravity = [0, -9.82, 0];
+  // Leave up to 10 cm of overlap uncorrected: the Eiffel struts interlock at their nodes by
+  // design, and the default 2 cm slop pries them apart until the lattice collapses (#9).
+  settings.solver.penetrationSlop = 0.1;
   const BP_MOVING = cc.addBroadphaseLayer(settings);
   const BP_STATIC = cc.addBroadphaseLayer(settings);
   const LAYER_MOVING = cc.addObjectLayer(settings, BP_MOVING);
