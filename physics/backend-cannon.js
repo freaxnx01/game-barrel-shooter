@@ -80,11 +80,14 @@ export function createCannonBackend(CANNON) {
 
   function applyImpulse(h, x, y, z) {
     h.raw.wakeUp();
-    h.raw.applyImpulse(new CANNON.Vec3(x, y, z), new CANNON.Vec3(0, 0, 0));
+    // Preserve the pre-facade call: the game passed body.position as cannon's
+    // relativePoint (lever arm), which adds spin. Kept identical so the cannon
+    // path is the unchanged regression baseline (#9).
+    h.raw.applyImpulse(new CANNON.Vec3(x, y, z), h.raw.position);
   }
   function applyForce(h, x, y, z) {
     h.raw.wakeUp();
-    h.raw.applyForce(new CANNON.Vec3(x, y, z), new CANNON.Vec3(0, 0, 0));
+    h.raw.applyForce(new CANNON.Vec3(x, y, z), h.raw.position);
   }
 
   function wake(h) { h.raw.wakeUp(); }

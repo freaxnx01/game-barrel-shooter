@@ -140,6 +140,12 @@
 <script type="module">
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { createCannonBackend } from './physics/backend-cannon.js';
+import { readEngineChoice } from './physics/engine-choice.js';
+
+// engine switch (temporary, #9)
+let phys = createCannonBackend(CANNON);
+void readEngineChoice; // used by the switch (Task 5)
 
 // ---------- Renderer / scene ----------
 const canvas = document.getElementById('c');
@@ -165,34 +171,12 @@ sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28;
 scene.add(sun);
 
 // ---------- Physics ----------
-const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
-world.broadphase = new CANNON.SAPBroadphase(world);
-world.allowSleep = true;
-
-const groundMat = new CANNON.Material('ground');
-const barrelMat = new CANNON.Material('barrel');
-const ballMat = new CANNON.Material('ball');
-const heavyMat = new CANNON.Material('heavy');
-world.addContactMaterial(new CANNON.ContactMaterial(heavyMat, groundMat, { friction: 0.6, restitution: 0.15 }));
-world.addContactMaterial(new CANNON.ContactMaterial(heavyMat, barrelMat, { friction: 0.4, restitution: 0.1 }));
-world.addContactMaterial(new CANNON.ContactMaterial(groundMat, barrelMat, { friction: 0.5, restitution: 0.15 }));
-world.addContactMaterial(new CANNON.ContactMaterial(barrelMat, barrelMat, { friction: 0.45, restitution: 0.1 }));
-world.addContactMaterial(new CANNON.ContactMaterial(ballMat, groundMat, { friction: 0.4, restitution: 0.75 }));
-world.addContactMaterial(new CANNON.ContactMaterial(ballMat, barrelMat, { friction: 0.3, restitution: 0.4 }));
-const cardMat = new CANNON.Material('card');
-world.addContactMaterial(new CANNON.ContactMaterial(cardMat, groundMat, { friction: 0.9, restitution: 0.0 }));
-world.addContactMaterial(new CANNON.ContactMaterial(cardMat, cardMat, { friction: 0.8, restitution: 0.0 }));
-world.addContactMaterial(new CANNON.ContactMaterial(cardMat, ballMat, { friction: 0.4, restitution: 0.1 }));
-const stoneMat = new CANNON.Material('stone');
-world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, groundMat, { friction: 0.8, restitution: 0.0 }));
-world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, stoneMat, { friction: 0.7, restitution: 0.0 }));
-world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, ballMat, { friction: 0.4, restitution: 0.2 }));
-world.addContactMaterial(new CANNON.ContactMaterial(stoneMat, heavyMat, { friction: 0.5, restitution: 0.05 }));
+// All physics goes through the `phys` facade (physics/backend-cannon.js).
+// Materials are identified by name strings; per-pair friction/restitution live
+// in physics/materials.js and are applied by the backend.
 
 // Ground
-const groundBody = new CANNON.Body({ mass: 0, material: groundMat, shape: new CANNON.Plane() });
-groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-world.addBody(groundBody);
+const groundBody = phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
 
 const groundMesh = new THREE.Mesh(
   new THREE.CircleGeometry(60, 48),
@@ -204,15 +188,11 @@ scene.add(groundMesh);
 
 // Platform the barrels sit on
 const platW = 8, platH = 0.5, platD = 3;
-const platBody = new CANNON.Body({ mass: 0, material: groundMat,
-  shape: new CANNON.Box(new CANNON.Vec3(platW/2, platH/2, platD/2)),
-  position: new CANNON.Vec3(0, platH/2, -6) });
-world.addBody(platBody);
 const platMesh = new THREE.Mesh(
   new THREE.BoxGeometry(platW, platH, platD),
   new THREE.MeshStandardMaterial({ color: '#3d4653', roughness: 0.8 })
 );
-platMesh.position.copy(platBody.position);
+platMesh.position.set(0, platH / 2, -6);
 platMesh.castShadow = platMesh.receiveShadow = true;
 scene.add(platMesh);
 
@@ -313,15 +293,13 @@ const woodCapGeo = new THREE.CircleGeometry(BARREL_R * 0.84, 24);
 const woodCapMatl = new THREE.MeshStandardMaterial({ color: '#7d4f26', roughness: 0.9, metalness: 0.05 });
 
 function createWoodBarrel(x, y, z) {
-  const body = new CANNON.Body({
-    mass: 8,
-    material: barrelMat,
-    shape: new CANNON.Cylinder(BARREL_R * 1.05, BARREL_R * 1.05, BARREL_H, 12),
-    position: new CANNON.Vec3(x, y, z),
+  const body = phys.addBody({
+    shape: { kind: 'cylinder', radiusTop: BARREL_R * 1.05, radiusBottom: BARREL_R * 1.05, height: BARREL_H, segments: 12 },
+    mass: 8, material: 'barrel',
+    position: { x, y, z },
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.6,
+    userData: { wood: true },
   });
-  body._wood = true;   // hits sound like wood, not steel
-  world.addBody(body);
 
   const group = new THREE.Group();
   const staveMatl = new THREE.MeshStandardMaterial({ map: makeWoodTexture(), roughness: 0.85, metalness: 0.05 });
@@ -336,18 +314,16 @@ function createWoodBarrel(x, y, z) {
   }
   scene.add(group);
 
-  barrels.push({ body, mesh: group, home: new CANNON.Vec3(x, y, z), homeQ: new CANNON.Quaternion(0, 0, 0, 1), down: false });
+  barrels.push({ body, mesh: group, home: { x, y, z }, homeQ: { x: 0, y: 0, z: 0, w: 1 }, down: false });
 }
 
 function createBarrel(x, y, z, colorIdx) {
-  const body = new CANNON.Body({
-    mass: 8,
-    material: barrelMat,
-    shape: new CANNON.Cylinder(BARREL_R * 1.05, BARREL_R * 1.05, BARREL_H, 12),
-    position: new CANNON.Vec3(x, y, z),
+  const body = phys.addBody({
+    shape: { kind: 'cylinder', radiusTop: BARREL_R * 1.05, radiusBottom: BARREL_R * 1.05, height: BARREL_H, segments: 12 },
+    mass: 8, material: 'barrel',
+    position: { x, y, z },
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.6,
   });
-  world.addBody(body);
 
   const group = new THREE.Group();
   const color = drumColors[colorIdx % drumColors.length];
@@ -380,7 +356,7 @@ function createBarrel(x, y, z, colorIdx) {
   group.add(bung);
   scene.add(group);
 
-  barrels.push({ body, mesh: group, home: new CANNON.Vec3(x, y, z), homeQ: new CANNON.Quaternion(0, 0, 0, 1), down: false });
+  barrels.push({ body, mesh: group, home: { x, y, z }, homeQ: { x: 0, y: 0, z: 0, w: 1 }, down: false });
 }
 
 function setupBarrels() {
@@ -424,24 +400,23 @@ const bridgeLen = PAIR_S * 0.92;
 const cardGeoFlat = new THREE.BoxGeometry(bridgeLen, CARD_T, CARD_W);
 
 function addCard(shapeHalf, geo, x, y, z, rotZ) {
-  const body = new CANNON.Body({
+  const body = phys.addBody({
+    shape: { kind: 'box', halfExtents: shapeHalf },
     mass: 0.3,
-    type: CANNON.Body.STATIC, // frozen until first projectile impact — unfreezeCards()
-    material: cardMat,
-    shape: new CANNON.Box(shapeHalf),
-    position: new CANNON.Vec3(x, y, z),
+    isStatic: phys.name === 'cannon', // frozen until first projectile impact — unfreezeCards() (cannon-only workaround #9)
+    material: 'card',
+    position: { x, y, z },
+    quaternion: { x: 0, y: 0, z: Math.sin(rotZ / 2), w: Math.cos(rotZ / 2) },
     linearDamping: 0.2, angularDamping: 0.4,
     sleepSpeedLimit: 0.25, sleepTimeLimit: 0.4,
   });
-  body.quaternion.setFromEuler(0, 0, rotZ);
-  world.addBody(body);
   const mesh = new THREE.Mesh(geo, cardFaceMatl);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
   barrels.push({
     body, mesh,
-    home: new CANNON.Vec3(x, y, z),
-    homeQ: body.quaternion.clone(),
+    home: { x, y, z },
+    homeQ: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w },
     down: false,
   });
 }
@@ -450,11 +425,11 @@ function setupCards() {
   const z = -6;
   const Heff = CARD_H * Math.cos(CARD_TILT);
   const dx = (CARD_H / 2) * Math.sin(CARD_TILT) + 0.015; // small apex gap so pairs don't spawn interpenetrating
-  const leanHalf = new CANNON.Vec3(CARD_T / 2, CARD_H / 2, CARD_W / 2);
-  const flatHalf = new CANNON.Vec3(bridgeLen / 2, CARD_T / 2, CARD_W / 2);
+  const leanHalf = [CARD_T / 2, CARD_H / 2, CARD_W / 2];
+  const flatHalf = [bridgeLen / 2, CARD_T / 2, CARD_W / 2];
   for (let level = 0; level < 6; level++) {
     const n = 6 - level;
-    // +0.018 per level: tilted cards' bottom corners dip (T/2)*sin(tilt) below baseY \u2014 keep them clear of the bridge underneath
+    // +0.018 per level: tilted cards' bottom corners dip (T/2)*sin(tilt) below baseY — keep them clear of the bridge underneath
     const baseY = platH + level * (Heff + CARD_T + 0.018) + 0.008;
     const cy = baseY + Heff / 2;
     const x0 = -((n - 1) * PAIR_S) / 2;
@@ -474,25 +449,25 @@ function setupCards() {
 }
 
 // wake the whole house of cards into dynamic bodies on first real impact
+// cannon-only workaround (#9): crashcat structures spawn dynamic+asleep, no freeze/wake.
 function unfreezeCards() {
+  if (phys.name !== 'cannon') return;
   for (const b of barrels) {
-    if (b.body.type !== CANNON.Body.STATIC) continue;
-    b.body.type = CANNON.Body.DYNAMIC;
-    b.body.mass = b.body._mass || 0.3;
-    b.body.updateMassProperties();
-    b.body.wakeUp();
+    if (!phys.isStatic(b.body)) continue;
+    phys.makeDynamic(b.body);
+    phys.wake(b.body);
   }
 }
 
 // wake only the STATIC pieces near an impact so a single hit doesn't detonate the whole structure
 function wakeNear(center, radius) {
+  if (phys.name !== 'cannon') return;
   for (const b of barrels) {
-    if (b.body.type !== CANNON.Body.STATIC) continue;
-    if (b.body.position.distanceTo(center) > radius) continue;
-    b.body.type = CANNON.Body.DYNAMIC;
-    b.body.mass = b.body._mass || 0.3;
-    b.body.updateMassProperties();
-    b.body.wakeUp();
+    if (!phys.isStatic(b.body)) continue;
+    const dx = b.body.position.x - center.x, dy = b.body.position.y - center.y, dz = b.body.position.z - center.z;
+    if (Math.hypot(dx, dy, dz) > radius) continue;
+    phys.makeDynamic(b.body);
+    phys.wake(b.body);
   }
 }
 
@@ -503,33 +478,34 @@ function wakeNear(center, radius) {
 // oriented-box test, not loose AABBs), and that support must trace back to the
 // ground — so mutually-leaning airborne clusters can't hold each other up.
 function collapseUnsupported() {
+  if (phys.name !== 'cannon') return; // cannon-only workaround (#9)
   const frozen = [], movers = [];
   let anyDynamic = false;
   for (const b of barrels) {
-    if (b.body.material !== stoneMat) continue; // stone buildings only (not drums/cards)
-    if (b.body.type === CANNON.Body.STATIC) { frozen.push(b.body); continue; }
+    if (b.body.material !== 'stone') continue; // stone buildings only (not drums/cards)
+    if (phys.isStatic(b.body)) { frozen.push(b.body); continue; }
     anyDynamic = true;
-    if (b.body.sleepState === CANNON.Body.SLEEPING) frozen.push(b.body); // asleep mid-air = frozen
-    else if (b.body.velocity.lengthSquared() > 0.8) movers.push(b.body);
+    if (phys.isSleeping(b.body)) frozen.push(b.body); // asleep mid-air = frozen
+    else {
+      const v = phys.getVelocity(b.body);
+      if (v.x * v.x + v.y * v.y + v.z * v.z > 0.8) movers.push(b.body);
+    }
   }
   if (!anyDynamic || frozen.length === 0) return; // structure untouched so far
-  for (const b of frozen) b.updateAABB();
-  for (const m of movers) m.updateAABB();
+  // cannon-only workaround (#9): AABBs / shapes / quaternion math via the raw cannon body
+  for (const b of frozen) b.raw.updateAABB();
+  for (const m of movers) m.raw.updateAABB();
   const S = TSCALE, GROUND_EPS = 0.35 * S, DROP = 0.4 * S, PAD = 0.08 * S, BPAD = 0.06 * S;
   const wake = (body) => {
-    if (body.type === CANNON.Body.STATIC) {
-      body.type = CANNON.Body.DYNAMIC;
-      body.mass = body._mass || 0.3;
-      body.updateMassProperties();
-    }
-    body.wakeUp();
+    if (phys.isStatic(body)) phys.makeDynamic(body);
+    phys.wake(body);
   };
   // 1) bump-wake: moving debris knocks any frozen piece it touches live
   const bumped = new Set();
   for (const b of frozen) {
-    const a = b.aabb;
+    const a = b.raw.aabb;
     for (const m of movers) {
-      const o = m.aabb;
+      const o = m.raw.aabb;
       if (o.upperBound.x < a.lowerBound.x - BPAD || o.lowerBound.x > a.upperBound.x + BPAD) continue;
       if (o.upperBound.y < a.lowerBound.y - BPAD || o.lowerBound.y > a.upperBound.y + BPAD) continue;
       if (o.upperBound.z < a.lowerBound.z - BPAD || o.lowerBound.z > a.upperBound.z + BPAD) continue;
@@ -542,17 +518,18 @@ function collapseUnsupported() {
   const info = [];
   for (const b of frozen) {
     if (bumped.has(b)) continue;
-    const sh = b.shapes[0];
+    const raw = b.raw;
+    const sh = raw.shapes[0];
     const he = sh.halfExtents || new CANNON.Vec3(
-      (b.aabb.upperBound.x - b.aabb.lowerBound.x) / 2,
-      (b.aabb.upperBound.y - b.aabb.lowerBound.y) / 2,
-      (b.aabb.upperBound.z - b.aabb.lowerBound.z) / 2);
+      (raw.aabb.upperBound.x - raw.aabb.lowerBound.x) / 2,
+      (raw.aabb.upperBound.y - raw.aabb.lowerBound.y) / 2,
+      (raw.aabb.upperBound.z - raw.aabb.lowerBound.z) / 2);
     const corners = [];
     let minY = Infinity, maxY = -Infinity;
     for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
       lp.set(he.x * sx, he.y * sy, he.z * sz);
-      b.quaternion.vmult(lp, wp);
-      const c = new CANNON.Vec3(b.position.x + wp.x, b.position.y + wp.y, b.position.z + wp.z);
+      raw.quaternion.vmult(lp, wp);
+      const c = new CANNON.Vec3(raw.position.x + wp.x, raw.position.y + wp.y, raw.position.z + wp.z);
       corners.push(c);
       if (c.y < minY) minY = c.y;
       if (c.y > maxY) maxY = c.y;
@@ -561,8 +538,9 @@ function collapseUnsupported() {
     info.push({ b, he, feet: corners.filter(c => c.y <= band), grounded: minY <= GROUND_EPS });
   }
   const contains = (rec, px, py, pz) => { // point inside rec's expanded oriented box?
-    lp.set(px - rec.b.position.x, py - rec.b.position.y, pz - rec.b.position.z);
-    rec.b.quaternion.conjugate(cq);
+    const raw = rec.b.raw;
+    lp.set(px - raw.position.x, py - raw.position.y, pz - raw.position.z);
+    raw.quaternion.conjugate(cq);
     cq.vmult(lp, wp);
     return Math.abs(wp.x) <= rec.he.x + E && Math.abs(wp.y) <= rec.he.y + E && Math.abs(wp.z) <= rec.he.z + E;
   };
@@ -571,7 +549,7 @@ function collapseUnsupported() {
     if (rec.grounded) continue;
     for (const other of info) {
       if (other === rec) continue;
-      const oa = other.b.aabb;
+      const oa = other.b.raw.aabb;
       let rests = false;
       for (const f of rec.feet) {
         const px = f.x, py = f.y - DROP / 2, pz = f.z;
@@ -606,23 +584,37 @@ const stoneMatls = ['#a39a88', '#968d7c', '#ada393'].map(c =>
 function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
   const S = TSCALE;
   hx *= S; hy *= S; hz *= S; x *= S; y *= S; z *= S;
-  const body = new CANNON.Body({
+  // cannon: spawn frozen (static) until first impact; crashcat: dynamic + asleep (no freeze hack, #9)
+  const body = phys.addBody({
+    shape: { kind: 'box', halfExtents: [hx, hy, hz] },
     mass,
-    type: CANNON.Body.STATIC, // frozen until first impact
-    material: stoneMat,
-    shape: new CANNON.Box(new CANNON.Vec3(hx, hy, hz)),
-    position: new CANNON.Vec3(x, y, z),
+    isStatic: phys.name === 'cannon',
+    startAsleep: phys.name === 'crashcat',
+    material: 'stone',
+    position: { x, y, z },
+    quaternion: fromEulerXYZ(0, ry, rz),
     linearDamping: 0.15, angularDamping: 0.3,
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+    userData: { specMass: mass },
   });
-  body.quaternion.setFromEuler(0, ry, rz);
-  body._mass = mass;
-  world.addBody(body);
   const mesh = new THREE.Mesh(unitBoxGeo, matl3);
   mesh.scale.set(hx * 2, hy * 2, hz * 2);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
-  barrels.push({ body, mesh, home: new CANNON.Vec3(x, y, z), homeQ: body.quaternion.clone(), down: false });
+  barrels.push({ body, mesh, home: { x, y, z }, homeQ: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w }, down: false });
+}
+
+// small Euler→quaternion helper (XYZ order), so builders don't need CANNON.
+function fromEulerXYZ(x, y, z) {
+  const cx = Math.cos(x / 2), sx = Math.sin(x / 2);
+  const cy = Math.cos(y / 2), sy = Math.sin(y / 2);
+  const cz = Math.cos(z / 2), sz = Math.sin(z / 2);
+  return {
+    x: sx * cy * cz + cx * sy * sz,
+    y: cx * sy * cz - sx * cy * sz,
+    z: cx * cy * sz + sx * sy * cz,
+    w: cx * cy * cz - sx * sy * sz,
+  };
 }
 
 function setupFortress() {
@@ -825,20 +817,23 @@ function setupCrosses() {
 
 // ---------- More buildings: Eiffel (matchsticks), bowling pins, cylindrical tower ----------
 // generic static-until-hit body with a custom shape + pre-sized mesh
-function addTargetBody(shape, mesh, mass, pos, quat) {
-  const body = new CANNON.Body({
-    mass, type: CANNON.Body.STATIC, material: stoneMat, shape,
-    position: new CANNON.Vec3(pos[0], pos[1], pos[2]),
+function addTargetBody(shapeSpec, mesh, mass, pos, quat) {
+  const body = phys.addBody({
+    shape: shapeSpec,
+    mass,
+    isStatic: phys.name === 'cannon',
+    startAsleep: phys.name === 'crashcat',
+    material: 'stone',
+    position: { x: pos[0], y: pos[1], z: pos[2] },
+    quaternion: quat || undefined,
     linearDamping: 0.15, angularDamping: 0.3, sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+    userData: { specMass: mass },
   });
-  if (quat) body.quaternion.copy(quat);
-  body._mass = mass;
-  world.addBody(body);
   mesh.position.copy(body.position);
   mesh.quaternion.copy(body.quaternion);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
-  barrels.push({ body, mesh, home: new CANNON.Vec3(pos[0], pos[1], pos[2]), homeQ: body.quaternion.clone(), down: false });
+  barrels.push({ body, mesh, home: { x: pos[0], y: pos[1], z: pos[2] }, homeQ: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w }, down: false });
 }
 
 const matchMatl = new THREE.MeshStandardMaterial({ color: '#d9b166', roughness: 0.85, flatShading: true });
@@ -853,10 +848,9 @@ function addStick(p1, p2, thick, mass) {
   const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2];
   const q = new THREE.Quaternion().setFromUnitVectors(
     new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize());
-  const cq = new CANNON.Quaternion(q.x, q.y, q.z, q.w);
   const mesh = new THREE.Mesh(unitBoxGeo, matchMatl);
   mesh.scale.set(thick, len, thick);
-  addTargetBody(new CANNON.Box(new CANNON.Vec3(thick / 2, len / 2, thick / 2)), mesh, mass, mid, cq);
+  addTargetBody({ kind: 'box', halfExtents: [thick / 2, len / 2, thick / 2] }, mesh, mass, mid, { x: q.x, y: q.y, z: q.z, w: q.w });
 }
 
 function setupEiffel() {
@@ -928,7 +922,7 @@ function setupBowling() {
       const z = zC - r * rowGap;      // apex (head pin) toward the camera
       const mesh = makePin();
       mesh.scale.setScalar(S);
-      addTargetBody(new CANNON.Cylinder(0.14 * S, 0.14 * S, PIN_H * S, 12), mesh, 1.8, [x * S, PIN_H / 2 * S, z * S], null);
+      addTargetBody({ kind: 'cylinder', radiusTop: 0.14 * S, radiusBottom: 0.14 * S, height: PIN_H * S, segments: 12 }, mesh, 1.8, [x * S, PIN_H / 2 * S, z * S], null);
     }
   }
 }
@@ -957,18 +951,31 @@ function setupCylinder() {
 
 // platform only makes sense under barrels / cards; stone structures stand on the ground
 let platformOn = true;
+let platBody = phys.addBody({
+  shape: { kind: 'box', halfExtents: [platW / 2, platH / 2, platD / 2] },
+  mass: 0, material: 'ground', position: { x: 0, y: platH / 2, z: -6 }, isStatic: true,
+});
 function setPlatform(on) {
   if (on === platformOn) return;
   platformOn = on;
-  if (on) { world.addBody(platBody); scene.add(platMesh); }
-  else { world.removeBody(platBody); scene.remove(platMesh); }
+  if (on) {
+    platBody = phys.addBody({
+      shape: { kind: 'box', halfExtents: [platW / 2, platH / 2, platD / 2] },
+      mass: 0, material: 'ground', position: { x: 0, y: platH / 2, z: -6 }, isStatic: true,
+    });
+    scene.add(platMesh);
+  } else {
+    phys.removeBody(platBody);
+    platBody = null;
+    scene.remove(platMesh);
+  }
 }
 
 // ---------- Target mode ----------
 let targetMode = 'barrels';
 const targetEl = document.getElementById('target');
 function clearTargets() {
-  for (const b of barrels) { world.removeBody(b.body); scene.remove(b.mesh); }
+  for (const b of barrels) { phys.removeBody(b.body); scene.remove(b.mesh); }
   barrels.length = 0;
   for (const s of paintSplats) scene.remove(s);
   paintSplats.length = 0;
@@ -1151,23 +1158,27 @@ function shootBall(dir, power) {
     harpoon:     { mass: 3,   r: SPEAR_R },
     sniper:      { mass: 6,   r: 0.14 },
   }[type];
-  let shape;
+  let shapeSpec;
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
     const rr = type === 'f16' ? 0.14 : SPEAR_R;
     const len = type === 'f16' ? 1.2 : (type === 'harpoon' ? 1.3 : SPEAR_LEN);
-    shape = new CANNON.Cylinder(rr, rr, len, 8);
+    shapeSpec = { kind: 'cylinder', radiusTop: rr, radiusBottom: rr, height: len, segments: 8 };
   } else if (type === 'hammer') {
-    shape = new CANNON.Box(new CANNON.Vec3(0.12, 0.34, 0.12));
+    shapeSpec = { kind: 'box', halfExtents: [0.12, 0.34, 0.12] };
   } else if (type === 'crt') {
-    shape = new CANNON.Box(new CANNON.Vec3(0.34, 0.28, 0.3));
+    shapeSpec = { kind: 'box', halfExtents: [0.34, 0.28, 0.3] };
   } else {
-    shape = new CANNON.Sphere(cfg.r);
+    shapeSpec = { kind: 'sphere', radius: cfg.r };
   }
-  const body = new CANNON.Body({
+  const fastProjectiles = new Set(['cannonball', 'spear', 'f16', 'sniper', 'slingshot', 'catapult', 'harpoon']);
+  const orientProjectiles = type === 'spear' || type === 'f16' || type === 'harpoon';
+  const body = phys.addBody({
     mass: cfg.mass,
-    material: (type === 'basketball' || type === 'soccerball' || type === 'tennisball') ? ballMat : heavyMat,
-    shape,
-    position: new CANNON.Vec3(start.x, start.y, start.z),
+    material: (type === 'basketball' || type === 'soccerball' || type === 'tennisball') ? 'ball' : 'heavy',
+    shape: shapeSpec,
+    position: { x: start.x, y: start.y, z: start.z },
+    fast: fastProjectiles.has(type),
+    angularDamping: orientProjectiles ? 0.9 : (type === 'hammer' ? 0.05 : undefined),
   });
   let speed = 18 + power * 22; // fast & flat
   let vdir = dir;
@@ -1190,41 +1201,34 @@ function shootBall(dir, power) {
   } else if (type === 'harpoon') {
     speed = 30 + power * 12;
   }
-  body.velocity.set(vdir.x * speed, vdir.y * speed, vdir.z * speed);
+  phys.setVelocity(body, vdir.x * speed, vdir.y * speed, vdir.z * speed);
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
-    body.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), new CANNON.Vec3(dir.x, dir.y, dir.z));
-    body.angularDamping = 0.9;
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dir.x, dir.y, dir.z));
+    phys.setQuaternion(body, q.x, q.y, q.z, q.w);
   } else if (type === 'hammer') {
     // tumble end-over-end about a horizontal axis perpendicular to flight
     const ax = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-    body.angularVelocity.set(ax.x * 22, ax.y * 22, ax.z * 22);
-    body.angularDamping = 0.05;
+    phys.setAngularVelocity(body, ax.x * 22, ax.y * 22, ax.z * 22);
   } else {
-    body.angularVelocity.set(Math.random() * 4 - 2, 0, Math.random() * 4 - 2);
+    phys.setAngularVelocity(body, Math.random() * 4 - 2, 0, Math.random() * 4 - 2);
   }
-  world.addBody(body);
 
   // wrecking ball hangs from a fixed point above the targets
   let constraint = null, chainMesh = null, anchorPos = null;
   if (type === 'wrecking') {
-    { const cfg = camCfg[targetMode]; anchorPos = new CANNON.Vec3(0, (cfg.plat ? 10 : 18) * TSCALE, cfg.tz * TSCALE); }
-    const anchor = new CANNON.Body({ mass: 0, position: anchorPos.clone() });
-    world.addBody(anchor);
+    { const cfg = camCfg[targetMode]; anchorPos = { x: 0, y: (cfg.plat ? 10 : 18) * TSCALE, z: cfg.tz * TSCALE }; }
+    const anchor = phys.addBody({ shape: { kind: 'sphere', radius: 0.05 }, mass: 0, material: 'heavy', position: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z }, isStatic: true });
     // chain just long enough that the bottom of the swing sweeps through the targets
     const len = anchorPos.y - 0.75;
-    const toBall = body.position.vsub(anchorPos);
-    toBall.normalize();
-    body.position.set(
-      anchorPos.x + toBall.x * len,
-      anchorPos.y + toBall.y * len,
-      anchorPos.z + toBall.z * len
-    );
-    constraint = new CANNON.DistanceConstraint(body, anchor, len);
-    world.addConstraint(constraint);
+    let toBallX = body.position.x - anchorPos.x, toBallY = body.position.y - anchorPos.y, toBallZ = body.position.z - anchorPos.z;
+    const toBallLen = Math.hypot(toBallX, toBallY, toBallZ) || 1;
+    toBallX /= toBallLen; toBallY /= toBallLen; toBallZ /= toBallLen;
+    phys.setPosition(body, anchorPos.x + toBallX * len, anchorPos.y + toBallY * len, anchorPos.z + toBallZ * len);
+    constraint = phys.addDistanceJoint(body, anchor, len);
+    constraint._anchorBody = anchor;
     chainMesh = new THREE.Mesh(chainGeo, chainMatl);
     chainMesh.castShadow = true;
     scene.add(chainMesh);
-    constraint._anchorBody = anchor;
   }
 
   let mesh;
@@ -1377,19 +1381,18 @@ function shootBall(dir, power) {
   const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos };
   // sounds: launch now, clank/bounce on collision
   playShoot(power);
-  body.addEventListener('collide', (e) => {
+  phys.onCollide(body, (other, impactSpeed) => {
     if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
     if (type === 'dynamite' && !rec.exploded) { explode(rec, 4.5, 150); return; }
-    if (type === 'paintball' && !rec.hit) { paintSplat(rec, e); return; }
-    if (type === 'harpoon' && !rec.hit) harpoonStick(rec, e);
+    if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
+    if (type === 'harpoon' && !rec.hit) harpoonStick(rec, other);
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
-    const v = e.contact.getImpactVelocityAlongNormal();
-    if (Math.abs(v) < 1.5) return;
-    const other = e.body === body ? e.target : e.body;
-    if (other.material === cardMat) unfreezeCards();
-    else if (other.material === stoneMat) wakeNear(rec.body.position, 2.6 * TSCALE);
-    if (other.material === barrelMat) (other._wood ? playWoodKnock : playClank)(Math.abs(v));
-    else playBounce(Math.abs(v));
+    if (Math.abs(impactSpeed) < 1.5) return;
+    if (!other) return;
+    if (other.material === 'card') unfreezeCards();
+    else if (other.material === 'stone') wakeNear(rec.body.position, 2.6 * TSCALE);
+    if (other.material === 'barrel') (other.userData && other.userData.wood ? playWoodKnock : playClank)(Math.abs(impactSpeed));
+    else playBounce(Math.abs(impactSpeed));
   });
   balls.push(rec);
   shots++;
@@ -1400,24 +1403,24 @@ function shootBall(dir, power) {
 const explosions = []; // {mesh, born, particles}
 function explode(rec, RADIUS = 3, STRENGTH = 80) {
   rec.exploded = true;
-  const p = rec.body.position.clone();
+  const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
   // radial impulse on all dynamic bodies
-  wakeNear(new CANNON.Vec3(p.x, p.y, p.z), RADIUS + 0.5); // only pieces in blast radius react
-  for (const body of world.bodies) {
+  wakeNear(p, RADIUS + 0.5); // only pieces in blast radius react
+  for (const body of phys.bodies()) {
     if (body.mass <= 0 || body === rec.body) continue;
-    const d = body.position.vsub(p);
-    const dist = Math.max(d.length(), 0.5);
+    let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
+    const dist = Math.max(Math.hypot(dx, dy, dz), 0.5);
     if (dist > RADIUS) continue;
-    d.normalize();
+    dx /= dist; dy /= dist; dz /= dist;
     const falloff = 1 - dist / RADIUS;
     const imp = STRENGTH * falloff;
-    body.wakeUp();
-    body.applyImpulse(new CANNON.Vec3(d.x * imp, d.y * imp + imp * 0.3, d.z * imp), body.position);
+    phys.wake(body);
+    phys.applyImpulse(body, dx * imp, dy * imp + imp * 0.3, dz * imp);
   }
   // remove the projectile — deferred out of the collide/step callback so we
   // never remove a body mid-narrowphase (which corrupts cannon-es' contacts)
   setTimeout(() => {
-    world.removeBody(rec.body);
+    phys.removeBody(rec.body);
     scene.remove(rec.mesh);
     const i = balls.indexOf(rec);
     if (i >= 0) balls.splice(i, 1);
@@ -1428,7 +1431,7 @@ function explode(rec, RADIUS = 3, STRENGTH = 80) {
     new THREE.SphereGeometry(0.4, 16, 12),
     new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.95 })
   );
-  flash.position.copy(p);
+  flash.position.set(p.x, p.y, p.z);
   scene.add(flash);
   const pGeo = new THREE.BufferGeometry();
   const N = 60;
@@ -1449,9 +1452,8 @@ function explode(rec, RADIUS = 3, STRENGTH = 80) {
 }
 
 // ---------- Paintball: turn hit pieces red + leave a splat ----------
-function paintSplat(rec, e) {
+function paintSplat(rec, other) {
   rec.hit = true;
-  const other = e.body === rec.body ? e.target : e.body;
   const tgt = barrels.find(b => b.body === other);
   if (tgt) tgt.mesh.traverse(o => { if (o.isMesh) o.material = paintMatl; });
   // splat blob at the impact spot
@@ -1463,7 +1465,7 @@ function paintSplat(rec, e) {
   scene.add(splat);
   paintSplats.push(splat);
   // remove the paintball itself
-  world.removeBody(rec.body);
+  phys.removeBody(rec.body);
   scene.remove(rec.mesh);
   const i = balls.indexOf(rec);
   if (i >= 0) balls.splice(i, 1);
@@ -1482,15 +1484,16 @@ function strikeLightning() {
     const t = r.direction.y !== 0 ? -r.origin.y / r.direction.y : 30;
     point = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.max(t, 1)));
   }
-  const c = new CANNON.Vec3(point.x, point.y, point.z);
+  const c = { x: point.x, y: point.y, z: point.z };
   const R = 4 * TSCALE;
   wakeNear(c, R);
   for (const b of barrels) {
-    const d = b.body.position.distanceTo(c);
+    const dx = b.body.position.x - c.x, dy = b.body.position.y - c.y, dz = b.body.position.z - c.z;
+    const d = Math.hypot(dx, dy, dz);
     if (d > R) continue;
-    b.body.wakeUp();
+    phys.wake(b.body);
     const f = (1 - d / R) * 110;
-    b.body.applyImpulse(new CANNON.Vec3((Math.random() - 0.5) * f, f * 0.5, (Math.random() - 0.5) * f), b.body.position);
+    phys.applyImpulse(b.body, (Math.random() - 0.5) * f, f * 0.5, (Math.random() - 0.5) * f);
   }
   spawnBolt(point);
   shake = 0.45;
@@ -1522,16 +1525,16 @@ function fireLaser() {
   const ray = raycaster.ray;
   const origin = ray.origin.clone().add(ray.direction.clone().multiplyScalar(1.0));
   const end = ray.origin.clone().add(ray.direction.clone().multiplyScalar(120));
-  const dir = new CANNON.Vec3(ray.direction.x, ray.direction.y, ray.direction.z);
-  for (const body of world.bodies) {
+  const dir = { x: ray.direction.x, y: ray.direction.y, z: ray.direction.z };
+  for (const body of phys.bodies()) {
     if (body.mass <= 0) continue;
     const bp = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
     const t = bp.clone().sub(ray.origin).dot(ray.direction);
     if (t < 0 || t > 120) continue;
     const closest = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
     if (bp.distanceTo(closest) > 1.1 * TSCALE) continue;
-    body.wakeUp();
-    body.applyImpulse(new CANNON.Vec3(dir.x * 60, dir.y * 60 + 12, dir.z * 60), body.position);
+    phys.wake(body);
+    phys.applyImpulse(body, dir.x * 60, dir.y * 60 + 12, dir.z * 60);
   }
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([origin, end]),
     new THREE.LineBasicMaterial({ color: '#ff3b6b', transparent: true, opacity: 1 }));
@@ -1554,18 +1557,18 @@ function disruptorBlast() {
     const t = r.direction.y !== 0 ? -r.origin.y / r.direction.y : 30;
     point = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.max(t, 1)));
   }
-  const c = new CANNON.Vec3(point.x, point.y, point.z);
+  const c = { x: point.x, y: point.y, z: point.z };
   const R = 6 * TSCALE;
   wakeNear(c, R);
-  for (const body of world.bodies) {
+  for (const body of phys.bodies()) {
     if (body.mass <= 0) continue;
-    const d = body.position.vsub(c);
-    const dist = Math.max(d.length(), 0.5);
+    let dx = body.position.x - c.x, dy = body.position.y - c.y, dz = body.position.z - c.z;
+    const dist = Math.max(Math.hypot(dx, dy, dz), 0.5);
     if (dist > R) continue;
-    d.normalize();
+    dx /= dist; dy /= dist; dz /= dist;
     const f = (1 - dist / R) * 130;
-    body.wakeUp();
-    body.applyImpulse(new CANNON.Vec3(d.x * f, d.y * f * 0.4 + 6, d.z * f), body.position);
+    phys.wake(body);
+    phys.applyImpulse(body, dx * f, dy * f * 0.4 + 6, dz * f);
   }
   const segs = 40, ringPts = [];
   for (let i = 0; i <= segs; i++) { const a = i / segs * Math.PI * 2; ringPts.push(new THREE.Vector3(point.x + Math.cos(a) * 0.6, point.y + 0.1, point.z + Math.sin(a) * 0.6)); }
@@ -1613,16 +1616,15 @@ function makeRopeTexture() {
 }
 
 // ---------- Harpoon: embed in the struck barrel; the player then reels it in ----------
-function harpoonStick(rec, e) {
+function harpoonStick(rec, other) {
   rec.hit = true;
   if (harpoonLink) return;                          // one tether at a time
-  const other = e.body === rec.body ? e.target : e.body;
-  if (!other || other.mass <= 0 || other.material !== barrelMat) return;  // only bites into barrels
+  if (!other || other.mass <= 0 || other.material !== 'barrel') return;  // only bites into barrels
   rec.stuck = true;
-  rec.body.velocity.scale(0.15, rec.body.velocity);
-  rec.body.angularVelocity.setZero();
-  const constraint = new CANNON.LockConstraint(rec.body, other);
-  world.addConstraint(constraint);
+  const v = phys.getVelocity(rec.body);
+  phys.setVelocity(rec.body, v.x * 0.15, v.y * 0.15, v.z * 0.15);
+  phys.setAngularVelocity(rec.body, 0, 0, 0);
+  const constraint = phys.addFixedJoint(rec.body, other);
   // thin braided rope: a unit-height cylinder we reposition/orient/scale every frame
   const rope = new THREE.Mesh(
     new THREE.CylinderGeometry(0.02, 0.02, 1, 8, 1, true),
@@ -1634,7 +1636,7 @@ function harpoonStick(rec, e) {
 
 function detachHarpoon() {
   if (!harpoonLink) return;
-  world.removeConstraint(harpoonLink.constraint);
+  phys.removeJoint(harpoonLink.constraint);
   scene.remove(harpoonLink.rope);
   harpoonLink.rope.geometry.dispose();
   harpoonLink.rope.material.dispose();
@@ -1926,11 +1928,11 @@ updateHud();
 
 function removeProjectile(b) {
   if (b.constraint) {
-    world.removeConstraint(b.constraint);
-    world.removeBody(b.constraint._anchorBody);
+    phys.removeJoint(b.constraint);
+    phys.removeBody(b.constraint._anchorBody);
   }
   if (b.chainMesh) { scene.remove(b.chainMesh); }
-  world.removeBody(b.body); scene.remove(b.mesh);
+  phys.removeBody(b.body); scene.remove(b.mesh);
 }
 
 function reset() {
@@ -2002,8 +2004,8 @@ function nearestStandingBarrel() {
 }
 
 function autoPlaySceneSettled() {
-  for (const b of balls) if (b.body.velocity.length() > AUTOPLAY_SETTLE_VELOCITY) return false;
-  for (const b of barrels) if (b.body.velocity.length() > AUTOPLAY_SETTLE_VELOCITY) return false;
+  for (const b of balls) { const v = phys.getVelocity(b.body); if (Math.hypot(v.x, v.y, v.z) > AUTOPLAY_SETTLE_VELOCITY) return false; }
+  for (const b of barrels) { const v = phys.getVelocity(b.body); if (Math.hypot(v.x, v.y, v.z) > AUTOPLAY_SETTLE_VELOCITY) return false; }
   return true;
 }
 
@@ -2042,8 +2044,6 @@ autoPlayEl.addEventListener('click', () => {
 
 // ---------- Loop ----------
 const clock = new THREE.Clock();
-const up = new CANNON.Vec3(0, 1, 0);
-const bodyUp = new CANNON.Vec3();
 let shake = 0;
 let magnetoActive = false;
 let quakeActive = false, quakeStart = 0;
@@ -2063,7 +2063,7 @@ function animate() {
   resize();
   const dt = Math.min(clock.getDelta(), 1 / 30);
   const now = performance.now();
-  world.step(1 / 240, dt, 10); // small fixed step so fast projectiles don't tunnel through
+  phys.step(dt); // fixed 1/240 internal step (≤10 substeps) so fast projectiles don't tunnel through
 
   // Harpoon tether: keep the rope drawn, and reel the barrel in while the player pulls.
   if (harpoonLink) {
@@ -2081,12 +2081,15 @@ function animate() {
     harpoonLink.rope.material.map.repeat.set(1, Math.max(1, Math.round(dist3 * 2)));  // braid stays fine-grained, doesn't stretch
     if (b.position.y < -5) { detachHarpoon(); }        // barrel fell off the world
     else if (pulling) {
-      const d = new CANNON.Vec3(from.x - b.position.x, from.y - b.position.y, from.z - b.position.z);
-      const dist = d.length(); d.normalize();
-      b.wakeUp(); rec.body.wakeUp();
-      const F = 220 * b.mass;                           // elephant-grade pull
-      b.applyForce(new CANNON.Vec3(d.x * F, d.y * F + 9.82 * b.mass, d.z * F), b.position);
-      b.velocity.scale(0.92, b.velocity);
+      let dx = from.x - b.position.x, dy = from.y - b.position.y, dz = from.z - b.position.z;
+      const dist = Math.hypot(dx, dy, dz) || 1;
+      dx /= dist; dy /= dist; dz /= dist;
+      phys.wake(b); phys.wake(rec.body);
+      const m = b.mass || 1;
+      const F = 220 * m;                           // elephant-grade pull
+      phys.applyForce(b, dx * F, dy * F + 9.82 * m, dz * F);
+      const v = phys.getVelocity(b);
+      phys.setVelocity(b, v.x * 0.92, v.y * 0.92, v.z * 0.92);
       if (dist < 4) detachHarpoon();                    // reeled in close → let go
     }
   }
@@ -2111,7 +2114,7 @@ function animate() {
         b.body.quaternion.x * b.homeQ.x + b.body.quaternion.y * b.homeQ.y +
         b.body.quaternion.z * b.homeQ.z + b.body.quaternion.w * b.homeQ.w
       );
-      const moved = b.body.position.vsub(b.home).length() > 0.45;
+      const moved = Math.hypot(b.body.position.x - b.home.x, b.body.position.y - b.home.y, b.body.position.z - b.home.z) > 0.45;
       if (qd < 0.93 || moved) { b.down = true; changed = true; }
     }
   }
@@ -2124,20 +2127,17 @@ function animate() {
     const r = raycaster.ray;
     const dist = Math.max((orbit.target.z - r.origin.z) / (r.direction.z || -1), 6);
     const tp = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.min(dist, 40)));
-    const target = new CANNON.Vec3(tp.x, Math.max(tp.y, 2), tp.z);
+    const target = { x: tp.x, y: Math.max(tp.y, 2), z: tp.z };
     for (const b of barrels) {
-      if (b.body.type === CANNON.Body.STATIC) {
-        b.body.type = CANNON.Body.DYNAMIC;
-        b.body.mass = b.body._mass || 0.3;
-        b.body.updateMassProperties();
-      }
-      b.body.wakeUp();
-      const toP = target.vsub(b.body.position);
-      const d = Math.max(toP.length(), 0.3); toP.normalize();
+      if (phys.isStatic(b.body)) phys.makeDynamic(b.body);
+      phys.wake(b.body);
+      let toPx = target.x - b.body.position.x, toPy = target.y - b.body.position.y, toPz = target.z - b.body.position.z;
+      const d = Math.max(Math.hypot(toPx, toPy, toPz), 0.3); toPx /= d; toPy /= d; toPz /= d;
       const F = Math.min(d, 6) * 16;
       const m = b.body.mass || 1;
-      b.body.applyForce(new CANNON.Vec3(toP.x * F * m, toP.y * F * m + 9.82 * m, toP.z * F * m), b.body.position);
-      b.body.velocity.scale(0.9, b.body.velocity);
+      phys.applyForce(b.body, toPx * F * m, toPy * F * m + 9.82 * m, toPz * F * m);
+      const v = phys.getVelocity(b.body);
+      phys.setVelocity(b.body, v.x * 0.9, v.y * 0.9, v.z * 0.9);
     }
   }
 
@@ -2146,15 +2146,11 @@ function animate() {
     const el = (now - quakeStart) / 1000;
     const intensity = Math.min(el / 1.2, 1);
     for (const b of barrels) {
-      if (b.body.type === CANNON.Body.STATIC) {
-        b.body.type = CANNON.Body.DYNAMIC;
-        b.body.mass = b.body._mass || 0.3;
-        b.body.updateMassProperties();
-      }
-      b.body.wakeUp();
+      if (phys.isStatic(b.body)) phys.makeDynamic(b.body);
+      phys.wake(b.body);
       const m = b.body.mass || 1;
       const q = 26 * intensity * m;
-      b.body.applyForce(new CANNON.Vec3((Math.random() - 0.5) * q, (Math.random() - 0.2) * q * 0.5, (Math.random() - 0.5) * q), b.body.position);
+      phys.applyForce(b.body, (Math.random() - 0.5) * q, (Math.random() - 0.2) * q * 0.5, (Math.random() - 0.5) * q);
     }
     shake = Math.max(shake, 0.18 * intensity);
   }
@@ -2178,32 +2174,29 @@ function animate() {
     h.dust.material.opacity = 0.16 * fade;
     // unfreeze frozen pieces the funnel reaches
     for (const b of barrels) {
-      if (b.body.type !== CANNON.Body.STATIC) continue;
+      if (!phys.isStatic(b.body)) continue;
       if (Math.hypot(b.body.position.x - gp.x, b.body.position.z - gp.z) > R * 0.8) continue;
       if (b.body.position.y > HH) continue;
-      b.body.type = CANNON.Body.DYNAMIC;
-      b.body.mass = b.body._mass || 0.3;
-      b.body.updateMassProperties();
-      b.body.wakeUp();
+      phys.makeDynamic(b.body);
+      phys.wake(b.body);
     }
     // swirl every dynamic body in reach
-    for (const body of world.bodies) {
-      if (body.mass <= 0 || body.type === CANNON.Body.STATIC) continue;
+    for (const body of phys.bodies()) {
+      if (body.mass <= 0 || phys.isStatic(body)) continue;
       const dx = body.position.x - gp.x, dz = body.position.z - gp.z;
       const d2 = Math.hypot(dx, dz);
       if (d2 > R || body.position.y > HH) continue;
-      body.wakeUp();
+      phys.wake(body);
       const f = (1 - d2 / R) * fade;
       const inv = d2 > 0.001 ? 1 / d2 : 0;
       const rx = dx * inv, rz = dz * inv;   // radial out
       const tx = -rz, tz = rx;              // tangential
       const sw = 40 * f, pull = 15 * f, lift = (24 + Math.random() * 10) * f;
       const m = body.mass;
-      body.applyImpulse(new CANNON.Vec3(
+      phys.applyImpulse(body,
         (tx * sw - rx * pull) * m * dt,
         lift * m * dt,
-        (tz * sw - rz * pull) * m * dt
-      ), body.position);
+        (tz * sw - rz * pull) * m * dt);
     }
   }
 
@@ -2227,10 +2220,15 @@ function animate() {
     // grenade cooks off after a short fuse
     if (b.type === 'grenade' && !b.exploded && now - b.born > 1500) { explode(b); continue; }
     // spear flies point-first until it hits something
-    if ((b.type === 'spear' || b.type === 'f16') && !b.hit && b.body.velocity.lengthSquared() > 4) {
-      const v = b.body.velocity.clone(); v.normalize();
-      b.body.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), v);
-      b.body.angularVelocity.setZero();
+    if ((b.type === 'spear' || b.type === 'f16') && !b.hit) {
+      const v = phys.getVelocity(b.body);
+      const vlen2 = v.x * v.x + v.y * v.y + v.z * v.z;
+      if (vlen2 > 4) {
+        const inv = 1 / Math.sqrt(vlen2);
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(v.x * inv, v.y * inv, v.z * inv));
+        phys.setQuaternion(b.body, q.x, q.y, q.z, q.w);
+        phys.setAngularVelocity(b.body, 0, 0, 0);
+      }
     }
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
