@@ -25,6 +25,25 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 
 > Designed for desktop browsers with a mouse — not built for touch.
 
+## Physics engine (temporary switch)
+
+The game ships with **two** rigid-body physics engines behind a single facade:
+
+- **cannon** (cannon-es) — the default, and the original engine.
+- **crashcat** — a Jolt-style engine built for stable stacking, loaded lazily
+  from `https://esm.sh/crashcat@0.0.5` the first time it's selected.
+
+Use the **`Physics:`** button (top-right) or the **`K`** key to switch engines
+mid-game. Switching destroys the current world and rebuilds the active
+structure fresh on the other engine. Your choice persists across reloads
+(`localStorage`); if crashcat can't load (e.g. the CDN is blocked) the game
+stays on cannon and the button reads `Physics: crashcat unavailable`.
+
+This is **temporary** — it exists to compare the two engines on the big stacked
+structures. The loser will be removed in a follow-up; all switch-related code
+is tagged `// engine switch (temporary, #9)`. See
+[issue #9](https://github.com/freaxnx01/game-barrel-shooter/issues/9).
+
 ## Game Content
 
 **Ammo (grouped in the bottom-left picker):**
