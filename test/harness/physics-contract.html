@@ -43,26 +43,22 @@ async function runOne(label, makeBackend) {
   let phys;
   try {
     phys = await makeBackend();
+    const results = runContract(phys);
+    for (const r of results) row(r);
+    phys.destroy();
   } catch (e) {
-    lines.push(`<span class="fail">[ERROR] backend unavailable: ${e.message}</span>`);
+    if (phys) { try { phys.destroy(); } catch {} }
+    lines.push(`<span class="fail">[ERROR] ${label} failed: ${e.message}</span>`);
     allPass = false;
-    return;
   }
-  const results = runContract(phys);
-  for (const r of results) row(r);
-  try { phys.destroy(); } catch {}
 }
 
 async function main() {
   await runOne('cannon', () => Promise.resolve(createCannonBackend(CANNON)));
-  try {
-    await runOne('crashcat', async () => {
-      const cc = await import('https://esm.sh/crashcat@0.0.5');
-      return createCrashcatBackend(cc);
-    });
-  } catch (e) {
-    lines.push(`<span class="info">[INFO] crashcat unavailable: ${e.message}</span>`);
-  }
+  await runOne('crashcat', async () => {
+    const cc = await import('https://esm.sh/crashcat@0.0.5');
+    return createCrashcatBackend(cc);
+  });
   out.innerHTML = lines.join('\n');
   document.title = allPass ? 'CONTRACT PASS' : 'CONTRACT FAIL';
 }
