@@ -1225,7 +1225,7 @@ function shootBall(dir, power) {
   let constraint = null, chainMesh = null, anchorPos = null;
   if (type === 'wrecking') {
     { const cfg = camCfg[targetMode]; anchorPos = { x: 0, y: (cfg.plat ? 10 : 18) * TSCALE, z: cfg.tz * TSCALE }; }
-    const anchor = phys.addBody({ shape: { kind: 'sphere', radius: 0.05 }, mass: 0, material: 'heavy', position: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z }, isStatic: true });
+    const anchor = phys.addBody({ shape: { kind: 'none' }, mass: 0, material: 'heavy', position: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z }, isStatic: true });
     // chain just long enough that the bottom of the swing sweeps through the targets
     const len = anchorPos.y - 0.75;
     let toBallX = body.position.x - anchorPos.x, toBallY = body.position.y - anchorPos.y, toBallZ = body.position.z - anchorPos.z;

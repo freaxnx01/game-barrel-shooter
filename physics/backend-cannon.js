@@ -3,7 +3,7 @@
 // behaviour is unchanged. Game code never touches CANNON directly after
 // the migration — it only talks to the `phys` handle returned here.
 
-import { MATERIALS, CONTACT_PAIRS, DEFAULT_CONTACT, contactFor } from './materials.js';
+import { MATERIALS, CONTACT_PAIRS } from './materials.js';
 
 export function createCannonBackend(CANNON) {
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
@@ -15,7 +15,6 @@ export function createCannonBackend(CANNON) {
   for (const [a, b, c] of CONTACT_PAIRS) {
     world.addContactMaterial(new CANNON.ContactMaterial(mats[a], mats[b], { friction: c.friction, restitution: c.restitution }));
   }
-  void DEFAULT_CONTACT; // cannon falls back to its internal default for unpaired
 
   const handles = new Set();
 
@@ -24,6 +23,7 @@ export function createCannonBackend(CANNON) {
     if (spec.kind === 'sphere') return new CANNON.Sphere(spec.radius);
     if (spec.kind === 'cylinder') return new CANNON.Cylinder(spec.radiusTop, spec.radiusBottom, spec.height, spec.segments);
     if (spec.kind === 'ground') return new CANNON.Plane();
+    if (spec.kind === 'none') return null; // shapeless anchor: holds joints, never collides
     throw new Error('unknown shape kind: ' + spec.kind);
   }
 
@@ -107,12 +107,7 @@ export function createCannonBackend(CANNON) {
       const otherRaw = e.body === h.raw ? e.target : e.body;
       const other = otherRaw ? otherRaw._handle : null;
       const impactSpeed = Math.abs(e.contact.getImpactVelocityAlongNormal());
-      const p = e.contact.bi.id === h.raw.id ? e.contact.ri : e.contact.rj;
-      const point = { x: p.x, y: p.y, z: p.z };
-      // translate to world point
-      const wp = { x: h.raw.position.x + p.x, y: h.raw.position.y + p.y, z: h.raw.position.z + p.z };
-      cb(other, impactSpeed, wp);
-      void point;
+      cb(other, impactSpeed);
     });
   }
 
