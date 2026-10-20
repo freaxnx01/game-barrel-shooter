@@ -638,20 +638,28 @@ function setupFortress() {
   let mi = 0;
   const m = () => stoneMatls[mi++ % stoneMatls.length];
   const xs = [-1.65 * F, -0.55 * F, 0.55 * F, 1.65 * F];
+  // crashcat: nothing may overlap (#9) — the gate lintel spans the whole course instead of
+  // cutting into its end bricks, side-wall bricks fit between the front and back walls,
+  // and the corner towers stand clear of the wall ends
+  const onCrashcat = phys.name === 'crashcat';
+  const sideBL = onCrashcat ? (2 * S - BD - 0.004) / 4 : BL;
+  const lintelHalf = onCrashcat ? 2 * BL : 1.65 * F;
   for (let c = 0; c < courses; c++) {
     const y = BH / 2 + c * (BH + 0.02);
     // front wall (+z) with gate opening + lintel
     for (let j = 0; j < 4; j++) {
       const mid = j === 1 || j === 2;
       if (mid && c < 3) continue; // gate opening (lintel replaces course 2)
+      if (onCrashcat && c === 2) continue;
       addBlock(BL / 2, BH / 2, BD / 2, m(), 60, xs[j], y, zC + S, 0, 0);
     }
-    if (c === 2) addBlock(1.65 * F, BH / 2, BD / 2, m(), 90, 0, y, zC + S, 0, 0);
+    if (c === 2) addBlock(lintelHalf, BH / 2, BD / 2, m(), 90, 0, y, zC + S, 0, 0);
     // back, left, right walls
     for (let j = 0; j < 4; j++) {
+      const sideZ = onCrashcat ? (j - 1.5) * sideBL : xs[j];
       addBlock(BL / 2, BH / 2, BD / 2, m(), 60, xs[j], y, zC - S, 0, 0);
-      addBlock(BL / 2, BH / 2, BD / 2, m(), 60, -S, y, zC + xs[j], Math.PI / 2, 0);
-      addBlock(BL / 2, BH / 2, BD / 2, m(), 60, S, y, zC + xs[j], Math.PI / 2, 0);
+      addBlock(sideBL / 2, BH / 2, BD / 2, m(), 60, -S, y, zC + sideZ, Math.PI / 2, 0);
+      addBlock(sideBL / 2, BH / 2, BD / 2, m(), 60, S, y, zC + sideZ, Math.PI / 2, 0);
     }
   }
   // battlements: cubes on wall tops, every other brick
@@ -663,7 +671,8 @@ function setupFortress() {
     addBlock(0.45, 0.45, 0.45, m(), 12, S, topY, zC + p, 0, 0);
   }
   // corner towers
-  for (const [tx, tz] of [[-S - 1.2, -S - 1.2], [S + 1.2, -S - 1.2], [-S - 1.2, S + 1.2], [S + 1.2, S + 1.2]]) {
+  const T = onCrashcat ? S + BD / 2 + 1.5 + 0.002 : S + 1.2;
+  for (const [tx, tz] of [[-T, -T], [T, -T], [-T, T], [T, T]]) {
     for (let k = 0; k < 4; k++) {
       addBlock(1.5, 1.08, 1.5, m(), 100, tx, 1.08 + k * (2.16 + 0.02), zC + tz, 0, 0);
     }
@@ -686,12 +695,14 @@ function setupColosseum() {
     const step = 2 * Math.PI / N;
     const a0 = Math.PI - ((count - 1) * step) / 2; // ruin opens toward the camera
     const chord = 2 * lv.R * Math.sin(step / 2);
+    // crashcat: lintels end where neighbours' inner faces meet, so adjacent lintels don't overlap (#9)
+    const lintelHalf = phys.name === 'crashcat' ? (lv.R - lD / 2) * Math.tan(step / 2) - 0.002 : chord / 2 + 0.2;
     for (let j = 0; j < count; j++) {
       const a = a0 + j * step;
       addBlock(pW / 2, pH / 2, pW / 2, m(), 45, lv.R * Math.sin(a), yP, zC + lv.R * Math.cos(a), a, 0);
       if (j < count - 1 || count === N) {
         const am = a + step / 2;
-        addBlock(chord / 2 + 0.2, lH / 2, lD / 2, m(), 35, lv.R * Math.sin(am), yL, zC + lv.R * Math.cos(am), am, 0);
+        addBlock(lintelHalf, lH / 2, lD / 2, m(), 35, lv.R * Math.sin(am), yL, zC + lv.R * Math.cos(am), am, 0);
       }
     }
   });
@@ -702,28 +713,38 @@ function setupColosseum() {
 // door (optional): { c0, c1, rows } carves a rectangular opening (columns c0..c1, bottom `rows` courses).
 function brickWall(cx, cz, along, cols, rows, bw, bh, bd, gap, m, mass, door) {
   const ry = along === 'z' ? Math.PI / 2 : 0;
+  const at = (off) => along === 'x' ? [cx + off, cz] : [cx, cz + off];
+  // crashcat: the unstaggered bricks over the door would rest on nothing, so the first
+  // course above it is one lintel bearing on the bricks beside the opening (#9)
+  const lintel = door && phys.name === 'crashcat' && door.rows < rows;
   for (let r = 0; r < rows; r++) {
     const y = bh / 2 + r * (bh + gap);
     for (let c = 0; c < cols; c++) {
       if (door && c >= door.c0 && c <= door.c1 && r < door.rows) continue;
-      const off = (c - (cols - 1) / 2) * (bw + gap);
-      const x = along === 'x' ? cx + off : cx;
-      const z = along === 'x' ? cz : cz + off;
+      if (lintel && r === door.rows && c >= door.c0 - 1 && c <= door.c1 + 1) continue;
+      const [x, z] = at((c - (cols - 1) / 2) * (bw + gap));
       addBlock(bw / 2, bh / 2, bd / 2, m(), mass, x, y, z, ry, 0);
     }
   }
+  if (!lintel) return;
+  const span = door.c1 - door.c0 + 3;
+  const [x, z] = at(((door.c0 + door.c1) / 2 - (cols - 1) / 2) * (bw + gap));
+  addBlock((span * (bw + gap) - gap) / 2, bh / 2, bd / 2, m(), mass * span, x, bh / 2 + door.rows * (bh + gap), z, ry, 0);
 }
 
 function setupPyramid() {
   const b = 1.1, gap = 0.02, zC = -6, levels = 8;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  // crashcat: each level's ring rests half on the ring below and half over the hollow, so it
+  // only stands frozen; a second, inner ring gives every block full support (#9)
+  const rings = phys.name === 'crashcat' ? 2 : 1;
   for (let i = 0; i < levels; i++) {
     const n = levels - i;            // blocks per side, shrinks each step
     const y = b / 2 + i * (b + gap);
     const half = (n - 1) / 2;
     for (let a = 0; a < n; a++) {
       for (let c = 0; c < n; c++) {
-        const edge = a === 0 || a === n - 1 || c === 0 || c === n - 1;
+        const edge = Math.min(a, c, n - 1 - a, n - 1 - c) < rings;
         if (n > 1 && !edge) continue; // hollow ring, solid single cube on top
         addBlock(b / 2, b / 2, b / 2, m(), 45, (a - half) * (b + gap), y, zC + (c - half) * (b + gap), 0, 0);
       }
@@ -738,16 +759,21 @@ function setupTowerGate() {
   const door = { c0: 2, c1: 3, rows: 4 };
   brickWall(0, zC + S, 'x', cols, rows, bw, bh, bd, gap, m, 30, door);       // front (gate)
   brickWall(0, zC - S, 'x', cols, rows, bw, bh, bd, gap, m, 30, door);       // back (gate)
-  brickWall(-S, zC, 'z', cols, rows, bw, bh, bd, gap, m, 30, door);         // left (gate)
-  brickWall(S, zC, 'z', cols, rows, bw, bh, bd, gap, m, 30, door);          // right (gate)
+  // crashcat: side-wall bricks are shortened to fit between the front and back walls, and the
+  // side crenellations shift half a brick so they clear the front and back ones at the corners (#9)
+  const onCrashcat = phys.name === 'crashcat';
+  const sideBw = onCrashcat ? (2 * S - bd - 0.004 - (cols - 1) * gap) / cols : bw;
+  brickWall(-S, zC, 'z', cols, rows, sideBw, bh, bd, gap, m, 30, door);     // left (gate)
+  brickWall(S, zC, 'z', cols, rows, sideBw, bh, bd, gap, m, 30, door);      // right (gate)
   // crenellations around the top
   const topY = rows * (bh + gap) + 0.35;
   for (let c = 0; c < cols; c += 2) {
     const off = (c - (cols - 1) / 2) * (bw + gap);
     addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC + S, 0, 0);
     addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC - S, 0, 0);
-    addBlock(0.35, 0.35, 0.35, m(), 10, -S, topY, zC + off, 0, 0);
-    addBlock(0.35, 0.35, 0.35, m(), 10, S, topY, zC + off, 0, 0);
+    const sideOff = onCrashcat ? off + (bw + gap) / 2 : off;
+    addBlock(0.35, 0.35, 0.35, m(), 10, -S, topY, zC + sideOff, 0, 0);
+    addBlock(0.35, 0.35, 0.35, m(), 10, S, topY, zC + sideOff, 0, 0);
   }
 }
 
@@ -761,6 +787,8 @@ function setupGate() {
 function setupSpiral() {
   const zC = -6, steps = 20, rise = 0.32, R = 1.7, rP = 2.15;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  // crashcat: the frame beams sit on the post tops instead of cutting through them (#9)
+  const onCrashcat = phys.name === 'crashcat';
   // spiral treads
   for (let i = 0; i < steps; i++) {
     const a = i * (Math.PI * 2 / 12);
@@ -772,13 +800,15 @@ function setupSpiral() {
   const cn = Math.ceil(topY / 0.7);
   for (let k = 0; k < cn; k++) addBlock(0.28, 0.35, 0.28, m(), 14, 0, 0.35 + k * 0.7, zC, 0, 0);
   // 4 corner posts
+  const postPitch = onCrashcat ? 0.702 : 0.7;
   const corners = [[rP, rP], [-rP, rP], [rP, -rP], [-rP, -rP]];
   for (const [px, pz] of corners) {
-    for (let k = 0; k < cn; k++) addBlock(0.22, 0.35, 0.22, m(), 12, px, 0.35 + k * 0.7, zC + pz, 0, 0);
+    for (let k = 0; k < cn; k++) addBlock(0.22, 0.35, 0.22, m(), 12, px, 0.35 + k * postPitch, zC + pz, 0, 0);
   }
-  // top frame beams linking the posts
+  // top frame beams linking the posts (crashcat: x-beams on the posts, z-beams across them)
+  const beamY = (ry) => onCrashcat ? cn * postPitch + 0.18 + (ry ? 0.362 : 0) : topY + 0.2;
   for (const [ax, az, ry] of [[0, rP, 0], [0, -rP, 0], [rP, 0, Math.PI / 2], [-rP, 0, Math.PI / 2]]) {
-    addBlock(rP + 0.22, 0.18, 0.22, m(), 10, ax, topY + 0.2, zC + az, ry, 0);
+    addBlock(rP + 0.22, 0.18, 0.22, m(), 10, ax, beamY(ry), zC + az, ry, 0);
   }
 }
 
@@ -801,15 +831,22 @@ function setupOctagon() {
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
   const step = 2 * Math.PI / N;
   const chord = 2 * R * Math.sin(step / 2);
+  // crashcat: beams sit on the column tops instead of cutting through the column joints,
+  // and stop where neighbouring beams' inner faces meet, so nothing overlaps (#9)
+  const onCrashcat = phys.name === 'crashcat';
+  const beamH = 0.14, beamD = 0.22;
+  const colH = onCrashcat ? fh - 2 * beamH - 0.004 : fh;
+  const beamHalf = onCrashcat ? (R - beamD) * Math.tan(step / 2) - 0.002 : chord / 2;
   for (let j = 0; j < N; j++) {
     const a = j * step;
     const cx = R * Math.sin(a), cz = zC + R * Math.cos(a);
     // column (stacked so it can shatter)
-    for (let f = 0; f < floors; f++) addBlock(colW, fh / 2, colW, m(), 22, cx, fh / 2 + f * fh, cz, a, 0);
+    for (let f = 0; f < floors; f++) addBlock(colW, colH / 2, colW, m(), 22, cx, colH / 2 + f * fh, cz, a, 0);
     // ring beams at each floor top
     const am = a + step / 2;
     for (let f = 1; f <= floors; f++) {
-      addBlock(chord / 2, 0.14, 0.22, m(), 14, R * Math.sin(am), f * fh, zC + R * Math.cos(am), am, 0);
+      const beamY = onCrashcat ? f * fh - beamH - 0.002 : f * fh;
+      addBlock(beamHalf, beamH, beamD, m(), 14, R * Math.sin(am), beamY, zC + R * Math.cos(am), am, 0);
     }
   }
 }
@@ -946,20 +983,32 @@ function setupCylinder() {
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
   const step = 2 * Math.PI / N;
   const chord = 2 * R * Math.sin(step / 2);
+  // crashcat: bricks stop where neighbours' inner faces meet, and the crown sits on
+  // the top course instead of dipping into it, so nothing overlaps (#9)
+  const onCrashcat = phys.name === 'crashcat';
+  const halfLen = (depth) => onCrashcat ? (R - depth) * Math.tan(step / 2) - 0.002 : chord / 2;
+  // crashcat: a staggered brick needs one of the two bricks below it, else it is left out —
+  // door and windows get stepped tops instead of bricks resting on nothing (#9)
+  let below = null;
   for (let c = 0; c < courses; c++) {
     const y = bh / 2 + c * (bh + gap);
+    const placed = new Array(N).fill(false);
     for (let j = 0; j < N; j++) {
       const a = j * step + (c % 2) * (step / 2);   // stagger like brickwork
       if (Math.cos(a) > 0.9 && c < 3) continue;    // doorway at the front
       if (c >= 4 && c <= 6 && j % 4 === 0) continue; // window band
-      addBlock(chord / 2, bh / 2, 0.4, m(), 35, R * Math.sin(a), y, zC + R * Math.cos(a), a, 0);
+      // odd courses sit between j and j+1 below, even ones between j-1 and j
+      if (onCrashcat && below && !(c % 2 ? below[j] || below[(j + 1) % N] : below[j] || below[(j + N - 1) % N])) continue;
+      placed[j] = true;
+      addBlock(halfLen(0.4), bh / 2, 0.4, m(), 35, R * Math.sin(a), y, zC + R * Math.cos(a), a, 0);
     }
+    below = placed;
   }
   // crown ring
-  const topY = bh / 2 + courses * (bh + gap);
+  const topY = onCrashcat ? courses * (bh + gap) + 0.28 : bh / 2 + courses * (bh + gap);
   for (let j = 0; j < N; j++) {
     const a = j * step;
-    addBlock(chord / 2, 0.28, 0.5, m(), 20, R * Math.sin(a), topY, zC + R * Math.cos(a), a, 0);
+    addBlock(halfLen(0.5), 0.28, 0.5, m(), 20, R * Math.sin(a), topY, zC + R * Math.cos(a), a, 0);
   }
 }
 
