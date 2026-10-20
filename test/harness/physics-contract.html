@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Physics Contract</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+  }
+}
+</script>
+<style>
+  body { background:#1a1611; color:#f5efe4; font-family: monospace; padding: 16px; }
+  pre { white-space: pre-wrap; }
+  .pass { color: #6dd96d; }
+  .fail { color: #e0483a; }
+  .info { color: #c9a13a; }
+</style>
+</head>
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+import * as CANNON from 'cannon-es';
+import { createCannonBackend } from '../../physics/backend-cannon.js';
+import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
+import { runContract } from './contract.js';
+
+const out = document.getElementById('out');
+const lines = [];
+let allPass = true;
+
+function row(r) {
+  const cls = r.pass ? 'pass' : (r.required === false ? 'info' : 'fail');
+  const tag = r.pass ? 'PASS' : (r.required === false ? 'INFO' : 'FAIL');
+  if (!r.pass && r.required !== false) allPass = false;
+  lines.push(`<span class="${cls}">[${tag}] ${r.name}: ${r.detail}</span>`);
+}
+
+async function runOne(label, makeBackend) {
+  lines.push(`=== ${label} ===`);
+  let phys;
+  try {
+    phys = await makeBackend();
+  } catch (e) {
+    lines.push(`<span class="fail">[ERROR] backend unavailable: ${e.message}</span>`);
+    allPass = false;
+    return;
+  }
+  const results = runContract(phys);
+  for (const r of results) row(r);
+  try { phys.destroy(); } catch {}
+}
+
+async function main() {
+  await runOne('cannon', () => Promise.resolve(createCannonBackend(CANNON)));
+  try {
+    await runOne('crashcat', async () => {
+      const cc = await import('https://esm.sh/crashcat@0.0.5');
+      return createCrashcatBackend(cc);
+    });
+  } catch (e) {
+    lines.push(`<span class="info">[INFO] crashcat unavailable: ${e.message}</span>`);
+  }
+  out.innerHTML = lines.join('\n');
+  document.title = allPass ? 'CONTRACT PASS' : 'CONTRACT FAIL';
+}
+main();
+</script>
+</body>
+</html>
