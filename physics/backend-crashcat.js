@@ -5,6 +5,9 @@
 
 import { contactFor, DEFAULT_CONTACT } from './materials.js';
 
+// Half-extent of the ground box: large enough to act like cannon's infinite plane.
+const GROUND_HALF = 1000;
+
 export function createCrashcatBackend(cc) {
   cc.registerAll();
 
@@ -22,14 +25,22 @@ export function createCrashcatBackend(cc) {
   const handles = new Set();        // PBody handles
   const byId = new Map();           // engine body.id → handle (for listener lookup)
   const collideCbs = new Map();      // handle → onCollide callback
-  const joints = new Set();
+  const joints = new Set();          // joint wrappers { raw, kind }
+  const pendingCollisions = [];      // collide events queued during updateWorld
 
   function makeShape(spec) {
     if (spec.kind === 'box') return cc.box.create({ halfExtents: spec.halfExtents });
     if (spec.kind === 'sphere') return cc.sphere.create({ radius: spec.radius });
     if (spec.kind === 'cylinder') return cc.cylinder.create({ halfHeight: spec.height / 2, radius: spec.radiusTop });
-    if (spec.kind === 'ground') return cc.box.create({ halfExtents: [100, 0.5, 100] });
+    if (spec.kind === 'ground') return cc.box.create({ halfExtents: [GROUND_HALF, 0.5, GROUND_HALF] });
+    if (spec.kind === 'none') return cc.emptyShape.create();
     throw new Error('unknown shape kind: ' + spec.kind);
+  }
+
+  // The ground's top surface sits at spec.position.y (like cannon's plane).
+  function bodyPosition(spec) {
+    const p = spec.position;
+    return spec.shape.kind === 'ground' ? [p.x, p.y - 0.5, p.z] : [p.x, p.y, p.z];
   }
 
   function addBody(spec) {
@@ -40,11 +51,12 @@ export function createCrashcatBackend(cc) {
       shape: makeShape(spec.shape),
       motionType,
       objectLayer,
-      position: [spec.position.x, spec.position.y, spec.position.z],
+      position: bodyPosition(spec),
       userData: null, // holds the handle (see below); game userData lives on the handle
     };
+    // spec mass also on static bodies, so makeDynamic() gets it instead of shape density
+    if (spec.mass > 0) opts.mass = spec.mass;
     if (!isStatic) {
-      opts.mass = spec.mass;
       if (spec.linearDamping != null) opts.linearDamping = spec.linearDamping;
       if (spec.angularDamping != null) opts.angularDamping = spec.angularDamping;
     }
@@ -54,10 +66,6 @@ export function createCrashcatBackend(cc) {
     const body = cc.rigidBody.create(world, opts);
     if (spec.quaternion) {
       cc.rigidBody.setQuaternion(world, body, [spec.quaternion.x, spec.quaternion.y, spec.quaternion.z, spec.quaternion.w], false);
-    }
-    if (spec.shape.kind === 'ground') {
-      // ground box top sits at y=0
-      cc.rigidBody.setPosition(world, body, [0, -0.5, 0], false);
     }
     const handle = {
       raw: body,
@@ -102,6 +110,7 @@ export function createCrashcatBackend(cc) {
     let n = 0;
     while (accumulator >= FIXED && n < 10) {
       cc.updateWorld(world, listener, FIXED);
+      flushCollisions();
       accumulator -= FIXED;
       n++;
     }
@@ -138,31 +147,50 @@ export function createCrashcatBackend(cc) {
 
   function onCollide(h, cb) { collideCbs.set(h, cb); }
 
-  // ---- listener: material pairs + contact dispatch ----
-  const wp = [0, 0, 0];
+  // ---- listener: material pairs + queued contact events ----
+  // crashcat keeps using the bodies after the listener returns, so the game's
+  // collide callbacks (which remove bodies / add joints) must not run inside
+  // updateWorld: contacts are queued here and dispatched by flushCollisions().
+  function applyPairMaterial(ha, hb, settings) {
+    const c = (ha && hb) ? contactFor(ha.material, hb.material) : DEFAULT_CONTACT;
+    settings.combinedFriction = c.friction;
+    settings.combinedRestitution = c.restitution;
+  }
+
+  function impactSpeedOf(bodyA, bodyB, manifold) {
+    const n = manifold.worldSpaceNormal; // [x,y,z], points A→B
+    const va = bodyA.motionProperties.linearVelocity;
+    const vb = bodyB.motionProperties.linearVelocity;
+    return Math.abs((va[0] - vb[0]) * n[0] + (va[1] - vb[1]) * n[1] + (va[2] - vb[2]) * n[2]);
+  }
+
   const listener = {
     onContactAdded(bodyA, bodyB, manifold, settings) {
       const ha = byId.get(bodyA.id);
       const hb = byId.get(bodyB.id);
-      const c = (ha && hb) ? contactFor(ha.material, hb.material) : DEFAULT_CONTACT;
-      settings.combinedFriction = c.friction;
-      settings.combinedRestitution = c.restitution;
-      // dispatch per-body collide callbacks
-      const n = manifold.worldSpaceNormal; // [x,y,z], points A→B
-      const va = bodyA.motionProperties ? bodyA.motionProperties.linearVelocity : [0, 0, 0];
-      const vb = bodyB.motionProperties ? bodyB.motionProperties.linearVelocity : [0, 0, 0];
-      const rvx = va[0] - vb[0], rvy = va[1] - vb[1], rvz = va[2] - vb[2];
-      const impactSpeed = Math.abs(rvx * n[0] + rvy * n[1] + rvz * n[2]);
-      cc.getWorldSpaceContactPointOnA(wp, manifold, 0);
-      const point = { x: wp[0], y: wp[1], z: wp[2] };
-      if (ha && collideCbs.has(ha)) {
-        try { collideCbs.get(ha)(hb, impactSpeed, point); } catch (e) { console.error(e); }
-      }
-      if (hb && collideCbs.has(hb)) {
-        try { collideCbs.get(hb)(ha, impactSpeed, point); } catch (e) { console.error(e); }
-      }
+      applyPairMaterial(ha, hb, settings);
+      if (!ha || !hb) return;
+      if (!collideCbs.has(ha) && !collideCbs.has(hb)) return;
+      pendingCollisions.push({ ha, hb, impactSpeed: impactSpeedOf(bodyA, bodyB, manifold) });
+    },
+    onContactPersisted(bodyA, bodyB, manifold, settings) {
+      applyPairMaterial(byId.get(bodyA.id), byId.get(bodyB.id), settings);
     },
   };
+
+  function dispatchCollision(self, other, impactSpeed) {
+    if (!handles.has(self) || !handles.has(other)) return;
+    const cb = collideCbs.get(self);
+    if (cb) cb(other, impactSpeed);
+  }
+
+  function flushCollisions() {
+    const events = pendingCollisions.splice(0);
+    for (const e of events) {
+      dispatchCollision(e.ha, e.hb, e.impactSpeed);
+      dispatchCollision(e.hb, e.ha, e.impactSpeed);
+    }
+  }
 
   function addDistanceJoint(a, b, length) {
     const pa = [a.position.x, a.position.y, a.position.z];
@@ -173,8 +201,9 @@ export function createCrashcatBackend(cc) {
       minDistance: length, maxDistance: length,
       space: cc.ConstraintSpace.WORLD,
     });
-    joints.add(j);
-    return { raw: j, kind: 'distance' };
+    const joint = { raw: j, kind: 'distance' };
+    joints.add(joint);
+    return joint;
   }
   function addFixedJoint(a, b) {
     const pa = [a.position.x, a.position.y, a.position.z];
@@ -186,8 +215,9 @@ export function createCrashcatBackend(cc) {
       axisX2: [1, 0, 0], axisY2: [0, 1, 0],
       space: cc.ConstraintSpace.WORLD,
     });
-    joints.add(j);
-    return { raw: j, kind: 'fixed' };
+    const joint = { raw: j, kind: 'fixed' };
+    joints.add(joint);
+    return joint;
   }
   function removeJoint(j) {
     if (!j) return;
@@ -197,17 +227,9 @@ export function createCrashcatBackend(cc) {
   }
 
   function destroy() {
-    for (const j of [...joints]) {
-      const mod = j.kind === 'distance' ? cc.distanceConstraint : cc.fixedConstraint;
-      try { mod.remove(world, j.raw); } catch {}
-    }
-    joints.clear();
-    for (const h of [...handles]) {
-      try { cc.rigidBody.remove(world, h.raw); } catch {}
-    }
-    handles.clear();
-    byId.clear();
-    collideCbs.clear();
+    for (const j of [...joints]) removeJoint(j);
+    for (const h of [...handles]) removeBody(h);
+    pendingCollisions.length = 0;
     accumulator = 0;
   }
 
