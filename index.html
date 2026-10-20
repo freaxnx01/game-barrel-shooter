@@ -417,6 +417,7 @@ function addCard(shapeHalf, geo, x, y, z, rotZ) {
     shape: { kind: 'box', halfExtents: shapeHalf },
     mass: 0.3,
     isStatic: phys.name === 'cannon', // frozen until first projectile impact — unfreezeCards() (cannon-only workaround #9)
+    startAsleep: phys.name === 'crashcat', // engine switch (temporary, #9)
     material: 'card',
     position: { x, y, z },
     quaternion: { x: 0, y: 0, z: Math.sin(rotZ / 2), w: Math.cos(rotZ / 2) },
@@ -1071,6 +1072,7 @@ const balls = []; // {body, mesh, born, type, exploded}
 let ammoType = 'basketball';
 const ammoEl = document.getElementById('ammo');
 function setAmmo(type) {
+  if (isCarvedOut(type)) type = 'basketball'; // engine switch (temporary, #9)
   ammoType = type;
   for (const b of ammoEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.type === type);
   // Sniper lens zooms the view for precision; other ammo restores the default FOV.
@@ -2001,6 +2003,10 @@ const engineEl = document.getElementById('engine');
 let crashcatUnavailable = false;
 let switching = false;
 
+function isCarvedOut(type) {
+  return phys.name === 'crashcat' && CRASHCAT_DISABLED_WEAPONS.has(type);
+}
+
 function engineLabel() {
   if (crashcatUnavailable) return 'Physics: crashcat unavailable';
   return 'Physics: ' + phys.name;
@@ -2010,13 +2016,20 @@ function refreshEngineUi() {
   engineEl.textContent = engineLabel();
   engineEl.disabled = crashcatUnavailable || switching;
   // dim carved-out weapons on crashcat
-  const disabled = phys.name === 'crashcat';
   for (const btn of ammoEl.querySelectorAll('button')) {
-    const off = disabled && CRASHCAT_DISABLED_WEAPONS.has(btn.dataset.type);
+    const off = isCarvedOut(btn.dataset.type);
     btn.disabled = off;
     btn.title = off ? 'Not available on crashcat yet' : '';
   }
-  if (disabled && CRASHCAT_DISABLED_WEAPONS.has(ammoType)) setAmmo('basketball');
+  if (isCarvedOut(ammoType)) setAmmo('basketball');
+}
+
+function persistEngineChoice(name) {
+  try {
+    writeEngineChoice(localStorage, name);
+  } catch (e) {
+    console.warn('[physics] could not persist engine choice:', e.message);
+  }
 }
 
 async function switchEngine(name) {
@@ -2025,25 +2038,27 @@ async function switchEngine(name) {
   if (name === 'crashcat' && crashcatUnavailable) return;
   switching = true;
   engineEl.disabled = true;
-  // tear down everything that references the old world
-  stopAutoPlay();
-  detachHarpoon();
-  for (const b of balls) removeProjectile(b);
-  balls.length = 0;
-  for (const h of hurricanes) scene.remove(h.group);
-  hurricanes.length = 0;
-  if (harpoonLink) detachHarpoon();
-  // destroy the old backend and create the other one
-  phys.destroy();
-  const loaded = await loadBackend(name, CANNON);
-  phys = loaded.phys;
-  if (loaded.error) { crashcatUnavailable = true; }
-  else { crashcatUnavailable = false; }
-  writeEngineChoice(localStorage, phys.name);
-  setupWorld(); // recreate ground + platform on the new backend
-  reset();      // rebuild the current structure fresh
-  switching = false;
-  refreshEngineUi();
+  try {
+    // tear down everything that references the old world
+    stopAutoPlay();
+    detachHarpoon();
+    for (const b of balls) removeProjectile(b);
+    balls.length = 0;
+    for (const h of hurricanes) scene.remove(h.group);
+    hurricanes.length = 0;
+    // destroy the old backend and create the other one
+    phys.destroy();
+    const loaded = await loadBackend(name, CANNON);
+    phys = loaded.phys;
+    if (loaded.error) { crashcatUnavailable = true; }
+    else { crashcatUnavailable = false; }
+    persistEngineChoice(phys.name);
+    setupWorld(); // recreate ground + platform on the new backend
+    reset();      // rebuild the current structure fresh
+  } finally {
+    switching = false;
+    refreshEngineUi();
+  }
 }
 
 function toggleEngine() {
