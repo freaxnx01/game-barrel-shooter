@@ -38,7 +38,7 @@
   #reset:hover, .target button:hover, #autoplay:hover, #engine:hover { background: rgba(245,239,228,0.22); }
   #autoplay.active { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
   #engine:disabled { opacity: 0.45; cursor: not-allowed; }
-  .target { position: fixed; top: 20px; right: 130px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 420px; }
+  .target { position: fixed; top: 20px; right: 236px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 420px; }
   .target button { padding: 8px 14px; }
   .target button.sel { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
   .ammo {
@@ -717,8 +717,9 @@ function brickWall(cx, cz, along, cols, rows, bw, bh, bd, gap, m, mass, door) {
   // crashcat: the unstaggered bricks over the door would rest on nothing, so the first
   // course above it is one lintel bearing on the bricks beside the opening (#9)
   const lintel = door && phys.name === 'crashcat' && door.rows < rows;
+  const rowPitch = brickRowPitch(bh, gap);
   for (let r = 0; r < rows; r++) {
-    const y = bh / 2 + r * (bh + gap);
+    const y = bh / 2 + r * rowPitch;
     for (let c = 0; c < cols; c++) {
       if (door && c >= door.c0 && c <= door.c1 && r < door.rows) continue;
       if (lintel && r === door.rows && c >= door.c0 - 1 && c <= door.c1 + 1) continue;
@@ -729,7 +730,12 @@ function brickWall(cx, cz, along, cols, rows, bw, bh, bd, gap, m, mass, door) {
   if (!lintel) return;
   const span = door.c1 - door.c0 + 3;
   const [x, z] = at(((door.c0 + door.c1) / 2 - (cols - 1) / 2) * (bw + gap));
-  addBlock((span * (bw + gap) - gap) / 2, bh / 2, bd / 2, m(), mass * span, x, bh / 2 + door.rows * (bh + gap), z, ry, 0);
+  addBlock((span * (bw + gap) - gap) / 2, bh / 2, bd / 2, m(), mass * span, x, bh / 2 + door.rows * rowPitch, z, ry, 0);
+}
+// crashcat: courses rest on each other instead of hovering a gap apart; a sleeping brick only
+// wakes when something touches it, so a hovering course would sag on the first hit (#9)
+function brickRowPitch(bh, gap) {
+  return bh + (phys.name === 'crashcat' ? 0.001 : gap);
 }
 
 function setupPyramid() {
@@ -766,7 +772,7 @@ function setupTowerGate() {
   brickWall(-S, zC, 'z', cols, rows, sideBw, bh, bd, gap, m, 30, door);     // left (gate)
   brickWall(S, zC, 'z', cols, rows, sideBw, bh, bd, gap, m, 30, door);      // right (gate)
   // crenellations around the top
-  const topY = rows * (bh + gap) + 0.35;
+  const topY = rows * brickRowPitch(bh, gap) + 0.35;
   for (let c = 0; c < cols; c += 2) {
     const off = (c - (cols - 1) / 2) * (bw + gap);
     addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC + S, 0, 0);
@@ -815,15 +821,17 @@ function setupSpiral() {
 function setupPoleTower() {
   const zC = -6, b = 0.9, gap = 0.04;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
+  // crashcat: layers rest on each other instead of hovering a gap apart (#9)
+  const lp = b + (phys.name === 'crashcat' ? 0.001 : gap);
   // clustered legs: 3x3 ring, then 2x2, then a stub column, then a tall pole
   const ring = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]];
   for (const [gx, gz] of ring) addBlock(b / 2, b / 2, b / 2, m(), 30, gx * (b + gap), b / 2, zC + gz * (b + gap), 0, 0);
   const quad = [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]];
-  for (const [gx, gz] of quad) addBlock(b / 2, b / 2, b / 2, m(), 24, gx * (b + gap), b + gap + b / 2, zC + gz * (b + gap), 0, 0);
+  for (const [gx, gz] of quad) addBlock(b / 2, b / 2, b / 2, m(), 24, gx * (b + gap), lp + b / 2, zC + gz * (b + gap), 0, 0);
   // stub column
-  for (let k = 0; k < 2; k++) addBlock(b / 2, b / 2, b / 2, m(), 18, 0, 2 * (b + gap) + b / 2 + k * (b + gap), zC, 0, 0);
+  for (let k = 0; k < 2; k++) addBlock(b / 2, b / 2, b / 2, m(), 18, 0, 2 * lp + b / 2 + k * lp, zC, 0, 0);
   // tall pole
-  addBlock(0.32, 2.2, 0.32, m(), 20, 0, 4 * (b + gap) + 2.2, zC, 0, 0);
+  addBlock(0.32, 2.2, 0.32, m(), 20, 0, 4 * lp + 2.2, zC, 0, 0);
 }
 
 function setupOctagon() {
@@ -938,7 +946,14 @@ function setupEiffel() {
   }
   // spire
   const top = Y[Y.length - 1];
-  addStick([0, top, zC], [0, top + 2.3, zC], th * 1.1, mass);
+  if (phys.name !== 'crashcat') {
+    addStick([0, top, zC], [0, top + 2.3, zC], th * 1.1, mass);
+    return;
+  }
+  // crashcat: the top ring is hollow, so the spire stands on a crossbar resting on the ring (#9)
+  const rTop = R[R.length - 1], ringTop = top + th * 0.85 / 2, barTop = ringTop + th * 1.1;
+  addStick([-rTop - 0.04, ringTop + th * 0.55, zC], [rTop + 0.04, ringTop + th * 0.55, zC], th * 1.1, mass * 0.7);
+  addStick([0, barTop + 0.001, zC], [0, barTop + 0.001 + 2.3, zC], th * 1.1, mass);
 }
 
 // bowling pin: smooth lathe profile + red neck stripes, geometry created once
