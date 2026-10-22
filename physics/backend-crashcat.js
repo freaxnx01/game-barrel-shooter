@@ -106,6 +106,27 @@ export function createCrashcatBackend(cc) {
   function bodies() { return [...handles]; }
   function bodyCount() { return handles.size; }
 
+  // crashcat wakes a sleeping body only when something touches it, so a piece whose support
+  // is knocked away would hang in the air. Every moving body wakes whatever sleeps within
+  // WAKE_MARGIN of it (Jolt's ActivateBodiesInAABox pattern); the margin covers the build
+  // gaps between rows (#9).
+  const WAKE_MARGIN = 0.15;
+  const WAKE_SPEED = 0.2;
+  const wakeBox = [0, 0, 0, 0, 0, 0];
+  function wakeAroundMovers() {
+    for (const h of handles) {
+      const b = h.raw;
+      if (b.sleeping || b.motionType !== cc.MotionType.DYNAMIC) continue;
+      const v = b.motionProperties.linearVelocity, w = b.motionProperties.angularVelocity;
+      if (Math.hypot(v[0], v[1], v[2]) < WAKE_SPEED && Math.hypot(w[0], w[1], w[2]) < WAKE_SPEED) continue;
+      for (let i = 0; i < 3; i++) {
+        wakeBox[i] = b.aabb[i] - WAKE_MARGIN;
+        wakeBox[i + 3] = b.aabb[i + 3] + WAKE_MARGIN;
+      }
+      cc.rigidBody.wakeInAABB(world, wakeBox);
+    }
+  }
+
   let accumulator = 0;
   const FIXED = 1 / 240;
   function step(dt) {
@@ -114,6 +135,7 @@ export function createCrashcatBackend(cc) {
     while (accumulator >= FIXED && n < 10) {
       cc.updateWorld(world, listener, FIXED);
       flushCollisions();
+      wakeAroundMovers();
       accumulator -= FIXED;
       n++;
     }
