@@ -21,6 +21,7 @@ export function runContract(phys) {
     fixedJointMovesTogether,
     bodyCountTracks,
     stack10Stands,
+    unsupportedSleeperFalls,
   ];
   for (const c of cases) {
     try {
@@ -294,6 +295,20 @@ function stack10Stands(phys) {
   // Required on crashcat (the spec's core goal); informational on cannon (known instability).
   const required = phys.name !== 'cannon';
   return { name: 'stack10Stands', pass, required, detail: `topY=${topY.toFixed(4)} expected ~${expected.toFixed(4)}` };
+}
+
+function unsupportedSleeperFalls(phys) {
+  const g = ground(phys);
+  const base = box(phys, [0.5, 0.5, 0.5], 1, 0.5, { startAsleep: true });
+  // 4 cm above the base, like the brick rows the game builds: asleep and not touching it
+  const top = box(phys, [0.5, 0.5, 0.5], 1, 1.54, { startAsleep: true });
+  phys.wake(base);
+  phys.setVelocity(base, 12, 0, 0); // knocked out from under the top box
+  step(phys, 2);
+  const topY = top.position.y;
+  cleanup(phys, [g, base, top]);
+  const pass = topY < 1.0;
+  return { name: 'unsupportedSleeperFalls', pass, detail: `topY=${topY.toFixed(4)} expected < 1 (fallen to the ground)` };
 }
 
 function ground(phys) {
