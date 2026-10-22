@@ -10,6 +10,10 @@ All notable changes to this project are documented here, following
 - Hover over the version number to see when the game was last updated, in your own time zone, and how long ago
 - Temporary physics engine switch between cannon-es and crashcat: press K or use the Physics button; the choice is remembered across reloads (#9)
 
+### Fixed
+- crashcat: pieces no longer hang in the air when what held them up is knocked away, and the Eiffel spire now stands on a crossbar instead of floating (#9)
+- The Physics button no longer covers the Spiral Stair button (#9)
+
 ## [0.2.0] - 2026-09-29
 
 ### Added
