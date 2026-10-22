@@ -411,6 +411,10 @@ const cardGeoLean = new THREE.BoxGeometry(CARD_T, CARD_H, CARD_W);
 const PAIR_S = 1.1;
 const bridgeLen = PAIR_S * 0.92;
 const cardGeoFlat = new THREE.BoxGeometry(bridgeLen, CARD_T, CARD_W);
+// crashcat: bridges reach from apex to apex and rest on the card tops; the short ones drop
+// between the leaning cards and wedge them apart once woken (#9)
+const bridgeLenApex = PAIR_S - 0.004;
+const cardGeoFlatApex = new THREE.BoxGeometry(bridgeLenApex, CARD_T, CARD_W);
 
 function addCard(shapeHalf, geo, x, y, z, rotZ) {
   const body = phys.addBody({
@@ -440,11 +444,18 @@ function setupCards() {
   const Heff = CARD_H * Math.cos(CARD_TILT);
   const dx = (CARD_H / 2) * Math.sin(CARD_TILT) + 0.015; // small apex gap so pairs don't spawn interpenetrating
   const leanHalf = [CARD_T / 2, CARD_H / 2, CARD_W / 2];
-  const flatHalf = [bridgeLen / 2, CARD_T / 2, CARD_W / 2];
+  const onCrashcat = phys.name === 'crashcat';
+  const flatLen = onCrashcat ? bridgeLenApex : bridgeLen;
+  const flatGeo = onCrashcat ? cardGeoFlatApex : cardGeoFlat;
+  const flatHalf = [flatLen / 2, CARD_T / 2, CARD_W / 2];
+  // tilted cards' corners stick out (T/2)*sin(tilt) past baseY and past the apex height
+  const cornerDip = (CARD_T / 2) * Math.sin(CARD_TILT);
   for (let level = 0; level < 6; level++) {
     const n = 6 - level;
     // +0.018 per level: tilted cards' bottom corners dip (T/2)*sin(tilt) below baseY — keep them clear of the bridge underneath
-    const baseY = platH + level * (Heff + CARD_T + 0.018) + 0.008;
+    const baseY = onCrashcat
+      ? platH + level * (Heff + CARD_T + 2 * cornerDip + 0.002) + cornerDip + 0.001
+      : platH + level * (Heff + CARD_T + 0.018) + 0.008;
     const cy = baseY + Heff / 2;
     const x0 = -((n - 1) * PAIR_S) / 2;
     for (let j = 0; j < n; j++) {
@@ -454,9 +465,9 @@ function setupCards() {
     }
     // bridges on top of this level (skip after topmost)
     if (n > 1) {
-      const by = baseY + Heff + CARD_T / 2 + 0.012;
+      const by = baseY + Heff + CARD_T / 2 + (onCrashcat ? cornerDip + 0.001 : 0.012);
       for (let j = 0; j < n - 1; j++) {
-        addCard(flatHalf, cardGeoFlat, x0 + PAIR_S / 2 + j * PAIR_S, by, z, 0);
+        addCard(flatHalf, flatGeo, x0 + PAIR_S / 2 + j * PAIR_S, by, z, 0);
       }
     }
   }
@@ -795,16 +806,21 @@ function setupSpiral() {
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
   // crashcat: the frame beams sit on the post tops instead of cutting through them (#9)
   const onCrashcat = phys.name === 'crashcat';
+  // crashcat: no separate column for the treads to cut through; each tread reaches past the
+  // axis instead (by two half-widths), so the stacked tread ends form the column and every tread rests its centre
+  // of mass on the tread below (#9)
+  const treadBack = onCrashcat ? 0.9 : 0;
+  const treadHalf = (R + treadBack) / 2, treadMid = (R - treadBack) / 2;
   // spiral treads
   for (let i = 0; i < steps; i++) {
     const a = i * (Math.PI * 2 / 12);
     const y = rise / 2 + i * rise;
-    addBlock(R / 2, rise / 2, 0.45, m(), 8, Math.cos(a) * (R / 2), y, zC + Math.sin(a) * (R / 2), -a, 0);
+    addBlock(treadHalf, rise / 2, 0.45, m(), 8, Math.cos(a) * treadMid, y, zC + Math.sin(a) * treadMid, -a, 0);
   }
   const topY = steps * rise;
   // central column
   const cn = Math.ceil(topY / 0.7);
-  for (let k = 0; k < cn; k++) addBlock(0.28, 0.35, 0.28, m(), 14, 0, 0.35 + k * 0.7, zC, 0, 0);
+  if (!onCrashcat) for (let k = 0; k < cn; k++) addBlock(0.28, 0.35, 0.28, m(), 14, 0, 0.35 + k * 0.7, zC, 0, 0);
   // 4 corner posts
   const postPitch = onCrashcat ? 0.702 : 0.7;
   const corners = [[rP, rP], [-rP, rP], [rP, -rP], [-rP, -rP]];
