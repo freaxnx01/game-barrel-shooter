@@ -1308,8 +1308,9 @@ function shootBall(dir, power) {
   if (type === 'wrecking') {
     { const cfg = camCfg[targetMode]; anchorPos = { x: 0, y: (cfg.plat ? 10 : 18) * TSCALE, z: cfg.tz * TSCALE }; }
     const anchor = phys.addBody({ shape: { kind: 'none' }, mass: 0, material: 'heavy', position: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z }, isStatic: true });
-    // chain just long enough that the bottom of the swing sweeps through the targets
-    const len = anchorPos.y - 0.75;
+    // chain just long enough that the bottom of the swing sweeps through the targets;
+    // on the platform modes it bottoms out just above the platform instead of hitting its edge (#15)
+    const len = anchorPos.y - (camCfg[targetMode].plat ? platH + 0.55 + 0.1 : 0.75);
     let toBallX = body.position.x - anchorPos.x, toBallY = body.position.y - anchorPos.y, toBallZ = body.position.z - anchorPos.z;
     const toBallLen = Math.hypot(toBallX, toBallY, toBallZ) || 1;
     toBallX /= toBallLen; toBallY /= toBallLen; toBallZ /= toBallLen;
@@ -1554,11 +1555,14 @@ function paintSplat(rec, other) {
   splat.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
   scene.add(splat);
   paintSplats.push(splat);
-  // remove the paintball itself
-  phys.removeBody(rec.body);
-  scene.remove(rec.mesh);
-  const i = balls.indexOf(rec);
-  if (i >= 0) balls.splice(i, 1);
+  // remove the paintball itself — deferred out of the collide callback like explode(),
+  // removing a body mid-step crashes cannon-es (#15)
+  setTimeout(() => {
+    phys.removeBody(rec.body);
+    scene.remove(rec.mesh);
+    const i = balls.indexOf(rec);
+    if (i >= 0) balls.splice(i, 1);
+  }, 0);
   playBounce(6);
 }
 

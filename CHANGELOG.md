@@ -13,6 +13,8 @@ All notable changes to this project are documented here, following
 ### Fixed
 - crashcat: pieces no longer hang in the air when what held them up is knocked away, and the Eiffel spire now stands on a crossbar instead of floating (#9)
 - crashcat: the house of cards no longer slumps once it is hit, and Spiral Stair stands until hit instead of shedding its treads (#9)
+- Paintball no longer throws an error when it hits the house of cards (#15)
+- The wrecking ball sweeps through the barrels instead of catching on the platform edge (#15)
 - The Physics button no longer covers the Spiral Stair button (#9)
 
 ## [0.2.0] - 2026-09-29
