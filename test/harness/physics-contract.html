@@ -6,8 +6,7 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
   }
 }
 </script>
@@ -22,8 +21,6 @@
 <body>
 <pre id="out">running…</pre>
 <script type="module">
-import * as CANNON from 'cannon-es';
-import { createCannonBackend } from '../../physics/backend-cannon.js';
 import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
 import { runContract } from './contract.js';
 
@@ -54,7 +51,6 @@ async function runOne(label, makeBackend) {
 }
 
 async function main() {
-  await runOne('cannon', () => Promise.resolve(createCannonBackend(CANNON)));
   await runOne('crashcat', async () => {
     const cc = await import('https://esm.sh/crashcat@0.0.5');
     return createCrashcatBackend(cc);

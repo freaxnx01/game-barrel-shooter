@@ -25,24 +25,14 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 
 > Designed for desktop browsers with a mouse — not built for touch.
 
-## Physics engine (temporary switch)
+## Physics engine
 
-The game ships with **two** rigid-body physics engines behind a single facade:
-
-- **cannon** (cannon-es) — the default, and the original engine.
-- **crashcat** — a Jolt-style engine built for stable stacking, loaded lazily
-  from `https://esm.sh/crashcat@0.0.5` the first time it's selected.
-
-Use the **`Physics:`** button (top-right) or the **`K`** key to switch engines
-mid-game. Switching destroys the current world and rebuilds the active
-structure fresh on the other engine. Your choice persists across reloads
-(`localStorage`); if crashcat can't load (e.g. the CDN is blocked) the game
-stays on cannon and the button reads `Physics: crashcat unavailable`.
-
-This is **temporary** — it exists to compare the two engines on the big stacked
-structures. The loser will be removed in a follow-up; all switch-related code
-is tagged `// engine switch (temporary, #9)`. See
-[issue #9](https://github.com/freaxnx01/game-barrel-shooter/issues/9).
+Physics runs on [crashcat](https://github.com/isaac-mason/crashcat), a Jolt-style
+rigid-body engine built for stable stacking, loaded from
+`https://esm.sh/crashcat@0.0.5`. Structures spawn asleep and stand still until
+hit. The original engine, cannon-es, was compared against it during
+[#9](https://github.com/freaxnx01/game-barrel-shooter/issues/9) and removed in
+[#20](https://github.com/freaxnx01/game-barrel-shooter/issues/20).
 
 Tests: `node --test test/*.test.mjs` runs the pure-module tests (no
 `package.json`; `node --test test/` does not work on Node 24). The physics
@@ -68,7 +58,7 @@ Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thund
 ## Tech Stack
 
 - Single self-contained `index.html` — no build step, no server-side code. Pure static HTML + ES modules.
-- [`three@0.160.0`](https://threejs.org/) for 3D rendering, [`cannon-es@0.20.0`](https://pmndrs.github.io/cannon-es/) for physics — both loaded from the jsDelivr CDN via an import map (internet connection required at runtime).
+- [`three@0.160.0`](https://threejs.org/) for 3D rendering (jsDelivr, via an import map) and [`crashcat@0.0.5`](https://github.com/isaac-mason/crashcat) for physics (esm.sh) — internet connection required at runtime.
 - All textures (oil-drum paint, basketball seams) are generated at runtime on a canvas — no image assets.
 - All sounds are synthesized with the Web Audio API — no audio assets.
 

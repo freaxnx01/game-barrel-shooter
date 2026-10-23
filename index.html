@@ -28,16 +28,14 @@
   #power .fill { height: 100%; width: 0%; background: oklch(0.72 0.17 55); border-radius: 5px; }
   #reset { position: fixed; top: 20px; right: 20px; }
   #autoplay { position: fixed; top: 66px; right: 20px; }
-  #engine { position: fixed; top: 112px; right: 20px; min-width: 150px; }
-  #reset, .target button, #autoplay, #engine {
+  #reset, .target button, #autoplay {
     padding: 10px 20px; font-size: 14px;
     background: rgba(245,239,228,0.1); color: #f5efe4; border: 1px solid rgba(245,239,228,0.3);
     border-radius: 6px; cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
     font-family: inherit;
   }
-  #reset:hover, .target button:hover, #autoplay:hover, #engine:hover { background: rgba(245,239,228,0.22); }
+  #reset:hover, .target button:hover, #autoplay:hover { background: rgba(245,239,228,0.22); }
   #autoplay.active { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
-  #engine:disabled { opacity: 0.45; cursor: not-allowed; }
   .target { position: fixed; top: 20px; right: 236px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 420px; }
   .target button { padding: 8px 14px; }
   .target button.sel { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
@@ -113,7 +111,6 @@
 <div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</div>
 <button id="reset">Reset</button>
 <button id="autoplay">▶ Auto-Play</button>
-<button id="engine" title="Switch physics engine (K)">Physics: cannon</button>
 <div class="target" id="target">
   <button data-mode="barrels" class="sel">Barrels</button>
   <button data-mode="woodbarrels">Wooden Barrels</button>
@@ -135,21 +132,25 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
   }
 }
 </script>
 <script type="module">
 import * as THREE from 'three';
-import * as CANNON from 'cannon-es';
-import { createCannonBackend } from './physics/backend-cannon.js';
-import { readEngineChoice, writeEngineChoice } from './physics/engine-choice.js';
-import { loadBackend } from './physics/load-backend.js';
+import { createCrashcatBackend } from './physics/backend-crashcat.js';
 
-// engine switch (temporary, #9): cannon is the synchronous default; if the
-// stored choice is crashcat we switch to it async after the module body runs.
-let phys = createCannonBackend(CANNON);
+// crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
+let cc;
+try {
+  cc = await import('https://esm.sh/crashcat@0.0.5');
+} catch (e) {
+  document.body.insertAdjacentHTML('beforeend',
+    '<div style="position:fixed;inset:0;display:grid;place-items:center;color:#f5efe4;font:16px sans-serif;text-align:center;padding:16px">' +
+    'The physics engine could not be loaded. Check your connection and reload the page.</div>');
+  throw e;
+}
+const phys = createCrashcatBackend(cc);
 
 // ---------- Renderer / scene ----------
 const canvas = document.getElementById('c');
@@ -175,7 +176,7 @@ sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28;
 scene.add(sun);
 
 // ---------- Physics ----------
-// All physics goes through the `phys` facade (physics/backend-cannon.js).
+// All physics goes through the `phys` facade (physics/backend-crashcat.js).
 // Materials are identified by name strings; per-pair friction/restitution live
 // in physics/materials.js and are applied by the backend.
 
@@ -196,18 +197,10 @@ const platMesh = new THREE.Mesh(
 platMesh.position.set(0, platH / 2, -6);
 platMesh.castShadow = platMesh.receiveShadow = true;
 
-// engine switch (temporary, #9): ground + platform bodies are (re)created by
-// setupWorld() after every backend creation, so a switch rebuilds them too.
-let groundBody = null;
-let platBody = null;
+phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
+let platBody = phys.addBody({ shape: { kind: 'box', halfExtents: [platW / 2, platH / 2, platD / 2] }, mass: 0, material: 'ground', position: { x: 0, y: platH / 2, z: -6 }, isStatic: true });
 let platformOn = true;
-function setupWorld() {
-  groundBody = phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
-  platBody = phys.addBody({ shape: { kind: 'box', halfExtents: [platW / 2, platH / 2, platD / 2] }, mass: 0, material: 'ground', position: { x: 0, y: platH / 2, z: -6 }, isStatic: true });
-  scene.add(platMesh);
-  platformOn = true;
-}
-setupWorld();
+scene.add(platMesh);
 
 // ---------- Barrel factory (55-gal steel drums) ----------
 const BARREL_R = 0.45, BARREL_H = 1.1;
@@ -409,19 +402,16 @@ const CARD_H = 1.0, CARD_W = 0.62, CARD_T = 0.03, CARD_TILT = 0.32;
 const cardFaceMatl = new THREE.MeshStandardMaterial({ color: '#f2efe6', roughness: 0.7 });
 const cardGeoLean = new THREE.BoxGeometry(CARD_T, CARD_H, CARD_W);
 const PAIR_S = 1.1;
-const bridgeLen = PAIR_S * 0.92;
+// bridges reach from apex to apex and rest on the card tops; shorter ones drop between
+// the leaning cards and wedge them apart once woken (#9)
+const bridgeLen = PAIR_S - 0.004;
 const cardGeoFlat = new THREE.BoxGeometry(bridgeLen, CARD_T, CARD_W);
-// crashcat: bridges reach from apex to apex and rest on the card tops; the short ones drop
-// between the leaning cards and wedge them apart once woken (#9)
-const bridgeLenApex = PAIR_S - 0.004;
-const cardGeoFlatApex = new THREE.BoxGeometry(bridgeLenApex, CARD_T, CARD_W);
 
 function addCard(shapeHalf, geo, x, y, z, rotZ) {
   const body = phys.addBody({
     shape: { kind: 'box', halfExtents: shapeHalf },
     mass: 0.3,
-    isStatic: phys.name === 'cannon', // frozen until first projectile impact — unfreezeCards() (cannon-only workaround #9)
-    startAsleep: phys.name === 'crashcat', // engine switch (temporary, #9)
+    startAsleep: true,
     material: 'card',
     position: { x, y, z },
     quaternion: { x: 0, y: 0, z: Math.sin(rotZ / 2), w: Math.cos(rotZ / 2) },
@@ -444,18 +434,12 @@ function setupCards() {
   const Heff = CARD_H * Math.cos(CARD_TILT);
   const dx = (CARD_H / 2) * Math.sin(CARD_TILT) + 0.015; // small apex gap so pairs don't spawn interpenetrating
   const leanHalf = [CARD_T / 2, CARD_H / 2, CARD_W / 2];
-  const onCrashcat = phys.name === 'crashcat';
-  const flatLen = onCrashcat ? bridgeLenApex : bridgeLen;
-  const flatGeo = onCrashcat ? cardGeoFlatApex : cardGeoFlat;
-  const flatHalf = [flatLen / 2, CARD_T / 2, CARD_W / 2];
+  const flatHalf = [bridgeLen / 2, CARD_T / 2, CARD_W / 2];
   // tilted cards' corners stick out (T/2)*sin(tilt) past baseY and past the apex height
   const cornerDip = (CARD_T / 2) * Math.sin(CARD_TILT);
   for (let level = 0; level < 6; level++) {
     const n = 6 - level;
-    // +0.018 per level: tilted cards' bottom corners dip (T/2)*sin(tilt) below baseY — keep them clear of the bridge underneath
-    const baseY = onCrashcat
-      ? platH + level * (Heff + CARD_T + 2 * cornerDip + 0.002) + cornerDip + 0.001
-      : platH + level * (Heff + CARD_T + 0.018) + 0.008;
+    const baseY = platH + level * (Heff + CARD_T + 2 * cornerDip + 0.002) + cornerDip + 0.001;
     const cy = baseY + Heff / 2;
     const x0 = -((n - 1) * PAIR_S) / 2;
     for (let j = 0; j < n; j++) {
@@ -465,139 +449,12 @@ function setupCards() {
     }
     // bridges on top of this level (skip after topmost)
     if (n > 1) {
-      const by = baseY + Heff + CARD_T / 2 + (onCrashcat ? cornerDip + 0.001 : 0.012);
+      const by = baseY + Heff + CARD_T / 2 + cornerDip + 0.001;
       for (let j = 0; j < n - 1; j++) {
-        addCard(flatHalf, flatGeo, x0 + PAIR_S / 2 + j * PAIR_S, by, z, 0);
+        addCard(flatHalf, cardGeoFlat, x0 + PAIR_S / 2 + j * PAIR_S, by, z, 0);
       }
     }
   }
-}
-
-// wake the whole house of cards into dynamic bodies on first real impact
-// cannon-only workaround (#9): crashcat structures spawn dynamic+asleep, no freeze/wake.
-function unfreezeCards() {
-  if (phys.name !== 'cannon') return;
-  for (const b of barrels) {
-    if (!phys.isStatic(b.body)) continue;
-    phys.makeDynamic(b.body);
-    phys.wake(b.body);
-  }
-}
-
-// wake only the STATIC pieces near an impact so a single hit doesn't detonate the whole structure
-function wakeNear(center, radius) {
-  if (phys.name !== 'cannon') return;
-  for (const b of barrels) {
-    if (!phys.isStatic(b.body)) continue;
-    const dx = b.body.position.x - center.x, dy = b.body.position.y - center.y, dz = b.body.position.z - center.z;
-    if (Math.hypot(dx, dy, dz) > radius) continue;
-    phys.makeDynamic(b.body);
-    phys.wake(b.body);
-  }
-}
-
-// Once a structure has been disturbed, any still-frozen (static OR sleeping) piece
-// that has lost the support beneath it must fall — otherwise shooting out the base
-// leaves the upper part hanging in mid-air. A piece counts as supported only if its
-// lowest corners actually rest on the ground or on another frozen piece (tight
-// oriented-box test, not loose AABBs), and that support must trace back to the
-// ground — so mutually-leaning airborne clusters can't hold each other up.
-function collapseUnsupported() {
-  if (phys.name !== 'cannon') return; // cannon-only workaround (#9)
-  const frozen = [], movers = [];
-  let anyDynamic = false;
-  for (const b of barrels) {
-    if (b.body.material !== 'stone') continue; // stone buildings only (not drums/cards)
-    if (phys.isStatic(b.body)) { frozen.push(b.body); continue; }
-    anyDynamic = true;
-    if (phys.isSleeping(b.body)) frozen.push(b.body); // asleep mid-air = frozen
-    else {
-      const v = phys.getVelocity(b.body);
-      if (v.x * v.x + v.y * v.y + v.z * v.z > 0.8) movers.push(b.body);
-    }
-  }
-  if (!anyDynamic || frozen.length === 0) return; // structure untouched so far
-  // cannon-only workaround (#9): AABBs / shapes / quaternion math via the raw cannon body
-  for (const b of frozen) b.raw.updateAABB();
-  for (const m of movers) m.raw.updateAABB();
-  const S = TSCALE, GROUND_EPS = 0.35 * S, DROP = 0.4 * S, PAD = 0.08 * S, BPAD = 0.06 * S;
-  const wake = (body) => {
-    if (phys.isStatic(body)) phys.makeDynamic(body);
-    phys.wake(body);
-  };
-  // 1) bump-wake: moving debris knocks any frozen piece it touches live
-  const bumped = new Set();
-  for (const b of frozen) {
-    const a = b.raw.aabb;
-    for (const m of movers) {
-      const o = m.raw.aabb;
-      if (o.upperBound.x < a.lowerBound.x - BPAD || o.lowerBound.x > a.upperBound.x + BPAD) continue;
-      if (o.upperBound.y < a.lowerBound.y - BPAD || o.lowerBound.y > a.upperBound.y + BPAD) continue;
-      if (o.upperBound.z < a.lowerBound.z - BPAD || o.lowerBound.z > a.upperBound.z + BPAD) continue;
-      wake(b); bumped.add(b); break;
-    }
-  }
-  // 2) support graph on the remaining frozen pieces
-  const lp = new CANNON.Vec3(), wp = new CANNON.Vec3(), cq = new CANNON.Quaternion();
-  const E = PAD + DROP / 2; // uniform expansion for the resting test
-  const info = [];
-  for (const b of frozen) {
-    if (bumped.has(b)) continue;
-    const raw = b.raw;
-    const sh = raw.shapes[0];
-    const he = sh.halfExtents || new CANNON.Vec3(
-      (raw.aabb.upperBound.x - raw.aabb.lowerBound.x) / 2,
-      (raw.aabb.upperBound.y - raw.aabb.lowerBound.y) / 2,
-      (raw.aabb.upperBound.z - raw.aabb.lowerBound.z) / 2);
-    const corners = [];
-    let minY = Infinity, maxY = -Infinity;
-    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
-      lp.set(he.x * sx, he.y * sy, he.z * sz);
-      raw.quaternion.vmult(lp, wp);
-      const c = new CANNON.Vec3(raw.position.x + wp.x, raw.position.y + wp.y, raw.position.z + wp.z);
-      corners.push(c);
-      if (c.y < minY) minY = c.y;
-      if (c.y > maxY) maxY = c.y;
-    }
-    const band = minY + Math.max((maxY - minY) * 0.25, 0.06 * S);
-    info.push({ b, he, feet: corners.filter(c => c.y <= band), grounded: minY <= GROUND_EPS });
-  }
-  const contains = (rec, px, py, pz) => { // point inside rec's expanded oriented box?
-    const raw = rec.b.raw;
-    lp.set(px - raw.position.x, py - raw.position.y, pz - raw.position.z);
-    raw.quaternion.conjugate(cq);
-    cq.vmult(lp, wp);
-    return Math.abs(wp.x) <= rec.he.x + E && Math.abs(wp.y) <= rec.he.y + E && Math.abs(wp.z) <= rec.he.z + E;
-  };
-  const dependents = new Map(); // supporter -> pieces resting on it
-  for (const rec of info) {
-    if (rec.grounded) continue;
-    for (const other of info) {
-      if (other === rec) continue;
-      const oa = other.b.raw.aabb;
-      let rests = false;
-      for (const f of rec.feet) {
-        const px = f.x, py = f.y - DROP / 2, pz = f.z;
-        if (px < oa.lowerBound.x - E || px > oa.upperBound.x + E) continue;
-        if (py < oa.lowerBound.y - E || py > oa.upperBound.y + E) continue;
-        if (pz < oa.lowerBound.z - E || pz > oa.upperBound.z + E) continue;
-        if (contains(other, px, py, pz)) { rests = true; break; }
-      }
-      if (rests) {
-        if (!dependents.has(other)) dependents.set(other, []);
-        dependents.get(other).push(rec);
-      }
-    }
-  }
-  // 3) only pieces whose support chain reaches the ground stay frozen
-  const held = new Set(), queue = [];
-  for (const rec of info) if (rec.grounded) { held.add(rec); queue.push(rec); }
-  while (queue.length) {
-    const deps = dependents.get(queue.pop());
-    if (!deps) continue;
-    for (const d of deps) if (!held.has(d)) { held.add(d); queue.push(d); }
-  }
-  for (const rec of info) if (!held.has(rec)) wake(rec.b);
 }
 
 // ---------- Stone structures (fortress / colosseum) ----------
@@ -609,12 +466,10 @@ const stoneMatls = ['#a39a88', '#968d7c', '#ada393'].map(c =>
 function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
   const S = TSCALE;
   hx *= S; hy *= S; hz *= S; x *= S; y *= S; z *= S;
-  // cannon: spawn frozen (static) until first impact; crashcat: dynamic + asleep (no freeze hack, #9)
   const body = phys.addBody({
     shape: { kind: 'box', halfExtents: [hx, hy, hz] },
     mass,
-    isStatic: phys.name === 'cannon',
-    startAsleep: phys.name === 'crashcat',
+    startAsleep: true,
     material: 'stone',
     position: { x, y, z },
     quaternion: fromEulerXYZ(0, ry, rz),
@@ -629,7 +484,7 @@ function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
   barrels.push({ body, mesh, home: { x, y, z }, homeQ: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w }, down: false });
 }
 
-// small Euler→quaternion helper (XYZ order), so builders don't need CANNON.
+// small Euler→quaternion helper (XYZ order)
 function fromEulerXYZ(x, y, z) {
   const cx = Math.cos(x / 2), sx = Math.sin(x / 2);
   const cy = Math.cos(y / 2), sy = Math.sin(y / 2);
@@ -649,25 +504,24 @@ function setupFortress() {
   let mi = 0;
   const m = () => stoneMatls[mi++ % stoneMatls.length];
   const xs = [-1.65 * F, -0.55 * F, 0.55 * F, 1.65 * F];
-  // crashcat: nothing may overlap (#9) — the gate lintel spans the whole course instead of
+  // nothing may overlap (#9) — the gate lintel spans the whole course instead of
   // cutting into its end bricks, side-wall bricks fit between the front and back walls,
   // and the corner towers stand clear of the wall ends
-  const onCrashcat = phys.name === 'crashcat';
-  const sideBL = onCrashcat ? (2 * S - BD - 0.004) / 4 : BL;
-  const lintelHalf = onCrashcat ? 2 * BL : 1.65 * F;
+  const sideBL = (2 * S - BD - 0.004) / 4;
+  const lintelHalf = 2 * BL;
   for (let c = 0; c < courses; c++) {
     const y = BH / 2 + c * (BH + 0.02);
     // front wall (+z) with gate opening + lintel
     for (let j = 0; j < 4; j++) {
       const mid = j === 1 || j === 2;
-      if (mid && c < 3) continue; // gate opening (lintel replaces course 2)
-      if (onCrashcat && c === 2) continue;
+      if (mid && c < 3) continue; // gate opening
+      if (c === 2) continue;      // the lintel replaces course 2
       addBlock(BL / 2, BH / 2, BD / 2, m(), 60, xs[j], y, zC + S, 0, 0);
     }
     if (c === 2) addBlock(lintelHalf, BH / 2, BD / 2, m(), 90, 0, y, zC + S, 0, 0);
     // back, left, right walls
     for (let j = 0; j < 4; j++) {
-      const sideZ = onCrashcat ? (j - 1.5) * sideBL : xs[j];
+      const sideZ = (j - 1.5) * sideBL;
       addBlock(BL / 2, BH / 2, BD / 2, m(), 60, xs[j], y, zC - S, 0, 0);
       addBlock(sideBL / 2, BH / 2, BD / 2, m(), 60, -S, y, zC + sideZ, Math.PI / 2, 0);
       addBlock(sideBL / 2, BH / 2, BD / 2, m(), 60, S, y, zC + sideZ, Math.PI / 2, 0);
@@ -682,7 +536,7 @@ function setupFortress() {
     addBlock(0.45, 0.45, 0.45, m(), 12, S, topY, zC + p, 0, 0);
   }
   // corner towers
-  const T = onCrashcat ? S + BD / 2 + 1.5 + 0.002 : S + 1.2;
+  const T = S + BD / 2 + 1.5 + 0.002;
   for (const [tx, tz] of [[-T, -T], [T, -T], [-T, T], [T, T]]) {
     for (let k = 0; k < 4; k++) {
       addBlock(1.5, 1.08, 1.5, m(), 100, tx, 1.08 + k * (2.16 + 0.02), zC + tz, 0, 0);
@@ -705,9 +559,8 @@ function setupColosseum() {
     const yL = base + pH + lH / 2 + 0.04;
     const step = 2 * Math.PI / N;
     const a0 = Math.PI - ((count - 1) * step) / 2; // ruin opens toward the camera
-    const chord = 2 * lv.R * Math.sin(step / 2);
-    // crashcat: lintels end where neighbours' inner faces meet, so adjacent lintels don't overlap (#9)
-    const lintelHalf = phys.name === 'crashcat' ? (lv.R - lD / 2) * Math.tan(step / 2) - 0.002 : chord / 2 + 0.2;
+    // lintels end where neighbours' inner faces meet, so adjacent lintels don't overlap (#9)
+    const lintelHalf = (lv.R - lD / 2) * Math.tan(step / 2) - 0.002;
     for (let j = 0; j < count; j++) {
       const a = a0 + j * step;
       addBlock(pW / 2, pH / 2, pW / 2, m(), 45, lv.R * Math.sin(a), yP, zC + lv.R * Math.cos(a), a, 0);
@@ -725,10 +578,10 @@ function setupColosseum() {
 function brickWall(cx, cz, along, cols, rows, bw, bh, bd, gap, m, mass, door) {
   const ry = along === 'z' ? Math.PI / 2 : 0;
   const at = (off) => along === 'x' ? [cx + off, cz] : [cx, cz + off];
-  // crashcat: the unstaggered bricks over the door would rest on nothing, so the first
+  // the unstaggered bricks over the door would rest on nothing, so the first
   // course above it is one lintel bearing on the bricks beside the opening (#9)
-  const lintel = door && phys.name === 'crashcat' && door.rows < rows;
-  const rowPitch = brickRowPitch(bh, gap);
+  const lintel = door && door.rows < rows;
+  const rowPitch = brickRowPitch(bh);
   for (let r = 0; r < rows; r++) {
     const y = bh / 2 + r * rowPitch;
     for (let c = 0; c < cols; c++) {
@@ -743,18 +596,18 @@ function brickWall(cx, cz, along, cols, rows, bw, bh, bd, gap, m, mass, door) {
   const [x, z] = at(((door.c0 + door.c1) / 2 - (cols - 1) / 2) * (bw + gap));
   addBlock((span * (bw + gap) - gap) / 2, bh / 2, bd / 2, m(), mass * span, x, bh / 2 + door.rows * rowPitch, z, ry, 0);
 }
-// crashcat: courses rest on each other instead of hovering a gap apart; a sleeping brick only
+// courses rest on each other instead of hovering a gap apart; a sleeping brick only
 // wakes when something touches it, so a hovering course would sag on the first hit (#9)
-function brickRowPitch(bh, gap) {
-  return bh + (phys.name === 'crashcat' ? 0.001 : gap);
+function brickRowPitch(bh) {
+  return bh + 0.001;
 }
 
 function setupPyramid() {
   const b = 1.1, gap = 0.02, zC = -6, levels = 8;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
-  // crashcat: each level's ring rests half on the ring below and half over the hollow, so it
-  // only stands frozen; a second, inner ring gives every block full support (#9)
-  const rings = phys.name === 'crashcat' ? 2 : 1;
+  // a single ring would rest half on the ring below and half over the hollow; a second,
+  // inner ring gives every block full support (#9)
+  const rings = 2;
   for (let i = 0; i < levels; i++) {
     const n = levels - i;            // blocks per side, shrinks each step
     const y = b / 2 + i * (b + gap);
@@ -776,19 +629,18 @@ function setupTowerGate() {
   const door = { c0: 2, c1: 3, rows: 4 };
   brickWall(0, zC + S, 'x', cols, rows, bw, bh, bd, gap, m, 30, door);       // front (gate)
   brickWall(0, zC - S, 'x', cols, rows, bw, bh, bd, gap, m, 30, door);       // back (gate)
-  // crashcat: side-wall bricks are shortened to fit between the front and back walls, and the
-  // side crenellations shift half a brick so they clear the front and back ones at the corners (#9)
-  const onCrashcat = phys.name === 'crashcat';
-  const sideBw = onCrashcat ? (2 * S - bd - 0.004 - (cols - 1) * gap) / cols : bw;
+  // side-wall bricks are shortened to fit between the front and back walls, and the side
+  // crenellations shift half a brick so they clear the front and back ones at the corners (#9)
+  const sideBw = (2 * S - bd - 0.004 - (cols - 1) * gap) / cols;
   brickWall(-S, zC, 'z', cols, rows, sideBw, bh, bd, gap, m, 30, door);     // left (gate)
   brickWall(S, zC, 'z', cols, rows, sideBw, bh, bd, gap, m, 30, door);      // right (gate)
   // crenellations around the top
-  const topY = rows * brickRowPitch(bh, gap) + 0.35;
+  const topY = rows * brickRowPitch(bh) + 0.35;
   for (let c = 0; c < cols; c += 2) {
     const off = (c - (cols - 1) / 2) * (bw + gap);
     addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC + S, 0, 0);
     addBlock(0.35, 0.35, 0.35, m(), 10, off, topY, zC - S, 0, 0);
-    const sideOff = onCrashcat ? off + (bw + gap) / 2 : off;
+    const sideOff = off + (bw + gap) / 2;
     addBlock(0.35, 0.35, 0.35, m(), 10, -S, topY, zC + sideOff, 0, 0);
     addBlock(0.35, 0.35, 0.35, m(), 10, S, topY, zC + sideOff, 0, 0);
   }
@@ -804,12 +656,10 @@ function setupGate() {
 function setupSpiral() {
   const zC = -6, steps = 20, rise = 0.32, R = 1.7, rP = 2.15;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
-  // crashcat: the frame beams sit on the post tops instead of cutting through them (#9)
-  const onCrashcat = phys.name === 'crashcat';
-  // crashcat: no separate column for the treads to cut through; each tread reaches past the
-  // axis instead (by two half-widths), so the stacked tread ends form the column and every tread rests its centre
-  // of mass on the tread below (#9)
-  const treadBack = onCrashcat ? 0.9 : 0;
+  // no separate column for the treads to cut through; each tread reaches past the axis
+  // (by two half-widths), so the stacked tread ends form the column and every tread rests
+  // its centre of mass on the tread below (#9)
+  const treadBack = 0.9;
   const treadHalf = (R + treadBack) / 2, treadMid = (R - treadBack) / 2;
   // spiral treads
   for (let i = 0; i < steps; i++) {
@@ -817,18 +667,15 @@ function setupSpiral() {
     const y = rise / 2 + i * rise;
     addBlock(treadHalf, rise / 2, 0.45, m(), 8, Math.cos(a) * treadMid, y, zC + Math.sin(a) * treadMid, -a, 0);
   }
-  const topY = steps * rise;
-  // central column
-  const cn = Math.ceil(topY / 0.7);
-  if (!onCrashcat) for (let k = 0; k < cn; k++) addBlock(0.28, 0.35, 0.28, m(), 14, 0, 0.35 + k * 0.7, zC, 0, 0);
-  // 4 corner posts
-  const postPitch = onCrashcat ? 0.702 : 0.7;
+  // 4 corner posts, as tall as the stair
+  const cn = Math.ceil(steps * rise / 0.7);
+  const postPitch = 0.702;
   const corners = [[rP, rP], [-rP, rP], [rP, -rP], [-rP, -rP]];
   for (const [px, pz] of corners) {
     for (let k = 0; k < cn; k++) addBlock(0.22, 0.35, 0.22, m(), 12, px, 0.35 + k * postPitch, zC + pz, 0, 0);
   }
-  // top frame beams linking the posts (crashcat: x-beams on the posts, z-beams across them)
-  const beamY = (ry) => onCrashcat ? cn * postPitch + 0.18 + (ry ? 0.362 : 0) : topY + 0.2;
+  // top frame beams on the post tops: x-beams on the posts, z-beams across them (#9)
+  const beamY = (ry) => cn * postPitch + 0.18 + (ry ? 0.362 : 0);
   for (const [ax, az, ry] of [[0, rP, 0], [0, -rP, 0], [rP, 0, Math.PI / 2], [-rP, 0, Math.PI / 2]]) {
     addBlock(rP + 0.22, 0.18, 0.22, m(), 10, ax, beamY(ry), zC + az, ry, 0);
   }
@@ -837,8 +684,8 @@ function setupSpiral() {
 function setupPoleTower() {
   const zC = -6, b = 0.9, gap = 0.04;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
-  // crashcat: layers rest on each other instead of hovering a gap apart (#9)
-  const lp = b + (phys.name === 'crashcat' ? 0.001 : gap);
+  // layers rest on each other instead of hovering a gap apart (#9)
+  const lp = b + 0.001;
   // clustered legs: 3x3 ring, then 2x2, then a stub column, then a tall pole
   const ring = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]];
   for (const [gx, gz] of ring) addBlock(b / 2, b / 2, b / 2, m(), 30, gx * (b + gap), b / 2, zC + gz * (b + gap), 0, 0);
@@ -854,13 +701,11 @@ function setupOctagon() {
   const zC = -6, N = 8, R = 1.9, floors = 5, fh = 1.15, colW = 0.28;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
   const step = 2 * Math.PI / N;
-  const chord = 2 * R * Math.sin(step / 2);
-  // crashcat: beams sit on the column tops instead of cutting through the column joints,
+  // beams sit on the column tops instead of cutting through the column joints,
   // and stop where neighbouring beams' inner faces meet, so nothing overlaps (#9)
-  const onCrashcat = phys.name === 'crashcat';
   const beamH = 0.14, beamD = 0.22;
-  const colH = onCrashcat ? fh - 2 * beamH - 0.004 : fh;
-  const beamHalf = onCrashcat ? (R - beamD) * Math.tan(step / 2) - 0.002 : chord / 2;
+  const colH = fh - 2 * beamH - 0.004;
+  const beamHalf = (R - beamD) * Math.tan(step / 2) - 0.002;
   for (let j = 0; j < N; j++) {
     const a = j * step;
     const cx = R * Math.sin(a), cz = zC + R * Math.cos(a);
@@ -869,7 +714,7 @@ function setupOctagon() {
     // ring beams at each floor top
     const am = a + step / 2;
     for (let f = 1; f <= floors; f++) {
-      const beamY = onCrashcat ? f * fh - beamH - 0.002 : f * fh;
+      const beamY = f * fh - beamH - 0.002;
       addBlock(beamHalf, beamH, beamD, m(), 14, R * Math.sin(am), beamY, zC + R * Math.cos(am), am, 0);
     }
   }
@@ -891,13 +736,12 @@ function setupCrosses() {
 }
 
 // ---------- More buildings: Eiffel (matchsticks), bowling pins, cylindrical tower ----------
-// generic static-until-hit body with a custom shape + pre-sized mesh
+// generic asleep-until-hit body with a custom shape + pre-sized mesh
 function addTargetBody(shapeSpec, mesh, mass, pos, quat) {
   const body = phys.addBody({
     shape: shapeSpec,
     mass,
-    isStatic: phys.name === 'cannon',
-    startAsleep: phys.name === 'crashcat',
+    startAsleep: true,
     material: 'stone',
     position: { x: pos[0], y: pos[1], z: pos[2] },
     quaternion: quat || undefined,
@@ -962,11 +806,7 @@ function setupEiffel() {
   }
   // spire
   const top = Y[Y.length - 1];
-  if (phys.name !== 'crashcat') {
-    addStick([0, top, zC], [0, top + 2.3, zC], th * 1.1, mass);
-    return;
-  }
-  // crashcat: the top ring is hollow, so the spire stands on a crossbar resting on the ring (#9)
+  // the top ring is hollow, so the spire stands on a crossbar resting on the ring (#9)
   const rTop = R[R.length - 1], ringTop = top + th * 0.85 / 2, barTop = ringTop + th * 1.1;
   addStick([-rTop - 0.04, ringTop + th * 0.55, zC], [rTop + 0.04, ringTop + th * 0.55, zC], th * 1.1, mass * 0.7);
   addStick([0, barTop + 0.001, zC], [0, barTop + 0.001 + 2.3, zC], th * 1.1, mass);
@@ -1013,12 +853,10 @@ function setupCylinder() {
   const zC = -6, N = 18, R = 2.4, courses = 10, bh = 0.5, gap = 0.02;
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
   const step = 2 * Math.PI / N;
-  const chord = 2 * R * Math.sin(step / 2);
-  // crashcat: bricks stop where neighbours' inner faces meet, and the crown sits on
+  // bricks stop where neighbours' inner faces meet, and the crown sits on
   // the top course instead of dipping into it, so nothing overlaps (#9)
-  const onCrashcat = phys.name === 'crashcat';
-  const halfLen = (depth) => onCrashcat ? (R - depth) * Math.tan(step / 2) - 0.002 : chord / 2;
-  // crashcat: a staggered brick needs one of the two bricks below it, else it is left out —
+  const halfLen = (depth) => (R - depth) * Math.tan(step / 2) - 0.002;
+  // a staggered brick needs one of the two bricks below it, else it is left out —
   // door and windows get stepped tops instead of bricks resting on nothing (#9)
   let below = null;
   for (let c = 0; c < courses; c++) {
@@ -1029,14 +867,14 @@ function setupCylinder() {
       if (Math.cos(a) > 0.9 && c < 3) continue;    // doorway at the front
       if (c >= 4 && c <= 6 && j % 4 === 0) continue; // window band
       // odd courses sit between j and j+1 below, even ones between j-1 and j
-      if (onCrashcat && below && !(c % 2 ? below[j] || below[(j + 1) % N] : below[j] || below[(j + N - 1) % N])) continue;
+      if (below && !(c % 2 ? below[j] || below[(j + 1) % N] : below[j] || below[(j + N - 1) % N])) continue;
       placed[j] = true;
       addBlock(halfLen(0.4), bh / 2, 0.4, m(), 35, R * Math.sin(a), y, zC + R * Math.cos(a), a, 0);
     }
     below = placed;
   }
   // crown ring
-  const topY = onCrashcat ? courses * (bh + gap) + 0.28 : bh / 2 + courses * (bh + gap);
+  const topY = courses * (bh + gap) + 0.28;
   for (let j = 0; j < N; j++) {
     const a = j * step;
     addBlock(halfLen(0.5), 0.28, 0.5, m(), 20, R * Math.sin(a), topY, zC + R * Math.cos(a), a, 0);
@@ -1152,7 +990,6 @@ const balls = []; // {body, mesh, born, type, exploded}
 let ammoType = 'basketball';
 const ammoEl = document.getElementById('ammo');
 function setAmmo(type) {
-  if (isCarvedOut(type)) type = 'basketball'; // engine switch (temporary, #9)
   ammoType = type;
   for (const b of ammoEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.type === type);
   // Sniper lens zooms the view for precision; other ammo restores the default FOV.
@@ -1480,8 +1317,6 @@ function shootBall(dir, power) {
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
     if (Math.abs(impactSpeed) < 1.5) return;
     if (!other) return;
-    if (other.material === 'card') unfreezeCards();
-    else if (other.material === 'stone') wakeNear(rec.body.position, 2.6 * TSCALE);
     if (other.material === 'barrel') (other.userData && other.userData.wood ? playWoodKnock : playClank)(Math.abs(impactSpeed));
     else playBounce(Math.abs(impactSpeed));
   });
@@ -1496,7 +1331,6 @@ function explode(rec, RADIUS = 3, STRENGTH = 80) {
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
   // radial impulse on all dynamic bodies
-  wakeNear(p, RADIUS + 0.5); // only pieces in blast radius react
   for (const body of phys.bodies()) {
     if (body.mass <= 0 || body === rec.body) continue;
     let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
@@ -1509,7 +1343,7 @@ function explode(rec, RADIUS = 3, STRENGTH = 80) {
     phys.applyImpulse(body, dx * imp, dy * imp + imp * 0.3, dz * imp);
   }
   // remove the projectile — deferred out of the collide/step callback so we
-  // never remove a body mid-narrowphase (which corrupts cannon-es' contacts)
+  // never remove a body while the world is stepping
   setTimeout(() => {
     phys.removeBody(rec.body);
     scene.remove(rec.mesh);
@@ -1556,7 +1390,7 @@ function paintSplat(rec, other) {
   scene.add(splat);
   paintSplats.push(splat);
   // remove the paintball itself — deferred out of the collide callback like explode(),
-  // removing a body mid-step crashes cannon-es (#15)
+  // never remove a body while the world is stepping (#15)
   setTimeout(() => {
     phys.removeBody(rec.body);
     scene.remove(rec.mesh);
@@ -1580,7 +1414,6 @@ function strikeLightning() {
   }
   const c = { x: point.x, y: point.y, z: point.z };
   const R = 4 * TSCALE;
-  wakeNear(c, R);
   for (const b of barrels) {
     const dx = b.body.position.x - c.x, dy = b.body.position.y - c.y, dz = b.body.position.z - c.z;
     const d = Math.hypot(dx, dy, dz);
@@ -1653,7 +1486,6 @@ function disruptorBlast() {
   }
   const c = { x: point.x, y: point.y, z: point.z };
   const R = 6 * TSCALE;
-  wakeNear(c, R);
   for (const body of phys.bodies()) {
     if (body.mass <= 0) continue;
     let dx = body.position.x - c.x, dy = body.position.y - c.y, dz = body.position.z - c.z;
@@ -2044,9 +1876,8 @@ function reset() {
 document.getElementById('reset').addEventListener('click', reset);
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
-  if (autoPlay && k !== 'r' && k !== 'k') return;
+  if (autoPlay && k !== 'r') return;
   if (k === 'r') reset();
-  if (k === 'k') toggleEngine(); // engine switch (temporary, #9)
   if (k === '1') setAmmo('basketball');
   if (k === '2') setAmmo('cannonball');
   if (k === '3') setAmmo('bomb');
@@ -2079,89 +1910,6 @@ addEventListener('keyup', (e) => {
   if (e.key === ' ') pulling = false;
   if (e.key === 'Shift') quakeActive = false;
 });
-
-// ---------- Engine switch (temporary, #9) ----------
-// Weapons carved out on crashcat (filled by the playtest; empty = all work).
-const CRASHCAT_DISABLED_WEAPONS = new Set([]);
-const engineEl = document.getElementById('engine');
-let crashcatUnavailable = false;
-let switching = false;
-
-function isCarvedOut(type) {
-  return phys.name === 'crashcat' && CRASHCAT_DISABLED_WEAPONS.has(type);
-}
-
-function engineLabel() {
-  if (crashcatUnavailable) return 'Physics: crashcat unavailable';
-  return 'Physics: ' + phys.name;
-}
-
-function refreshEngineUi() {
-  engineEl.textContent = engineLabel();
-  engineEl.disabled = crashcatUnavailable || switching;
-  // dim carved-out weapons on crashcat
-  for (const btn of ammoEl.querySelectorAll('button')) {
-    const off = isCarvedOut(btn.dataset.type);
-    btn.disabled = off;
-    btn.title = off ? 'Not available on crashcat yet' : '';
-  }
-  if (isCarvedOut(ammoType)) setAmmo('basketball');
-}
-
-function persistEngineChoice(name) {
-  try {
-    writeEngineChoice(localStorage, name);
-  } catch (e) {
-    console.warn('[physics] could not persist engine choice:', e.message);
-  }
-}
-
-async function switchEngine(name) {
-  if (switching) return;
-  if (name === phys.name) return;
-  if (name === 'crashcat' && crashcatUnavailable) return;
-  switching = true;
-  engineEl.disabled = true;
-  try {
-    // tear down everything that references the old world
-    stopAutoPlay();
-    detachHarpoon();
-    for (const b of balls) removeProjectile(b);
-    balls.length = 0;
-    for (const h of hurricanes) scene.remove(h.group);
-    hurricanes.length = 0;
-    // destroy the old backend and create the other one
-    phys.destroy();
-    const loaded = await loadBackend(name, CANNON);
-    phys = loaded.phys;
-    if (loaded.error) { crashcatUnavailable = true; }
-    else { crashcatUnavailable = false; }
-    persistEngineChoice(phys.name);
-    setupWorld(); // recreate ground + platform on the new backend
-    reset();      // rebuild the current structure fresh
-  } finally {
-    switching = false;
-    refreshEngineUi();
-  }
-}
-
-function toggleEngine() {
-  const next = phys.name === 'cannon' ? 'crashcat' : 'cannon';
-  switchEngine(next);
-}
-
-engineEl.addEventListener('click', toggleEngine);
-refreshEngineUi();
-
-// On startup, apply the persisted choice (default cannon). Invoked at the
-// end of the module (after all top-level lets are initialized) to avoid TDZ.
-async function initEngine() {
-  let stored = 'cannon';
-  try { stored = readEngineChoice(localStorage); } catch { stored = 'cannon'; }
-  if (stored === 'crashcat') {
-    await switchEngine('crashcat');
-  }
-}
 
 // ---------- Auto-play ----------
 let autoPlay = false;
@@ -2235,7 +1983,6 @@ function resize() {
   }
 }
 
-let lastCollapseCheck = 0;
 function animate() {
   requestAnimationFrame(animate);
   resize();
@@ -2272,9 +2019,6 @@ function animate() {
     }
   }
 
-  // after any disturbance, drop blocks that lost their support (~every 120ms)
-  if (now - lastCollapseCheck > 120) { lastCollapseCheck = now; collapseUnsupported(); }
-
   // charge bar
   if (charging) {
     const t = Math.min((performance.now() - chargeStart) / 400, 1);
@@ -2307,7 +2051,6 @@ function animate() {
     const tp = r.origin.clone().add(r.direction.clone().multiplyScalar(Math.min(dist, 40)));
     const target = { x: tp.x, y: Math.max(tp.y, 2), z: tp.z };
     for (const b of barrels) {
-      if (phys.isStatic(b.body)) phys.makeDynamic(b.body);
       phys.wake(b.body);
       let toPx = target.x - b.body.position.x, toPy = target.y - b.body.position.y, toPz = target.z - b.body.position.z;
       const d = Math.max(Math.hypot(toPx, toPy, toPz), 0.3); toPx /= d; toPy /= d; toPz /= d;
@@ -2324,7 +2067,6 @@ function animate() {
     const el = (now - quakeStart) / 1000;
     const intensity = Math.min(el / 1.2, 1);
     for (const b of barrels) {
-      if (phys.isStatic(b.body)) phys.makeDynamic(b.body);
       phys.wake(b.body);
       const m = b.body.mass || 1;
       const q = 26 * intensity * m;
@@ -2350,17 +2092,9 @@ function animate() {
     h.outer.material.opacity = 0.2 * fade;
     h.inner.material.opacity = 0.28 * fade;
     h.dust.material.opacity = 0.16 * fade;
-    // unfreeze frozen pieces the funnel reaches
-    for (const b of barrels) {
-      if (!phys.isStatic(b.body)) continue;
-      if (Math.hypot(b.body.position.x - gp.x, b.body.position.z - gp.z) > R * 0.8) continue;
-      if (b.body.position.y > HH) continue;
-      phys.makeDynamic(b.body);
-      phys.wake(b.body);
-    }
     // swirl every dynamic body in reach
     for (const body of phys.bodies()) {
-      if (body.mass <= 0 || phys.isStatic(body)) continue;
+      if (body.mass <= 0) continue;
       const dx = body.position.x - gp.x, dz = body.position.z - gp.z;
       const d2 = Math.hypot(dx, dz);
       if (d2 > R || body.position.y > HH) continue;
@@ -2461,7 +2195,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
-initEngine(); // engine switch (temporary, #9): switch to crashcat if stored
 
 </script>
 <nav id="game-nav" aria-label="Game navigation" style="position:fixed;right:10px;bottom:8px;z-index:2147483647;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">

@@ -1,11 +1,11 @@
 // PhysicsBackend facade over crashcat.
 // createCrashcatBackend(cc): wraps crashcat, where `cc` is the module namespace
 // from `import('https://esm.sh/crashcat@0.0.5')`. Game code talks only to the
-// returned handle, exactly as it does with the cannon backend.
+// returned handle.
 
 import { contactFor, DEFAULT_CONTACT } from './materials.js';
 
-// Half-extent of the ground box: large enough to act like cannon's infinite plane.
+// Half-extent of the ground box: large enough to act like an infinite plane.
 const GROUND_HALF = 1000;
 
 export function createCrashcatBackend(cc) {
@@ -40,7 +40,7 @@ export function createCrashcatBackend(cc) {
     throw new Error('unknown shape kind: ' + spec.kind);
   }
 
-  // The ground's top surface sits at spec.position.y (like cannon's plane).
+  // The ground's top surface sits at spec.position.y.
   function bodyPosition(spec) {
     const p = spec.position;
     return spec.shape.kind === 'ground' ? [p.x, p.y - 0.5, p.z] : [p.x, p.y, p.z];
@@ -57,7 +57,6 @@ export function createCrashcatBackend(cc) {
       position: bodyPosition(spec),
       userData: null, // holds the handle (see below); game userData lives on the handle
     };
-    // spec mass also on static bodies, so makeDynamic() gets it instead of shape density
     if (spec.mass > 0) opts.mass = spec.mass;
     if (!isStatic) {
       if (spec.linearDamping != null) opts.linearDamping = spec.linearDamping;
@@ -75,7 +74,6 @@ export function createCrashcatBackend(cc) {
       material: spec.material,
       mass: isStatic ? 0 : spec.mass,
       userData: spec.userData,
-      _specMass: spec.mass,
       _pos: { x: spec.position.x, y: spec.position.y, z: spec.position.z },
       _quat: { x: 0, y: 0, z: 0, w: 1 },
       get position() { syncTransform(this); return this._pos; },
@@ -161,14 +159,6 @@ export function createCrashcatBackend(cc) {
 
   function wake(h) { cc.rigidBody.wake(world, h.raw); }
   function isSleeping(h) { return !!h.raw.sleeping; }
-  function isStatic(h) { return h.raw.motionType === cc.MotionType.STATIC; }
-  function makeDynamic(h) {
-    if (h.raw.motionType === cc.MotionType.STATIC) {
-      cc.rigidBody.setMotionType(world, h.raw, cc.MotionType.DYNAMIC, true);
-      cc.rigidBody.setObjectLayer(world, h.raw, LAYER_MOVING);
-      h.mass = h._specMass || h.mass || 0;
-    }
-  }
 
   function onCollide(h, cb) { collideCbs.set(h, cb); }
 
@@ -259,13 +249,12 @@ export function createCrashcatBackend(cc) {
   }
 
   return {
-    name: 'crashcat',
     addBody, removeBody, bodies, bodyCount,
     step,
     getVelocity, setVelocity, getAngularVelocity, setAngularVelocity,
     setPosition, setQuaternion,
     applyImpulse, applyForce,
-    wake, isSleeping, isStatic, makeDynamic,
+    wake, isSleeping,
     onCollide,
     addDistanceJoint, addFixedJoint, removeJoint,
     destroy,
