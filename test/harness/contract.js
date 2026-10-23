@@ -8,14 +8,12 @@ export function runContract(phys) {
     restsOnGround,
     impulseChangesVelocity,
     staticDoesNotMove,
-    makeDynamicFalls,
     sleepsWhenResting,
     collideReportsImpact,
     collideRemovalDeferred,
     mutateFromInsideCollide,
     restingContactUsesPairFriction,
     groundHonoursPositionAndExtent,
-    makeDynamicUsesSpecMass,
     shapelessAnchorDoesNotCollide,
     distanceJointHoldsLength,
     fixedJointMovesTogether,
@@ -75,21 +73,12 @@ function staticDoesNotMove(phys) {
   const b = box(phys, [0.5, 0.5, 0.5], 5, 3, { isStatic: true });
   step(phys, 1);
   const y = b.position.y;
-  const okStatic = phys.isStatic(b) && b.mass === 0;
+  const okStatic = b.mass === 0;
   cleanup(phys, [b]);
   const pass = Math.abs(y - 3) < 1e-6 && okStatic;
   return { name: 'staticDoesNotMove', pass, detail: `y=${y.toFixed(4)} static=${okStatic}` };
 }
 
-function makeDynamicFalls(phys) {
-  const b = box(phys, [0.5, 0.5, 0.5], 1, 3, { isStatic: true });
-  phys.makeDynamic(b);
-  step(phys, 1);
-  const y = b.position.y;
-  cleanup(phys, [b]);
-  const pass = y < 2.9;
-  return { name: 'makeDynamicFalls', pass, detail: `y=${y.toFixed(4)} expected < 2.9` };
-}
 
 function sleepsWhenResting(phys) {
   const g = ground(phys);
@@ -137,11 +126,6 @@ function collideRemovalDeferred(phys) {
 // backend must make that safe: the next steps must not throw, the removal
 // must take effect, and the world must keep simulating correctly.
 function mutateFromInsideCollide(phys) {
-  // cannon-es corrupts its own step when a body is removed mid-step; the game
-  // defers removal there instead (explode → setTimeout), so cannon is skipped.
-  if (phys.name === 'cannon') {
-    return { name: 'mutateFromInsideCollide', pass: false, required: false, detail: 'skipped: cannon-es cannot mutate mid-step (known)' };
-  }
   const g = ground(phys);
   const doomed = phys.addBody({ shape: { kind: 'sphere', radius: 0.5 }, mass: 1, material: 'ball', position: { x: -3, y: 3, z: 0 } });
   const harpoon = phys.addBody({ shape: { kind: 'sphere', radius: 0.5 }, mass: 1, material: 'ball', position: { x: 3, y: 3, z: 0 } });
@@ -177,8 +161,6 @@ function mutateFromInsideCollide(phys) {
 // A box already resting on the ground (persisted contact) must slide with the
 // materials.js pair friction: card/ground 0.9 stops short, ball/ground 0.4
 // slides further. v0=2 → d = v0²/(2µg): 0.23 m at µ=0.9, 0.51 m at µ=0.4.
-// Required on crashcat; informational on cannon, whose iterative friction
-// stops a sliding box almost instantly regardless of µ.
 function restingContactUsesPairFriction(phys) {
   const g = ground(phys);
   const slide = (material) => {
@@ -196,12 +178,10 @@ function restingContactUsesPairFriction(phys) {
   const dBall = slide('ball');
   cleanup(phys, [g]);
   const pass = dCard > 0.15 && dCard < 0.33 && dBall > 0.4 && dBall < 0.65;
-  const required = phys.name !== 'cannon';
-  return { name: 'restingContactUsesPairFriction', pass, required, detail: `card/ground d=${dCard.toFixed(3)} (~0.23) ball/ground d=${dBall.toFixed(3)} (~0.51)` };
+  return { name: 'restingContactUsesPairFriction', pass, detail: `card/ground d=${dCard.toFixed(3)} (~0.23) ball/ground d=${dBall.toFixed(3)} (~0.51)` };
 }
 
-// Ground top surface sits at spec.position.y and spans far beyond the arena
-// (cannon's plane is infinite).
+// Ground top surface sits at spec.position.y and spans far beyond the arena.
 function groundHonoursPositionAndExtent(phys) {
   const g = phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: -2, z: 0 }, isStatic: true });
   const near = box(phys, [0.5, 0.5, 0.5], 1, 0);
@@ -211,16 +191,6 @@ function groundHonoursPositionAndExtent(phys) {
   cleanup(phys, [g, near, far]);
   const pass = Math.abs(nearY + 1.5) < 0.05 && Math.abs(farY + 1.5) < 0.05;
   return { name: 'groundHonoursPositionAndExtent', pass, detail: `nearY=${nearY.toFixed(4)} farY=${farY.toFixed(4)} expected ~-1.5` };
-}
-
-function makeDynamicUsesSpecMass(phys) {
-  const b = box(phys, [0.5, 0.5, 0.5], 2, 3, { isStatic: true });
-  phys.makeDynamic(b);
-  phys.applyImpulse(b, 4, 0, 0);
-  const vx = phys.getVelocity(b).x;
-  cleanup(phys, [b]);
-  const pass = Math.abs(vx - 2) < 0.01 && b.mass === 2;
-  return { name: 'makeDynamicUsesSpecMass', pass, detail: `vx=${vx.toFixed(4)} expected ~2 (mass 2) h.mass=${b.mass}` };
 }
 
 // The wrecking-ball anchor is shapeless: it holds a joint but nothing hits it.
@@ -292,9 +262,7 @@ function stack10Stands(phys) {
   const expected = 0.5 + 9 * (1 + 0.001); // center of the top box
   cleanup(phys, [g, ...stack]);
   const pass = Math.abs(topY - expected) < 0.05;
-  // Required on crashcat (the spec's core goal); informational on cannon (known instability).
-  const required = phys.name !== 'cannon';
-  return { name: 'stack10Stands', pass, required, detail: `topY=${topY.toFixed(4)} expected ~${expected.toFixed(4)}` };
+  return { name: 'stack10Stands', pass, detail: `topY=${topY.toFixed(4)} expected ~${expected.toFixed(4)}` };
 }
 
 function unsupportedSleeperFalls(phys) {

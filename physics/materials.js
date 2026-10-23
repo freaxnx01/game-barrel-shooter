@@ -1,5 +1,5 @@
 // Material table and contact pairs for the physics backends.
-// Values verbatim from index.html (cannon-es ContactMaterial pairs).
+// Values carried over from the original cannon-es ContactMaterial pairs.
 // Pure module: no engine, no DOM.
 
 export const DEFAULT_CONTACT = { friction: 0.3, restitution: 0 };
