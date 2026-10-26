@@ -4,7 +4,7 @@
 
 export const DEFAULT_CONTACT = { friction: 0.3, restitution: 0 };
 
-export const MATERIALS = ['ground', 'barrel', 'ball', 'heavy', 'card', 'stone'];
+export const MATERIALS = ['ground', 'barrel', 'ball', 'heavy', 'card', 'stone', 'masonry'];
 
 export const CONTACT_PAIRS = [
   ['heavy', 'ground', { friction: 0.6, restitution: 0.15 }],
@@ -20,6 +20,12 @@ export const CONTACT_PAIRS = [
   ['stone', 'stone', { friction: 0.7, restitution: 0.0 }],
   ['stone', 'ball', { friction: 0.4, restitution: 0.2 }],
   ['stone', 'heavy', { friction: 0.5, restitution: 0.05 }],
+  // block-built stone buildings: lower friction than 'stone' so a hit can push loaded
+  // blocks out of a wall on crashcat (#22)
+  ['masonry', 'ground', { friction: 0.45, restitution: 0.0 }],
+  ['masonry', 'masonry', { friction: 0.35, restitution: 0.0 }],
+  ['masonry', 'ball', { friction: 0.4, restitution: 0.2 }],
+  ['masonry', 'heavy', { friction: 0.5, restitution: 0.05 }],
 ];
 
 const lookup = new Map();

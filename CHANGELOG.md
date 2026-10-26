@@ -17,6 +17,7 @@ All notable changes to this project are documented here, following
 - The house of cards no longer slumps once it is hit, and Spiral Stair stands until hit instead of shedding its treads (#9)
 - Paintball no longer throws an error when it hits the house of cards (#15)
 - The wrecking ball sweeps through the barrels instead of catching on the platform edge (#15)
+- Stone buildings (fortress, octagon, tower gate, …) break apart again: weapons and explosions could barely move their blocks after the switch to crashcat (#22)
 
 ## [0.2.0] - 2026-09-29
 
