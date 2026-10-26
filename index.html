@@ -463,14 +463,19 @@ let TSCALE = 1; // per-mode size multiplier (set in buildTargets)
 const stoneMatls = ['#a39a88', '#968d7c', '#ada393'].map(c =>
   new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
 
+// crashcat pins a loaded wall block in place by friction, so at full weight no weapon
+// could break a stone building; lighter blocks keep them destructible (#22)
+const MASONRY_MASS_SCALE = 0.25;
+
 function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
   const S = TSCALE;
   hx *= S; hy *= S; hz *= S; x *= S; y *= S; z *= S;
+  mass *= MASONRY_MASS_SCALE;
   const body = phys.addBody({
     shape: { kind: 'box', halfExtents: [hx, hy, hz] },
     mass,
     startAsleep: true,
-    material: 'stone',
+    material: 'masonry',
     position: { x, y, z },
     quaternion: fromEulerXYZ(0, ry, rz),
     linearDamping: 0.15, angularDamping: 0.3,
@@ -1311,7 +1316,7 @@ function shootBall(dir, power) {
   playShoot(power);
   phys.onCollide(body, (other, impactSpeed) => {
     if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
-    if (type === 'dynamite' && !rec.exploded) { explode(rec, 4.5, 150); return; }
+    if (type === 'dynamite' && !rec.exploded) { explode(rec, 4.5, 600); return; }
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
     if (type === 'harpoon' && !rec.hit) harpoonStick(rec, other);
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
@@ -1327,7 +1332,8 @@ function shootBall(dir, power) {
 
 // ---------- Explosion ----------
 const explosions = []; // {mesh, born, particles}
-function explode(rec, RADIUS = 3, STRENGTH = 80) {
+// strengths are 4x the cannon-es values: crashcat stacks are stiffer, so the old blasts barely moved stone (#22)
+function explode(rec, RADIUS = 3, STRENGTH = 320) {
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
   // radial impulse on all dynamic bodies

@@ -65,8 +65,8 @@ Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thund
 ## Technical Notes
 
 - Physics runs at a fixed **240 Hz** substep to stop fast projectiles from tunneling through thin bodies.
-- Stone structures spawn as `STATIC` bodies and convert to dynamic on first projectile impact; cards spawn asleep with clearance gaps to prevent self-collapse.
-- **Structural collapse:** a periodic support check (`collapseUnsupported`, ~every 120 ms after a disturbance) drops frozen or sleeping pieces whose support chain no longer reaches the ground — support counts only where a piece's lowest corners rest on another piece (oriented-box test) or the ground, so shooting out a base no longer leaves chunks hanging in mid-air. Moving debris also bumps frozen pieces it touches into live physics.
+- Structures spawn asleep and stay put until something hits them; a moving body wakes whatever sleeps next to it, so pieces whose support is knocked away fall instead of hanging in mid-air.
+- Block-built stone buildings use a lighter, lower-friction `masonry` material, and explosions are tuned for crashcat's stiff stacking, so weapons can break walls whose blocks are pinned by the weight above them (#22).
 - Knock-down detection compares each body's quaternion/position against its spawn pose.
 
 ## Running Locally
