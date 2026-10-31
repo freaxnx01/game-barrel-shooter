@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAYOUTS, frameBuilding, brickBox, massFor, APK_UNIT } from '../targets/apk-layouts.js';
+import { LAYOUTS, frameBuilding, brickBox, spiralStair, massFor, APK_UNIT } from '../targets/apk-layouts.js';
 import { boxesOverlap, overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const box = (x, y, z, ry = 0) => ({ hx: 0.5, hy: 0.5, hz: 0.5, x, y, z, ry });
@@ -13,7 +13,7 @@ test('boxesOverlap_RotatedCornerIntoNeighbour_True', () => {
 });
 
 const EXACT = { frameTower: 126, frameBlock: 120, frameHigh: 240, frameHall: 260,
-  brickBox: 288, brickTower: 196 };
+  brickBox: 288, brickTower: 196, spiral: 71, spiralTower: 95 };
 for (const [name, n] of Object.entries(EXACT)) {
   test(`${name}_Layout_HasPrefabBlockCount`, () => assert.equal(LAYOUTS[name]().length, n));
   test(`${name}_Layout_NoOverlaps`, () => assert.deepEqual(overlappingPairs(LAYOUTS[name]()), []));
@@ -36,4 +36,15 @@ test('brickBox_Course0And1_SwapCornerOwnership', () => {
   const owners = c => c.filter(x => Math.abs(Math.abs(x.x) - 4.5 * APK_UNIT) < 1e-6).length;
   assert.equal(owners(c0), 10);  // x-walls own corners in course 0
   assert.equal(owners(c1), 8);   // and not in course 1
+});
+
+test('spiralStair_36Treads_Has35PostsOf25FullHeight', () => {
+  const thin = v => Math.abs(v - 0.5 * APK_UNIT) < 1e-9;
+  const posts = spiralStair(36).filter(b => thin(b.hx) && thin(b.hz));
+  assert.equal(posts.length, 35);   // one under every tread i >= 1
+  assert.equal(posts.filter(p => Math.abs(p.hy * 2 - 11 * APK_UNIT) < 1e-6).length, 25); // i = 11..35
+});
+test('spiralStair_Tread0_BottomOnGround', () => {
+  const t0 = spiralStair(36).reduce((a, b) => (b.y < a.y ? b : a));
+  assert.ok(Math.abs(t0.y - t0.hy) < 1e-6);
 });

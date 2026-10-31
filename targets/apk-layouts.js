@@ -106,6 +106,32 @@ export function brickBox(wallOffset, ownBricks, courses) {
   return boxes;
 }
 
+// ---- Spirals ----------------------------------------------------------------
+// Wendeltreppe: treads spiral up at 30° pitch with the inner ends stacking into
+// a central column; a post under each tread i>=1 stands on the ground (i<=11)
+// or on tread i-12 one turn below (i>=12), forming the outer ring of posts.
+export function spiralStair(treads) {
+  const treadRadial = 10, treadTang = 2, treadH = 1;
+  const treadR = 4, postR = 8, postSize = 1;
+  const step = Math.PI / 6;   // 30°
+  const boxes = [];
+  const emit = (hx, hy, hz, x, y, z, ry) =>
+    boxes.push({ hx: hx * APK_UNIT, hy: hy * APK_UNIT, hz: hz * APK_UNIT, x: x * APK_UNIT, y: y * APK_UNIT, z: z * APK_UNIT, ry });
+  for (let i = 0; i < treads; i++) {
+    const a = i * step;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    // tread: radial 10 along local x, tangential 2 along local z, yaw -a
+    emit(treadRadial / 2, treadH / 2, treadTang / 2, treadR * ca, i + treadH / 2, treadR * sa, -a);
+    if (i >= 1) {
+      const full = i <= 11;            // i=11..35 use the constant 11-height form
+      const h = full ? i : 11;
+      const bottom = full ? 0 : i - 11;
+      emit(postSize / 2, h / 2, postSize / 2, postR * ca, bottom + h / 2, postR * sa, 0);
+    }
+  }
+  return boxes;
+}
+
 export const LAYOUTS = {
   frameTower: () => frameBuilding(3, 6),
   frameBlock: () => frameBuilding(4, 3),
@@ -113,4 +139,6 @@ export const LAYOUTS = {
   frameHall: () => frameBuilding(5, 4),
   brickBox: () => brickBox(4.5, 5, 16),
   brickTower: () => brickBox(3.5, 4, 14),
+  spiral: () => spiralStair(36),
+  spiralTower: () => spiralStair(48),
 };
