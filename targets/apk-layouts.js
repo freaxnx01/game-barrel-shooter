@@ -66,9 +66,51 @@ export function frameBuilding(grid, storeys) {
   return boxes;
 }
 
+// ---- Brick boxes ------------------------------------------------------------
+// Hollow square towers from bricks 1.9×1×0.95 laid lengthwise along their wall.
+// Each course, two opposite walls run full width and own the corners; the other
+// two fit between them. The owning pair swaps every course (running bond).
+// wallOffset = wall centre-line distance from the axis (u); ownBricks = brick
+// count of a corner-owning wall; the inner walls get one fewer.
+export function brickBox(wallOffset, ownBricks, courses) {
+  const brickL = 1.9, brickH = 1, brickD = 0.95, pitch = 2;
+  const rowPitch = brickH + 0.001;
+  const centres = (n) => {
+    const a = [];
+    for (let k = 0; k < n; k++) a.push((k - (n - 1) / 2) * pitch);
+    return a;
+  };
+  const own = centres(ownBricks);
+  const inner = centres(ownBricks - 1);
+  const boxes = [];
+  const emit = (hx, hy, hz, x, y, z, ry) =>
+    boxes.push({ hx: hx * APK_UNIT, hy: hy * APK_UNIT, hz: hz * APK_UNIT, x: x * APK_UNIT, y: y * APK_UNIT, z: z * APK_UNIT, ry });
+  for (let c = 0; c < courses; c++) {
+    const y = brickH / 2 + c * rowPitch;
+    const zOwns = c % 2 === 0;   // z-walls own the corners in even courses
+    // x-walls run along x at z = ±wallOffset
+    const xCentres = zOwns ? inner : own;
+    for (const xc of xCentres) {
+      for (const zo of [wallOffset, -wallOffset]) {
+        emit(brickL / 2, brickH / 2, brickD / 2, xc, y, zo, 0);
+      }
+    }
+    // z-walls run along z at x = ±wallOffset (rotated so the long side lies along z)
+    const zCentres = zOwns ? own : inner;
+    for (const zc of zCentres) {
+      for (const xo of [wallOffset, -wallOffset]) {
+        emit(brickL / 2, brickH / 2, brickD / 2, xo, y, zc, Math.PI / 2);
+      }
+    }
+  }
+  return boxes;
+}
+
 export const LAYOUTS = {
   frameTower: () => frameBuilding(3, 6),
   frameBlock: () => frameBuilding(4, 3),
   frameHigh: () => frameBuilding(4, 6),
   frameHall: () => frameBuilding(5, 4),
+  brickBox: () => brickBox(4.5, 5, 16),
+  brickTower: () => brickBox(3.5, 4, 14),
 };
