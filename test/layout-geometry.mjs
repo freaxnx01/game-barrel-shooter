@@ -2,10 +2,12 @@
 // Used by `test/apk-layouts.test.mjs` to assert no overlaps and every block resting.
 
 // 2D projection of a yaw-rotated xz rectangle onto an axis (ax, az).
+// three.js Y-rotation by ry maps local +x to (cos ry, -sin ry) and local +z to
+// (sin ry, cos ry) in world xz.
 function projRange(box, ax, az) {
   const c = Math.cos(box.ry), s = Math.sin(box.ry);
-  const lx = [c, s];   // box local x axis in world xz
-  const lz = [-s, c];  // box local z axis in world xz
+  const lx = [c, -s];  // box local x axis in world xz
+  const lz = [s, c];   // box local z axis in world xz
   const base = box.x * ax + box.z * az;
   const d1 = box.hx * (lx[0] * ax + lx[1] * az);
   const d2 = box.hz * (lz[0] * ax + lz[1] * az);
@@ -18,10 +20,10 @@ export function boxesOverlap(a, b, eps = 1e-6) {
   const bLo = b.y - b.hy, bHi = b.y + b.hy;
   if (aHi <= bLo + eps || bHi <= aLo + eps) return false;
   const axes = [
-    [Math.cos(a.ry), Math.sin(a.ry)],
-    [-Math.sin(a.ry), Math.cos(a.ry)],
-    [Math.cos(b.ry), Math.sin(b.ry)],
-    [-Math.sin(b.ry), Math.cos(b.ry)],
+    [Math.cos(a.ry), -Math.sin(a.ry)],
+    [Math.sin(a.ry), Math.cos(a.ry)],
+    [Math.cos(b.ry), -Math.sin(b.ry)],
+    [Math.sin(b.ry), Math.cos(b.ry)],
   ];
   for (const [ax, az] of axes) {
     const [aMin, aMax] = projRange(a, ax, az);
@@ -34,10 +36,10 @@ export function boxesOverlap(a, b, eps = 1e-6) {
 // true if the xz rectangles overlap with positive area (strict, no eps tolerance).
 function xzOverlapStrict(a, b) {
   const axes = [
-    [Math.cos(a.ry), Math.sin(a.ry)],
-    [-Math.sin(a.ry), Math.cos(a.ry)],
-    [Math.cos(b.ry), Math.sin(b.ry)],
-    [-Math.sin(b.ry), Math.cos(b.ry)],
+    [Math.cos(a.ry), -Math.sin(a.ry)],
+    [Math.sin(a.ry), Math.cos(a.ry)],
+    [Math.cos(b.ry), -Math.sin(b.ry)],
+    [Math.sin(b.ry), Math.cos(b.ry)],
   ];
   for (const [ax, az] of axes) {
     const [aMin, aMax] = projRange(a, ax, az);
