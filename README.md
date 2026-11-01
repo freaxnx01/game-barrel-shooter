@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag; scroll wheel to zoom |
 | **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer) |
-| **Switch target** | Buttons top-right: Barrels / Cards / Fortress / Colosseum / Pyramid / Tower Gate / Gate / Spiral Stair / Pole Tower / Octagon / Crosses / Eiffel / Bowling / Cylinder |
+| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
 | **Reset** | `R` key or the Reset button |
 
@@ -50,7 +50,9 @@ backend contract runs in the browser: serve the repo and open
 
 **Targets:** barrel pyramid on a platform; 6-level house of cards; stone fortress and ruined
 colosseum; step pyramid; tower gate; gate wall; spiral staircase; pole tower; octagon tower;
-stacked crosses; Eiffel-style matchstick truss; bowling pins; cylindrical brick tower.
+stacked crosses; Eiffel-style matchstick truss; bowling pins; cylindrical brick tower; arch, double
+and castle gates; hollow brick box and brick tower; four post-and-beam frame buildings; spiral
+tower.
 
 **Feedback:** score HUD (targets knocked down / total), shot counter, and synthesized
 Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thunder, wind).
@@ -84,3 +86,6 @@ Or just open the local `index.html` in your browser of choice. No python or web 
 ## Credits
 
 Built by [Claude](https://claude.com/claude-code). Published as-is from the design handoff package.
+
+Building designs for the frame buildings, brick towers, gates and spirals are adapted from the
+Android game *Physics Simulation Building Destruction* (#24); the layouts are rebuilt from scratch.
