@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin } from '../weapons/tire.js';
+import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from '../weapons/tire.js';
 
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 const rotY = (q) => { // rotate (0,1,0) by q
@@ -58,4 +58,21 @@ test('tipSpin_AboutRollDirection_SignFromRand', () => {
   const w = tipSpin({ x: 0, y: 0, z: -2 }, 0.2);
   close(w.x, 0); close(w.y, 0); close(w.z, 1.5);
   close(tipSpin({ x: 0, y: 0, z: -2 }, 0.8).z, -1.5);
+});
+// a cylinder standing on its tread is statically stable, so the tip is driven
+// kinematically past the balance point before the physics takes over (#8)
+test('leanStep_UprightTire_TiltsByLeanRateTimesDt', () => {
+  const q = leanStep(upright, { x: 0, y: 0, z: -1 }, 0.1);
+  close(axleTilt(q), TIRE.leanRate * 0.1);
+});
+test('leanStep_LeanAxisAlongRoll_KeepsAxlePerpendicularToRoll', () => {
+  const a = rotY(leanStep(upright, { x: 0, y: 0, z: -1 }, 0.2));
+  close(a.z, 0);
+});
+test('leanUntil_IsPastTheBalancePoint', () => {
+  assert.ok(TIRE.leanUntil > Math.atan2(TIRE.width / 2, TIRE.radius));
+});
+test('restHeight_UprightAndFlat_RadiusAndHalfWidth', () => {
+  close(restHeight(0), TIRE.radius);
+  close(restHeight(Math.PI / 2), TIRE.width / 2);
 });

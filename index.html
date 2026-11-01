@@ -178,7 +178,7 @@
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
-import { TIRE, tireLaunch, rollingStep, shouldTip, tipSpin } from './weapons/tire.js';
+import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -2278,10 +2278,24 @@ function animate() {
         const w = tipSpin(v, Math.random());
         phys.setAngularVelocity(b.body, w.x, w.y, w.z);
         b.tipped = true;
+        b.tipAxis = { x: w.x / TIRE.tipSpin, y: 0, z: w.z / TIRE.tipSpin };
+      } else if (!b.tipped && axleTilt(q) > TIRE.tipAxleMax) {
+        b.tipped = true;   // knocked over by a hit: the physics takes over, no more rolling resistance
       } else if (!b.tipped) {
         const r = rollingStep(v, phys.getAngularVelocity(b.body), dt);
         phys.setVelocity(b.body, r.velocity.x, r.velocity.y, r.velocity.z);
         phys.setAngularVelocity(b.body, r.angularVelocity.x, r.angularVelocity.y, r.angularVelocity.z);
+      }
+      // a cylinder standing on its tread is statically stable and the contact solver eats the
+      // tip spin, so lean it past the balance point by hand; then the physics lets it fall flat
+      if (b.tipAxis && axleTilt(q) < TIRE.leanUntil) {
+        const lq = leanStep(q, b.tipAxis, dt), p = b.body.position;
+        phys.wake(b.body);
+        phys.setQuaternion(b.body, lq.x, lq.y, lq.z, lq.w);
+        phys.setPosition(b.body, p.x, restHeight(axleTilt(lq)), p.z);
+        phys.setVelocity(b.body, v.x * 0.9, 0, v.z * 0.9);
+        const k = TIRE.leanRate;
+        phys.setAngularVelocity(b.body, b.tipAxis.x * k, 0, b.tipAxis.z * k);
       }
       const hSpeed = Math.hypot(v.x, v.z);
       b.rumble.setSpeed(hSpeed);
