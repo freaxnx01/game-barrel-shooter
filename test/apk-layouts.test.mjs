@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAYOUTS, frameBuilding, brickBox, spiralStair, massFor, APK_UNIT } from '../targets/apk-layouts.js';
+import { LAYOUTS, frameBuilding, brickBox, spiralStair, pierGate, massFor, APK_UNIT } from '../targets/apk-layouts.js';
 import { boxesOverlap, overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const box = (x, y, z, ry = 0) => ({ hx: 0.5, hy: 0.5, hz: 0.5, x, y, z, ry });
@@ -47,4 +47,25 @@ test('spiralStair_36Treads_Has35PostsOf25FullHeight', () => {
 test('spiralStair_Tread0_BottomOnGround', () => {
   const t0 = spiralStair(36).reduce((a, b) => (b.y < a.y ? b : a));
   assert.ok(Math.abs(t0.y - t0.hy) < 1e-6);
+});
+
+const APPROX = { archGate: 311, doubleGate: 515, castleGate: 352, castleGateSmall: 258 };
+for (const [name, ref] of Object.entries(APPROX)) {
+  test(`${name}_Layout_CountWithin15Percent`, () => {
+    const n = LAYOUTS[name]().length;
+    assert.ok(n >= ref * 0.85 && n <= ref * 1.15, `${n} vs ${ref}`);
+  });
+  test(`${name}_Layout_NoOverlaps`, () => assert.deepEqual(overlappingPairs(LAYOUTS[name]()), []));
+  test(`${name}_Layout_EveryBlockRests`, () => assert.deepEqual(unsupported(LAYOUTS[name]()), []));
+}
+test('pierGate_ThreePiers_HasTwoOpenings', () => {
+  const g = pierGate(3), low = g.filter(b => b.y < 1.5 * APK_UNIT);
+  const covered = x => low.some(b => Math.abs(b.x - x) < b.hx + b.hz);
+  assert.equal(covered(0), true);  // centre pier
+  const openings = [-1, 1].map(s => s * 6 * APK_UNIT).filter(x => !covered(x)); // piers at 0, ±12 u
+  assert.equal(openings.length, 2);
+});
+test('castleGate_GateOpening_ClearAtGroundLevel', () => {
+  const low = LAYOUTS.castleGate().filter(b => b.y < 1.5 * APK_UNIT);
+  assert.ok(!low.some(b => Math.abs(b.x) < 2 * APK_UNIT && Math.abs(b.z) < 1.5 * APK_UNIT));
 });
