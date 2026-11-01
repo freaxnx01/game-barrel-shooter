@@ -36,8 +36,14 @@
   }
   #reset:hover, .target button:hover, #autoplay:hover { background: rgba(245,239,228,0.22); }
   #autoplay.active { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
-  .target { position: fixed; top: 20px; right: 236px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 420px; }
-  .target button { padding: 8px 14px; }
+  .target { position: fixed; top: 20px; right: 236px; display: flex; flex-direction: column; gap: 6px; max-width: min(620px, calc(100vw - 560px)); }
+  .target-group { display: flex; align-items: flex-start; gap: 8px; }
+  .target-group .glabel {
+    flex: none; width: 54px; padding-top: 7px; text-align: right;
+    font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; opacity: 0.4;
+  }
+  .target-group .btns { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+  .target button { padding: 5px 9px; font-size: 11px; }
   .target button.sel { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
   .ammo {
     position: fixed; bottom: 24px; left: 24px; display: flex; gap: 16px; align-items: flex-end; user-select: none;
@@ -112,21 +118,52 @@
 <button id="reset">Reset</button>
 <button id="autoplay">▶ Auto-Play</button>
 <div class="target" id="target">
-  <button data-mode="barrels" class="sel">Barrels</button>
-  <button data-mode="woodbarrels">Wooden Barrels</button>
-  <button data-mode="cards">Cards</button>
-  <button data-mode="fortress">Fortress</button>
-  <button data-mode="colosseum">Colosseum</button>
-  <button data-mode="pyramid">Pyramid</button>
-  <button data-mode="towergate">Tower Gate</button>
-  <button data-mode="gate">Gate</button>
-  <button data-mode="spiral">Spiral Stair</button>
-  <button data-mode="poletower">Pole Tower</button>
-  <button data-mode="octagon">Octagon</button>
-  <button data-mode="crosses">Crosses</button>
-  <button data-mode="eiffel">Eiffel</button>
-  <button data-mode="bowling">Bowling</button>
-  <button data-mode="cylinder">Cylinder</button>
+  <div class="target-group">
+    <div class="glabel">Stacks</div>
+    <div class="btns">
+      <button data-mode="barrels" class="sel">Barrels</button>
+      <button data-mode="woodbarrels">Wooden Barrels</button>
+      <button data-mode="cards">Cards</button>
+      <button data-mode="bowling">Bowling</button>
+    </div>
+  </div>
+  <div class="target-group">
+    <div class="glabel">Stone</div>
+    <div class="btns">
+      <button data-mode="fortress">Fortress</button>
+      <button data-mode="colosseum">Colosseum</button>
+      <button data-mode="pyramid">Pyramid</button>
+      <button data-mode="gate">Gate</button>
+      <button data-mode="towergate">Tower Gate</button>
+      <button data-mode="archgate">Arch Gate</button>
+      <button data-mode="doublegate">Double Gate</button>
+      <button data-mode="castlegate">Castle Gate</button>
+      <button data-mode="castlegatesmall">Small Castle Gate</button>
+    </div>
+  </div>
+  <div class="target-group">
+    <div class="glabel">Towers</div>
+    <div class="btns">
+      <button data-mode="cylinder">Cylinder</button>
+      <button data-mode="octagon">Octagon</button>
+      <button data-mode="poletower">Pole Tower</button>
+      <button data-mode="brickbox">Brick Box</button>
+      <button data-mode="bricktower">Brick Tower</button>
+    </div>
+  </div>
+  <div class="target-group">
+    <div class="glabel">Frames</div>
+    <div class="btns">
+      <button data-mode="spiral">Spiral Stair</button>
+      <button data-mode="spiraltower">Spiral Tower</button>
+      <button data-mode="frametower">Frame Tower</button>
+      <button data-mode="frameblock">Frame Block</button>
+      <button data-mode="framehigh">Frame High-rise</button>
+      <button data-mode="framehall">Frame Hall</button>
+      <button data-mode="crosses">Crosses</button>
+      <button data-mode="eiffel">Eiffel</button>
+    </div>
+  </div>
 </div>
 
 <script type="importmap">
@@ -139,6 +176,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
+import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -658,32 +696,15 @@ function setupGate() {
   brickWall(0, zC, 'x', cols, rows, bw, bh, bd, gap, m, 40, { c0: 2, c1: 3, rows: rows - 2 });
 }
 
-function setupSpiral() {
-  const zC = -6, steps = 20, rise = 0.32, R = 1.7, rP = 2.15;
+// buildings adapted from 'Physics Simulation Building Destruction' (#24); the layouts
+// are pure data from targets/apk-layouts.js, centred on x = 0, z = 0 with the ground at y = 0
+function placeLayout(boxes, zC) {
   let mi = 0; const m = () => stoneMatls[mi++ % stoneMatls.length];
-  // no separate column for the treads to cut through; each tread reaches past the axis
-  // (by two half-widths), so the stacked tread ends form the column and every tread rests
-  // its centre of mass on the tread below (#9)
-  const treadBack = 0.9;
-  const treadHalf = (R + treadBack) / 2, treadMid = (R - treadBack) / 2;
-  // spiral treads
-  for (let i = 0; i < steps; i++) {
-    const a = i * (Math.PI * 2 / 12);
-    const y = rise / 2 + i * rise;
-    addBlock(treadHalf, rise / 2, 0.45, m(), 8, Math.cos(a) * treadMid, y, zC + Math.sin(a) * treadMid, -a, 0);
-  }
-  // 4 corner posts, as tall as the stair
-  const cn = Math.ceil(steps * rise / 0.7);
-  const postPitch = 0.702;
-  const corners = [[rP, rP], [-rP, rP], [rP, -rP], [-rP, -rP]];
-  for (const [px, pz] of corners) {
-    for (let k = 0; k < cn; k++) addBlock(0.22, 0.35, 0.22, m(), 12, px, 0.35 + k * postPitch, zC + pz, 0, 0);
-  }
-  // top frame beams on the post tops: x-beams on the posts, z-beams across them (#9)
-  const beamY = (ry) => cn * postPitch + 0.18 + (ry ? 0.362 : 0);
-  for (const [ax, az, ry] of [[0, rP, 0], [0, -rP, 0], [rP, 0, Math.PI / 2], [-rP, 0, Math.PI / 2]]) {
-    addBlock(rP + 0.22, 0.18, 0.22, m(), 10, ax, beamY(ry), zC + az, ry, 0);
-  }
+  for (const b of boxes) addBlock(b.hx, b.hy, b.hz, m(), massFor(b), b.x, b.y, b.z + zC, b.ry, 0);
+}
+
+function setupSpiral() {
+  placeLayout(LAYOUTS.spiral(), -6);
 }
 
 function setupPoleTower() {
@@ -921,13 +942,24 @@ const camCfg = {
   pyramid:   { r: 22,   ty: 4,   tz: -6, plat: false, build: setupPyramid },
   towergate: { r: 18,   ty: 3,   tz: -6, plat: false, build: setupTowerGate },
   gate:      { r: 18,   ty: 3,   tz: -6, plat: false, build: setupGate },
-  spiral:    { r: 20,   ty: 3.5, tz: -6, plat: false, build: setupSpiral },
+  spiral:    { r: 24,   ty: 4.5, tz: -6, plat: false, build: setupSpiral },
   poletower: { r: 18,   ty: 3.5, tz: -6, plat: false, build: setupPoleTower },
   octagon:   { r: 20,   ty: 3.5, tz: -6, plat: false, build: setupOctagon },
   crosses:   { r: 18,   ty: 2.8, tz: -6, plat: false, build: setupCrosses },
   eiffel:    { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupEiffel },
   bowling:   { r: 13,   ty: 1.5, tz: -6, plat: false, build: setupBowling },
   cylinder:  { r: 22,   ty: 3.5, tz: -6, plat: false, build: setupCylinder },
+  spiraltower:     { r: 26, ty: 6,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.spiralTower(), -6) },
+  frametower:      { r: 22, ty: 4,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.frameTower(), -6) },
+  frameblock:      { r: 20, ty: 2.5, tz: -6, plat: false, build: () => placeLayout(LAYOUTS.frameBlock(), -6) },
+  framehigh:       { r: 24, ty: 4,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.frameHigh(), -6) },
+  framehall:       { r: 24, ty: 3,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.frameHall(), -6) },
+  brickbox:        { r: 18, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.brickBox(), -6) },
+  bricktower:      { r: 18, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.brickTower(), -6) },
+  archgate:        { r: 20, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.archGate(), -6) },
+  doublegate:      { r: 24, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.doubleGate(), -6) },
+  castlegate:      { r: 24, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGate(), -6) },
+  castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
 };
 function buildTargets() {
   detachHarpoon();   // a tethered harpoon references a barrel body we're about to remove
