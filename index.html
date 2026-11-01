@@ -94,6 +94,7 @@
     <button data-type="wrecking"><span class="dot" style="background:#3a3d42;border:2px solid #74787e;box-sizing:border-box"></span>Wrecking ball <span style="opacity:0.5">7</span></button>
     <button data-type="hammer"><span class="dot" style="background:#4a4e55;border-radius:2px"></span>Hammer <span style="opacity:0.5">H</span></button>
     <button data-type="spear"><span class="dot" style="background:#8a6a3c;border-radius:2px"></span>Spear <span style="opacity:0.5">6</span></button>
+    <button data-type="tire"><span class="dot" style="background:#1a1a1d;border:2px solid #e8c13c;box-sizing:border-box"></span>Tractor tire <span style="opacity:0.5">T</span></button>
     <button data-type="anchor"><span class="dot" style="background:#8a8f98;border:2px solid #cfd4da;box-sizing:border-box"></span>Ship anchor <span style="opacity:0.5">A</span></button>
     <button data-type="crt"><span class="dot" style="background:#3a4650;border-radius:2px"></span>Tube monitor <span style="opacity:0.5">C</span></button>
   </div>
@@ -177,6 +178,7 @@
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
+import { TIRE, tireLaunch, rollingStep, shouldTip, tipSpin } from './weapons/tire.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -1093,12 +1095,71 @@ function makeSoccerballTexture() {
   return tex;
 }
 
+function makeTireMesh() {
+  const g = new THREE.Group();
+  const rubber = new THREE.MeshStandardMaterial({ color: '#1a1a1d', roughness: 0.92 });
+  const rim = new THREE.MeshStandardMaterial({ color: '#e8c13c', roughness: 0.4, metalness: 0.5 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(TIRE.radius, TIRE.radius, TIRE.width, 36), rubber);
+  g.add(body);
+  const treadCount = 24;
+  const treadGeo = new THREE.BoxGeometry(0.13, TIRE.width * 0.92, 0.1);
+  for (let i = 0; i < treadCount; i++) {
+    const a = (i / treadCount) * Math.PI * 2;
+    const block = new THREE.Mesh(treadGeo, rubber);
+    block.position.set(Math.cos(a) * TIRE.radius, 0, Math.sin(a) * TIRE.radius);
+    block.rotation.y = -a;
+    g.add(block);
+  }
+  const rimGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.07, 28);
+  const top = new THREE.Mesh(rimGeo, rim); top.position.y = TIRE.width / 2 - 0.035; g.add(top);
+  const bot = new THREE.Mesh(rimGeo, rim); bot.position.y = -(TIRE.width / 2 - 0.035); g.add(bot);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, TIRE.width + 0.05, 16), rim);
+  g.add(hub);
+  return g;
+}
+
+function shootTire(dir, power) {
+  const cf = new THREE.Vector3().subVectors(orbit.target, camera.position).normalize();
+  const launch = tireLaunch(
+    { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+    { x: dir.x, y: dir.y, z: dir.z },
+    { x: cf.x, y: cf.y, z: cf.z },
+    power,
+  );
+  const tBody = phys.addBody({
+    mass: TIRE.mass,
+    material: 'heavy',
+    shape: { kind: 'cylinder', radiusTop: TIRE.radius, radiusBottom: TIRE.radius, height: TIRE.width },
+    position: launch.position,
+    fast: true,
+    angularDamping: 0.15,
+  });
+  phys.setVelocity(tBody, launch.velocity.x, launch.velocity.y, launch.velocity.z);
+  phys.setAngularVelocity(tBody, launch.angularVelocity.x, launch.angularVelocity.y, launch.angularVelocity.z);
+  phys.setQuaternion(tBody, launch.quaternion.x, launch.quaternion.y, launch.quaternion.z, launch.quaternion.w);
+  const tMesh = makeTireMesh();
+  tMesh.castShadow = true;
+  scene.add(tMesh);
+  const rec = { body: tBody, mesh: tMesh, born: performance.now(), type: 'tire', exploded: false, tipped: false, rumble: startRumble() };
+  playShoot(power);
+  phys.onCollide(tBody, (other, impactSpeed) => {
+    if (Math.abs(impactSpeed) < 1.5) return;
+    if (!other) return;
+    if (other.material === 'barrel') (other.userData && other.userData.wood ? playWoodKnock : playClank)(Math.abs(impactSpeed));
+    else playBounce(Math.abs(impactSpeed));
+  });
+  balls.push(rec);
+  shots++;
+  updateHud();
+}
+
 function shootBall(dir, power) {
   const type = ammoType;
   if (type === 'lightning') { strikeLightning(); shots++; updateHud(); return; }
   if (type === 'hurricane') { spawnHurricane(); shots++; updateHud(); return; }
   if (type === 'laser') { fireLaser(); shots++; updateHud(); return; }
   if (type === 'disruptor') { disruptorBlast(); shots++; updateHud(); return; }
+  if (type === 'tire') { shootTire(dir, power); return; }
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
@@ -1804,6 +1865,34 @@ function playBounce(impact) {
   o.connect(g).connect(ac.destination);
   o.start(t); o.stop(t + 0.2);
 }
+function startRumble() {
+  const ac = ctx();
+  const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+  const filter = ac.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 70;
+  const gain = ac.createGain(); gain.gain.value = 0;
+  src.connect(filter).connect(gain).connect(ac.destination);
+  src.start();
+  let stopped = false;
+  return {
+    setSpeed(mps) {
+      if (stopped) return;
+      const t = ac.currentTime;
+      const v = Math.min(Math.max(mps, 0) / 8, 1) * 0.22;
+      gain.gain.setTargetAtTime(v, t, 0.08);
+      filter.frequency.setTargetAtTime(45 + Math.max(mps, 0) * 6, t, 0.1);
+    },
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      const t = ac.currentTime;
+      gain.gain.setTargetAtTime(0, t, 0.05);
+      setTimeout(() => { try { src.stop(); } catch (e) {} }, 120);
+    },
+  };
+}
 
 // ---------- Camera orbit (right-drag) ----------
 const orbit = { theta: 0, phi: 0.24, radius: 15.5, target: new THREE.Vector3(0, 2.8, -6) };
@@ -1891,6 +1980,7 @@ function updateHud() {
 updateHud();
 
 function removeProjectile(b) {
+  b.rumble?.stop();
   if (b.constraint) {
     phys.removeJoint(b.constraint);
     phys.removeBody(b.constraint._anchorBody);
@@ -1937,6 +2027,7 @@ addEventListener('keydown', (e) => {
   if (k === 'd') setAmmo('dynamite');
   if (k === 'a') setAmmo('anchor');
   if (k === 'c') setAmmo('crt');
+  if (k === 't') setAmmo('tire');
   if (k === 'j') setAmmo('harpoon');
   if (k === 'x') setAmmo('laser');
   if (k === 'v') setAmmo('disruptor');
@@ -2179,6 +2270,22 @@ function animate() {
         phys.setQuaternion(b.body, q.x, q.y, q.z, q.w);
         phys.setAngularVelocity(b.body, 0, 0, 0);
       }
+    }
+    if (b.type === 'tire') {
+      const v = phys.getVelocity(b.body);
+      const q = b.body.quaternion;
+      if (shouldTip(v, q, b.tipped)) {
+        const w = tipSpin(v, Math.random());
+        phys.setAngularVelocity(b.body, w.x, w.y, w.z);
+        b.tipped = true;
+      } else if (!b.tipped) {
+        const r = rollingStep(v, phys.getAngularVelocity(b.body), dt);
+        phys.setVelocity(b.body, r.velocity.x, r.velocity.y, r.velocity.z);
+        phys.setAngularVelocity(b.body, r.angularVelocity.x, r.angularVelocity.y, r.angularVelocity.z);
+      }
+      const hSpeed = Math.hypot(v.x, v.z);
+      b.rumble.setSpeed(hSpeed);
+      if (b.tipped && hSpeed < 0.3) b.rumble.stop();
     }
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
