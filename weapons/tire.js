@@ -9,6 +9,8 @@ export const TIRE = {
   tipSpeed: 2.5,
   tipAxleMax: Math.PI / 6,
   tipSpin: 1.5,
+  leanRate: Math.PI / 3,   // rad/s while the tip is driven
+  leanUntil: Math.PI / 7,  // ~26°, past the ~19° balance point of a 1.6 × 0.55 m tire
 };
 
 function horizDir(v) {
@@ -89,4 +91,21 @@ export function tipSpin(velocity, rand) {
   const sign = rand < 0.5 ? -1 : 1;
   const m = TIRE.tipSpin * sign;
   return { x: (velocity.x / h) * m, y: 0, z: (velocity.z / h) * m };
+}
+// rotate the tire by leanRate * dt about a horizontal world axis (the roll direction)
+export function leanStep(quaternion, axis, dt) {
+  const half = TIRE.leanRate * dt / 2, s = Math.sin(half);
+  const r = { x: axis.x * s, y: axis.y * s, z: axis.z * s, w: Math.cos(half) };
+  const q = quaternion;
+  return {
+    x: r.w * q.x + r.x * q.w + r.y * q.z - r.z * q.y,
+    y: r.w * q.y - r.x * q.z + r.y * q.w + r.z * q.x,
+    z: r.w * q.z + r.x * q.y - r.y * q.x + r.z * q.w,
+    w: r.w * q.w - r.x * q.x - r.y * q.y - r.z * q.z,
+  };
+}
+
+// centre height of a tire leaning by `tilt` with its lower tread edge on the ground
+export function restHeight(tilt) {
+  return TIRE.radius * Math.cos(tilt) + TIRE.width / 2 * Math.sin(tilt);
 }
