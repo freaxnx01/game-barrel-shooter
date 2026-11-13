@@ -116,7 +116,7 @@ test('selectPushes_AfterMaxPushes_NotPushed', () => {
 });
 
 function fakePhys() {
-  const calls = { wake: [], applyImpulse: [], getVelocity: [], getAngularVelocity: [], setAngularVelocity: [] };
+  const calls = { wake: [], applyImpulse: [], getVelocity: [], getAngularVelocity: [], setAngularVelocity: [], setQuaternion: [] };
   return {
     calls,
     wake(h) { calls.wake.push(h); },
@@ -124,6 +124,7 @@ function fakePhys() {
     getVelocity(h) { calls.getVelocity.push(h); return h._vel || { x: 0, y: 0, z: 0 }; },
     getAngularVelocity(h) { calls.getAngularVelocity.push(h); return { x: 0, y: 0, z: 0 }; },
     setAngularVelocity(h, x, y, z) { calls.setAngularVelocity.push({ h, x, y, z }); },
+    setQuaternion(h, x, y, z, w) { calls.setQuaternion.push({ h, x, y, z, w }); },
   };
 }
 function piecesFrom(snaps, vel) {
