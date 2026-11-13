@@ -8,6 +8,8 @@ export const SUPPORT = {
   repushMs: 600, maxPushes: 4, activeMs: 2000,
 };
 
+const BARREL_MASS = 8;
+
 // ---- 2D convex geometry (x/z plane) ----
 
 function convexHull2D(pts) {
@@ -129,10 +131,74 @@ export function pushFor(piece, others, floors, mass, cfg = SUPPORT) {
   return { impulse, spin };
 }
 
+function restsOn(piece, sup, cfg) {
+  if (!sup.upright) return false;
+  const pieceBot = piece.y - cfg.h / 2;
+  const supTop = sup.y + cfg.h / 2;
+  if (Math.abs(supTop - pieceBot) > cfg.contactGap) return false;
+  return Math.hypot(sup.x - piece.x, sup.z - piece.z) < 2 * cfg.r;
+}
+
 export function selectPushes(snaps, floors, now, log, cfg = SUPPORT) {
-  throw new Error('selectPushes not implemented');
+  const candidates = snaps.filter(s => s.upright && s.speed <= cfg.maxSpeed);
+  const pushes = [];
+  for (const c of candidates) {
+    const entry = log.get(c.id);
+    if (entry && entry.count >= cfg.maxPushes) continue;
+    if (entry && now - entry.lastAt < cfg.repushMs) continue;
+    const others = snaps.filter(s => s !== c);
+    const pf = pushFor(c, others, floors, BARREL_MASS, cfg);
+    if (!pf) continue;
+    const wake = [c.id];
+    for (const o of candidates) {
+      if (o === c) continue;
+      if (restsOn(o, c, cfg)) wake.push(o.id);
+    }
+    log.set(c.id, { count: (entry ? entry.count : 0) + 1, lastAt: now });
+    pushes.push({ id: c.id, impulse: pf.impulse, spin: pf.spin, wake });
+  }
+  return pushes;
 }
 
 export function createBarrelSupport({ phys, floors, cfg = SUPPORT }) {
-  throw new Error('createBarrelSupport not implemented');
+  let lastMotionAt = -Infinity;
+  let lastCheckAt = -Infinity;
+  let disturbed = false;
+  let log = new Map();
+
+  function reset() {
+    lastMotionAt = -Infinity;
+    lastCheckAt = -Infinity;
+    disturbed = false;
+    log = new Map();
+  }
+
+  function tick(now, pieces) {
+    const barrels = [];
+    for (const p of pieces) {
+      if (!p || !p.body || p.body.material !== 'barrel') continue;
+      const b = p.body;
+      const q = b.quaternion;
+      const upright = 1 - 2 * (q.x * q.x + q.z * q.z) >= cfg.uprightCos;
+      const v = phys.getVelocity(b);
+      const speed = Math.hypot(v.x, v.y, v.z);
+      barrels.push({ id: b, x: b.position.x, y: b.position.y, z: b.position.z, upright, speed });
+      if (speed > cfg.maxSpeed) { disturbed = true; lastMotionAt = now; }
+    }
+    if (!disturbed) return 0;
+    if (now - lastMotionAt > cfg.activeMs) return 0;
+    if (now - lastCheckAt < cfg.periodMs) return 0;
+    lastCheckAt = now;
+    const pushes = selectPushes(barrels, floors, now, log, cfg);
+    for (const push of pushes) {
+      for (const id of push.wake) phys.wake(id);
+      phys.applyImpulse(push.id, push.impulse.x, push.impulse.y, push.impulse.z);
+      const av = phys.getAngularVelocity(push.id);
+      phys.setAngularVelocity(push.id, av.x + push.spin.x, av.y + push.spin.y, av.z + push.spin.z);
+    }
+    if (pushes.length > 0) lastMotionAt = now;
+    return pushes.length;
+  }
+
+  return { reset, tick };
 }

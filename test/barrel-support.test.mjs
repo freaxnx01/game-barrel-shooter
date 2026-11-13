@@ -72,3 +72,120 @@ test('pushFor_OverhangToPlusX_PushesPlusXNeverUp', () => {
   close(Math.hypot(impulse.x, impulse.z), 8 * SUPPORT.pushSpeed);
   assert.ok(spin.z < 0); close(Math.hypot(spin.x, spin.z), SUPPORT.tipSpin); assert.equal(spin.y, 0);
 });
+
+// ---- Task 2: controller ----
+
+test('selectPushes_IntactPyramid_None', () => {
+  assert.deepEqual(selectPushes(pyramid(), [0, 0.5], 0, new Map()), []);
+});
+test('selectPushes_Row2MiddleRemoved_PushesBothRow3BarrelsAboveGap', () => {
+  const ids = selectPushes(pyramid({ without: 'r1c2' }), [0, 0.5], 0, new Map()).map(p => p.id).sort();
+  assert.deepEqual(ids, ['r2c1', 'r2c2']);
+});
+test('selectPushes_TopBarrelRemoved_None', () => {
+  assert.deepEqual(selectPushes(pyramid({ without: 'r5c0' }), [0, 0.5], 0, new Map()), []);
+});
+test('selectPushes_PushIncludesBarrelsRestingOnIt_InWake', () => {
+  const p = selectPushes(pyramid({ without: 'r1c2' }), [0, 0.5], 0, new Map()).find(x => x.id === 'r2c1');
+  assert.ok(p.wake.includes('r2c1') && p.wake.includes('r3c0') && p.wake.includes('r3c1'));
+});
+test('selectPushes_FastOrTiltedPiece_Skipped', () => {
+  // both gap barrels fast but still upright: they stay supports for the rows
+  // above, so nothing is pushed (the fast pair is skipped as candidates)
+  assert.deepEqual(selectPushes(gapWith({ r2c1: { speed: 1 }, r2c2: { speed: 1 } }), [0, 0.5], 0, new Map()), []);
+});
+test('selectPushes_TiltedPiece_NotInPushList', () => {
+  // a tilted barrel is never a candidate, even if it is itself unsupported
+  const ids = selectPushes(gapWith({ r2c1: { upright: false } }), [0, 0.5], 0, new Map()).map(p => p.id);
+  assert.ok(!ids.includes('r2c1'));
+});
+test('selectPushes_WithinRepushDelay_NotPushedAgain', () => {
+  const log = new Map(); const s = pyramid({ without: 'r1c2' });
+  selectPushes(s, [0, 0.5], 0, log);
+  assert.deepEqual(selectPushes(s, [0, 0.5], SUPPORT.repushMs - 1, log), []);
+});
+test('selectPushes_StillUnsupportedAfterRepushDelay_PushedAgain', () => {
+  const log = new Map(); const s = pyramid({ without: 'r1c2' });
+  selectPushes(s, [0, 0.5], 0, log);
+  assert.equal(selectPushes(s, [0, 0.5], SUPPORT.repushMs, log).length, 2);
+  assert.equal(log.get('r2c1').count, 2);
+});
+test('selectPushes_AfterMaxPushes_NotPushed', () => {
+  const log = new Map([['r2c1', { count: SUPPORT.maxPushes, lastAt: 0 }], ['r2c2', { count: SUPPORT.maxPushes, lastAt: 0 }]]);
+  assert.deepEqual(selectPushes(pyramid({ without: 'r1c2' }), [0, 0.5], 10_000, log), []);
+});
+
+function fakePhys() {
+  const calls = { wake: [], applyImpulse: [], getVelocity: [], getAngularVelocity: [], setAngularVelocity: [] };
+  return {
+    calls,
+    wake(h) { calls.wake.push(h); },
+    applyImpulse(h, x, y, z) { calls.applyImpulse.push({ h, x, y, z }); },
+    getVelocity(h) { calls.getVelocity.push(h); return h._vel || { x: 0, y: 0, z: 0 }; },
+    getAngularVelocity(h) { calls.getAngularVelocity.push(h); return { x: 0, y: 0, z: 0 }; },
+    setAngularVelocity(h, x, y, z) { calls.setAngularVelocity.push({ h, x, y, z }); },
+  };
+}
+function piecesFrom(snaps, vel) {
+  return snaps.map(s => ({
+    body: { material: 'barrel', position: { x: s.x, y: s.y, z: s.z }, quaternion: { x: 0, y: 0, z: 0, w: 1 }, _vel: vel || { x: 0, y: 0, z: 0 } },
+  }));
+}
+
+test('tick_NeverDisturbed_NoPushes', () => {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = piecesFrom(pyramid());
+  let total = 0;
+  for (let t = 0; t <= 5000; t += 120) total += sup.tick(t, pieces);
+  assert.equal(total, 0);
+  assert.equal(fake.calls.applyImpulse.length, 0);
+});
+test('tick_AfterMotionAndGap_PushesAndWakes', () => {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = piecesFrom(pyramid({ without: 'r1c2' }));
+  pieces[0].body._vel = { x: 0, y: 2, z: 0 };
+  const pushes = sup.tick(0, pieces);
+  assert.equal(pushes, 2);
+  assert.ok(fake.calls.wake.length >= 4);
+});
+test('tick_CalledFasterThanPeriod_ChecksOncePerPeriod', () => {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = piecesFrom(pyramid({ without: 'r1c2' }));
+  pieces[0].body._vel = { x: 0, y: 2, z: 0 };
+  let checks = 0;
+  for (let t = 0; t <= 110; t += 10) { if (sup.tick(t, pieces) > 0) checks++; }
+  assert.equal(checks, 1);
+});
+test('tick_QuietLongerThanActiveMs_StopsChecking', () => {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = piecesFrom(pyramid());
+  pieces[0].body._vel = { x: 0, y: 2, z: 0 };
+  sup.tick(0, pieces);
+  pieces[0].body._vel = { x: 0, y: 0, z: 0 };
+  let pushesAfter = 0;
+  for (let t = 120; t <= SUPPORT.activeMs + 200; t += 120) pushesAfter += sup.tick(t, pieces);
+  assert.equal(pushesAfter, 0);
+});
+test('tick_NonBarrelMaterial_Ignored', () => {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = pyramid({ without: 'r1c2' }).map(s => ({
+    body: { material: 'stone', position: { x: s.x, y: s.y, z: s.z }, quaternion: { x: 0, y: 0, z: 0, w: 1 }, _vel: { x: 0, y: 2, z: 0 } },
+  }));
+  sup.tick(0, pieces);
+  assert.equal(fake.calls.applyImpulse.length, 0);
+});
+test('reset_ClearsPushLogAndDisturbed', () => {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = piecesFrom(pyramid({ without: 'r1c2' }));
+  pieces[0].body._vel = { x: 0, y: 2, z: 0 };
+  sup.tick(0, pieces);
+  pieces[0].body._vel = { x: 0, y: 0, z: 0 };
+  sup.reset();
+  assert.equal(sup.tick(0, pieces), 0);
+});
