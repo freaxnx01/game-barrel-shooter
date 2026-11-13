@@ -38,6 +38,7 @@ Tests: `node --test test/*.test.mjs` runs the pure-module tests (no
 `package.json`; `node --test test/` does not work on Node 24). The physics
 backend contract runs in the browser: serve the repo and open
 `test/harness/physics-contract.html` (title becomes `CONTRACT PASS`/`FAIL`).
+`test/harness/barrel-support.html` checks that barrels which lose their support topple (title `SUPPORT PASS`/`FAIL`).
 
 ## Game Content
 
