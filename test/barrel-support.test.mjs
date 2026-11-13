@@ -65,12 +65,20 @@ test('supportPatches_TiltedNeighbour_Ignored', () => {
 test('pushFor_Supported_Null', () => {
   assert.equal(pushFor(up(1, 0, y0), [], [0, 0.5], 8), null);
 });
-test('pushFor_OverhangToPlusX_PushesPlusXNeverUp', () => {
+test('pushFor_OverhangToPlusX_PushesPlusXTurnedBySlideTurnNeverUp', () => {
   const a = up(1, -ROW / 2, y0), top = up(3, 0, y1);
-  const { impulse, spin } = pushFor(top, [a], [0, 0.5], 8);
-  assert.ok(impulse.x > 0); assert.equal(impulse.y, 0); assert.ok(Math.abs(impulse.z) < 1e-9);
+  const { impulse } = pushFor(top, [a], [0, 0.5], 8);
+  assert.ok(impulse.x > 0); assert.equal(impulse.y, 0);
+  close(Math.atan2(impulse.z, impulse.x), SUPPORT.slideTurn);
   close(Math.hypot(impulse.x, impulse.z), 8 * SUPPORT.pushSpeed);
-  assert.ok(spin.z < 0); close(Math.hypot(spin.x, spin.z), SUPPORT.tipSpin); assert.equal(spin.y, 0);
+});
+test('pushFor_PartnersOverOneGap_SlidePastOnOppositeSides', () => {
+  const s = pyramid({ without: 'r1c2' });
+  const left = s.find(b => b.id === 'r2c1'), right = s.find(b => b.id === 'r2c2');
+  const l = pushFor(left, s.filter(b => b !== left), [0, 0.5], 8).impulse;
+  const r = pushFor(right, s.filter(b => b !== right), [0, 0.5], 8).impulse;
+  assert.ok(l.x > 0 && r.x < 0);
+  assert.ok(l.z * r.z < 0);
 });
 
 // ---- Task 2: controller ----
@@ -116,15 +124,16 @@ test('selectPushes_AfterMaxPushes_NotPushed', () => {
 });
 
 function fakePhys() {
-  const calls = { wake: [], applyImpulse: [], getVelocity: [], getAngularVelocity: [], setAngularVelocity: [], setQuaternion: [] };
+  const calls = { wake: [], applyImpulse: [], getVelocity: [], getAngularVelocity: [], setQuaternion: [], setFriction: [], restoreFriction: [] };
   return {
     calls,
     wake(h) { calls.wake.push(h); },
     applyImpulse(h, x, y, z) { calls.applyImpulse.push({ h, x, y, z }); },
     getVelocity(h) { calls.getVelocity.push(h); return h._vel || { x: 0, y: 0, z: 0 }; },
     getAngularVelocity(h) { calls.getAngularVelocity.push(h); return { x: 0, y: 0, z: 0 }; },
-    setAngularVelocity(h, x, y, z) { calls.setAngularVelocity.push({ h, x, y, z }); },
     setQuaternion(h, x, y, z, w) { calls.setQuaternion.push({ h, x, y, z, w }); },
+    setFriction(h, f) { calls.setFriction.push({ h, f }); },
+    restoreFriction(h) { calls.restoreFriction.push(h); },
   };
 }
 function piecesFrom(snaps, vel) {
@@ -190,15 +199,27 @@ test('reset_ClearsPushLogAndDisturbed', () => {
   sup.reset();
   assert.equal(sup.tick(0, pieces), 0);
 });
-// ---- tip spin, no pop ----
+// ---- slide push with released friction, no pop ----
 
-function pushedTick() {
+function pushedRun() {
   const fake = fakePhys();
   const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
   const pieces = piecesFrom(pyramid({ without: 'r1c2' }));
   pieces[0].body._vel = { x: 0, y: 2, z: 0 };
   sup.tick(0, pieces);
-  return fake.calls;
+  pieces[0].body._vel = { x: 0, y: 0, z: 0 };
+  return { fake, sup, pieces };
+}
+function pushedTick() {
+  return pushedRun().fake.calls;
+}
+const pushedIds = (calls) => calls.applyImpulse.map(i => i.h);
+// moving faster than maxSpeed: still upright, but no longer a push candidate
+function holdMoving(pieces) {
+  for (const p of pieces) p.body._vel = { x: 1, y: 0, z: 0 };
+}
+function tipAll(pieces) {
+  for (const p of pieces) p.body.quaternion = { x: 0.2, y: 0, z: 0, w: 0.98 };
 }
 
 test('tick_Push_ImpulseHasNoUpwardComponent', () => {
@@ -206,25 +227,42 @@ test('tick_Push_ImpulseHasNoUpwardComponent', () => {
   assert.equal(calls.applyImpulse.length, 2);
   for (const i of calls.applyImpulse) assert.equal(i.y, 0);
 });
-test('tick_Push_SpinAxisHorizontal', () => {
+test('tick_Push_DropsFrictionToSlipFriction', () => {
   const calls = pushedTick();
-  assert.equal(calls.setAngularVelocity.length, 2);
-  for (const s of calls.setAngularVelocity) assert.equal(s.y, 0);
+  assert.equal(calls.setFriction.length, 2);
+  for (const c of calls.setFriction) assert.equal(c.f, SUPPORT.slipFriction);
+  assert.deepEqual(calls.setFriction.map(c => c.h), pushedIds(calls));
 });
-test('tick_Push_SpinMagnitudeIsTipSpin', () => {
-  const calls = pushedTick();
-  assert.equal(calls.setAngularVelocity.length, 2);
-  for (const s of calls.setAngularVelocity) close(Math.hypot(s.x, s.y, s.z), SUPPORT.tipSpin);
+test('tick_SlippingBeforeSlipMs_KeepsFrictionDropped', () => {
+  const { fake, sup, pieces } = pushedRun();
+  holdMoving(pieces);
+  sup.tick(SUPPORT.slipMs - 1, pieces);
+  assert.equal(fake.calls.restoreFriction.length, 0);
 });
-test('tick_Push_SpinAxisPerpendicularToPushTipsTowardGap', () => {
-  const calls = pushedTick();
-  assert.equal(calls.setAngularVelocity.length, 2);
-  for (const s of calls.setAngularVelocity) {
-    const i = calls.applyImpulse.find(p => p.h === s.h);
-    close(s.x * i.x + s.z * i.z, 0);
-    // top moves along the push: (spin x up) . push > 0  with up = (0,1,0) -> spin x up = (-s.z, 0, s.x)
-    assert.ok(-s.z * i.x + s.x * i.z > 0);
-  }
+test('tick_SlipMsAfterLastPush_RestoresFrictionOnce', () => {
+  const { fake, sup, pieces } = pushedRun();
+  holdMoving(pieces);
+  sup.tick(SUPPORT.slipMs, pieces);
+  sup.tick(SUPPORT.slipMs + 200, pieces);
+  assert.deepEqual(fake.calls.restoreFriction, pushedIds(fake.calls));
+});
+test('tick_RepushedWhileSlipping_ExtendsSlipWindow', () => {
+  const { fake, sup, pieces } = pushedRun();
+  sup.tick(SUPPORT.repushMs, pieces);          // still unsupported: pushed again
+  holdMoving(pieces);
+  sup.tick(SUPPORT.slipMs, pieces);
+  assert.equal(fake.calls.restoreFriction.length, 0);
+});
+test('tick_SlippingBarrelTipped_RestoresFriction', () => {
+  const { fake, sup, pieces } = pushedRun();
+  tipAll(pieces);
+  sup.tick(1, pieces);
+  assert.deepEqual(fake.calls.restoreFriction, pushedIds(fake.calls));
+});
+test('tick_QuietLongAfterPush_StillRestoresFriction', () => {
+  const { fake, sup, pieces } = pushedRun();
+  sup.tick(SUPPORT.activeMs + SUPPORT.slipMs + 1, pieces);
+  assert.equal(fake.calls.restoreFriction.length, 2);
 });
 test('tick_Push_NoQuaternionTeleport', () => {
   assert.equal(pushedTick().setQuaternion.length, 0);
