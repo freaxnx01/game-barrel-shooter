@@ -16,7 +16,7 @@ All notable changes to this project are documented here, following
 - Physics now runs on crashcat instead of cannon-es: buildings stand still until hit and break apart piece by piece instead of bursting from a light touch (#9, #20)
 
 ### Fixed
-- Barrels that lose their support now tip into the gap instead of hanging in mid-air (#28)
+- Barrels that lose their support now slide off and fall instead of hanging in mid-air (#28)
 - Pieces no longer hang in the air when what held them up is knocked away, and the Eiffel spire stands on a crossbar instead of floating (#9)
 - The house of cards no longer slumps once it is hit, and Spiral Stair stands until hit instead of shedding its treads (#9)
 - Paintball no longer throws an error when it hits the house of cards (#15)
