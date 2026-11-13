@@ -13,6 +13,7 @@ export function runContract(phys) {
     collideRemovalDeferred,
     mutateFromInsideCollide,
     restingContactUsesPairFriction,
+    frictionOverrideSlidesAndRestores,
     groundHonoursPositionAndExtent,
     shapelessAnchorDoesNotCollide,
     distanceJointHoldsLength,
@@ -183,6 +184,30 @@ function restingContactUsesPairFriction(phys) {
   cleanup(phys, [g]);
   const pass = dCard > 0.15 && dCard < 0.33 && dBall > 0.4 && dBall < 0.65;
   return { name: 'restingContactUsesPairFriction', pass, detail: `card/ground d=${dCard.toFixed(3)} (~0.23) ball/ground d=${dBall.toFixed(3)} (~0.51)` };
+}
+
+// setFriction overrides a body's contact friction until restoreFriction: a
+// stone box (stone/ground 0.8, d ~0.25 m from v0=2) slides almost freely at
+// friction 0.01 (d = v0²/(2µg) caps at the 2 s run, ~3.8 m), then stops short
+// again once the pair friction is back.
+function frictionOverrideSlidesAndRestores(phys) {
+  const g = ground(phys);
+  const b = phys.addBody({ shape: { kind: 'box', halfExtents: [0.5, 0.25, 0.5] }, mass: 1, material: 'stone', position: { x: 0, y: 0.25, z: 0 }, linearDamping: 0, angularDamping: 0 });
+  step(phys, 1);
+  const slide = () => {
+    const x0 = b.position.x;
+    phys.wake(b);
+    phys.setVelocity(b, 2, 0, 0);
+    step(phys, 2);
+    return b.position.x - x0;
+  };
+  phys.setFriction(b, 0.01);
+  const dSlip = slide();
+  phys.restoreFriction(b);
+  const dBack = slide();
+  cleanup(phys, [g, b]);
+  const pass = dSlip > 3 && dBack > 0.15 && dBack < 0.4;
+  return { name: 'frictionOverrideSlidesAndRestores', pass, detail: `slip d=${dSlip.toFixed(3)} (>3) restored d=${dBack.toFixed(3)} (~0.25)` };
 }
 
 // Ground top surface sits at spec.position.y and spans far beyond the arena.
