@@ -4,8 +4,9 @@
 
 export const SUPPORT = {
   r: 0.4725, h: 1.1, comMargin: 0.015, contactGap: 0.06, uprightCos: 0.99,
-  maxSpeed: 0.3, periodMs: 120, pushSpeed: 0.01, tipSpin: 0.6,
+  maxSpeed: 0.3, periodMs: 120, pushSpeed: 0.1, slideTurn: 0.6,
   repushMs: 120, maxPushes: 60, activeMs: 10000,
+  slipFriction: 0, slipMs: 1000,
 };
 
 const BARREL_MASS = 8;
@@ -128,9 +129,13 @@ export function pushFor(piece, others, floors, mass, cfg = SUPPORT) {
   const len = Math.hypot(dx, dz);
   if (len < 1e-9) return null;
   dx /= len; dz /= len;
-  const impulse = { x: mass * cfg.pushSpeed * dx, y: 0, z: mass * cfg.pushSpeed * dz };
-  const spin = { x: cfg.tipSpin * dz, y: 0, z: -cfg.tipSpin * dx };
-  return { impulse, spin };
+  // Barrels in a row stand 9 cm apart, so the two barrels over one gap, pushed straight
+  // at each other, jam. Turning every push by the same angle sends such a pair past each
+  // other on opposite sides; a lone overhang still slides away from its support.
+  const c = Math.cos(cfg.slideTurn), s = Math.sin(cfg.slideTurn);
+  const k = mass * cfg.pushSpeed;
+  const impulse = { x: k * (dx * c - dz * s), y: 0, z: k * (dx * s + dz * c) };
+  return { impulse };
 }
 
 function restsOn(piece, sup, cfg) {
@@ -157,7 +162,7 @@ export function selectPushes(snaps, floors, now, log, cfg = SUPPORT) {
       if (restsOn(o, c, cfg)) wake.push(o.id);
     }
     log.set(c.id, { count: (entry ? entry.count : 0) + 1, lastAt: now });
-    pushes.push({ id: c.id, impulse: pf.impulse, spin: pf.spin, wake });
+    pushes.push({ id: c.id, impulse: pf.impulse, wake });
   }
   return pushes;
 }
@@ -168,6 +173,7 @@ export function createBarrelSupport({ phys, floors, cfg = SUPPORT }) {
   let disturbed = false;
   let log = new Map();
   let lastCount = null;
+  let slipping = new Map(); // body → time of its last push
 
   function reset() {
     lastMotionAt = -Infinity;
@@ -175,6 +181,18 @@ export function createBarrelSupport({ phys, floors, cfg = SUPPORT }) {
     disturbed = false;
     log = new Map();
     lastCount = null;
+    slipping = new Map();
+  }
+
+  // A slipping barrel gets its material friction back once it has tipped (gravity has
+  // it) or slipMs after its last push.
+  function restoreFriction(now, barrels) {
+    const tipped = new Set(barrels.filter(b => !b.upright).map(b => b.id));
+    for (const [body, pushedAt] of slipping) {
+      if (!tipped.has(body) && now - pushedAt < cfg.slipMs) continue;
+      phys.restoreFriction(body);
+      slipping.delete(body);
+    }
   }
 
   function tick(now, pieces) {
@@ -189,6 +207,7 @@ export function createBarrelSupport({ phys, floors, cfg = SUPPORT }) {
       barrels.push({ id: b, x: b.position.x, y: b.position.y, z: b.position.z, upright, speed });
       if (speed > cfg.maxSpeed) { disturbed = true; lastMotionAt = now; }
     }
+    restoreFriction(now, barrels);
     if (lastCount !== null && barrels.length < lastCount) { disturbed = true; lastMotionAt = now; }
     lastCount = barrels.length;
     if (!disturbed) return 0;
@@ -198,11 +217,13 @@ export function createBarrelSupport({ phys, floors, cfg = SUPPORT }) {
     const pushes = selectPushes(barrels, floors, now, log, cfg);
     for (const push of pushes) {
       for (const id of push.wake) phys.wake(id);
+      // The rows above lock an unsupported barrel in place by friction, and a push or
+      // spin small enough not to pop it can't break that lock. With friction released
+      // the horizontal push slides it off its support and gravity tips it. Never an
+      // upward term (no pop) and no teleport — #28.
       phys.applyImpulse(push.id, push.impulse.x, push.impulse.y, push.impulse.z);
-      // Tip spin about the horizontal axis perpendicular to the push, so the
-      // top rotates toward the gap. Linear velocity gets only the horizontal
-      // impulse above, never an upward term (no pop) — #28.
-      phys.setAngularVelocity(push.id, push.spin.x, push.spin.y, push.spin.z);
+      phys.setFriction(push.id, cfg.slipFriction);
+      slipping.set(push.id, now);
     }
     if (pushes.length > 0) lastMotionAt = now;
     return pushes.length;
