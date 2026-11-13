@@ -207,6 +207,7 @@ import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { nudgeOrbit, heldNudge } from './camera/orbit.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
+import { createBarrelSupport } from './targets/barrel-support.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -269,6 +270,8 @@ phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position:
 let platBody = phys.addBody({ shape: { kind: 'box', halfExtents: [platW / 2, platH / 2, platD / 2] }, mass: 0, material: 'ground', position: { x: 0, y: platH / 2, z: -6 }, isStatic: true });
 let platformOn = true;
 scene.add(platMesh);
+
+const barrelSupport = createBarrelSupport({ phys, floors: [0, platH] });
 
 // ---------- Barrel factory (55-gal steel drums) ----------
 const BARREL_R = 0.45, BARREL_H = 1.1;
@@ -964,8 +967,8 @@ function clearTargets() {
   paintSplats.length = 0;
 }
 const camCfg = {
-  barrels:   { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupBarrels },
-  woodbarrels: { r: 15.5, ty: 2.8, tz: -6, plat: true, build: setupWoodBarrels },
+  barrels:   { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupBarrels, support: true },
+  woodbarrels: { r: 15.5, ty: 2.8, tz: -6, plat: true, build: setupWoodBarrels, support: true },
   cards:     { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupCards },
   fortress:  { r: 34,   ty: 5,   tz: -8, plat: false, build: setupFortress },
   colosseum: { r: 34,   ty: 5,   tz: -8, plat: false, build: setupColosseum },
@@ -993,6 +996,7 @@ const camCfg = {
 };
 function buildTargets() {
   detachHarpoon();   // a tethered harpoon references a barrel body we're about to remove
+  barrelSupport.reset();
   clearTargets();
   for (const h of hurricanes) scene.remove(h.group);
   hurricanes.length = 0;
@@ -2225,6 +2229,7 @@ function animate() {
     }
   }
   if (changed) updateHud();
+  if (camCfg[targetMode].support) barrelSupport.tick(now, barrels);
   updateAutoPlay(now);
 
   // Magneto: while held, lift every piece and gather it toward the aim point ("led by thoughts")
