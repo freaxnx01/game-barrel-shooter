@@ -75,6 +75,7 @@ export function createCrashcatBackend(cc) {
       material: spec.material,
       mass: isStatic ? 0 : spec.mass,
       userData: spec.userData,
+      frictionOverride: null,
       _pos: { x: spec.position.x, y: spec.position.y, z: spec.position.z },
       _quat: { x: 0, y: 0, z: 0, w: 1 },
       get position() { syncTransform(this); return this._pos; },
@@ -162,6 +163,11 @@ export function createCrashcatBackend(cc) {
     if (f) { f[0] += x; f[1] += y; f[2] += z; } else pendingForces.set(h, [x, y, z]);
   }
 
+  // Contact friction for every contact of h until restoreFriction(h); applied by the
+  // listener on the next substep, also to contacts that already persist.
+  function setFriction(h, f) { h.frictionOverride = f; }
+  function restoreFriction(h) { h.frictionOverride = null; }
+
   function wake(h) { cc.rigidBody.wake(world, h.raw); }
   function isSleeping(h) { return !!h.raw.sleeping; }
 
@@ -171,10 +177,14 @@ export function createCrashcatBackend(cc) {
   // crashcat keeps using the bodies after the listener returns, so the game's
   // collide callbacks (which remove bodies / add joints) must not run inside
   // updateWorld: contacts are queued here and dispatched by flushCollisions().
+  // A body with a friction override (setFriction) caps the pair friction at that value.
   function applyPairMaterial(ha, hb, settings) {
     const c = (ha && hb) ? contactFor(ha.material, hb.material) : DEFAULT_CONTACT;
-    settings.combinedFriction = c.friction;
+    settings.combinedFriction = Math.min(c.friction, frictionOverride(ha), frictionOverride(hb));
     settings.combinedRestitution = c.restitution;
+  }
+  function frictionOverride(h) {
+    return h && h.frictionOverride != null ? h.frictionOverride : Infinity;
   }
 
   function impactSpeedOf(bodyA, bodyB, manifold) {
@@ -260,6 +270,7 @@ export function createCrashcatBackend(cc) {
     getVelocity, setVelocity, getAngularVelocity, setAngularVelocity,
     setPosition, setQuaternion,
     applyImpulse, applyForce,
+    setFriction, restoreFriction,
     wake, isSleeping,
     onCollide,
     addDistanceJoint, addFixedJoint, removeJoint,
