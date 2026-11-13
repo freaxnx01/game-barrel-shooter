@@ -20,6 +20,7 @@ All notable changes to this project are documented here, following
 - Paintball no longer throws an error when it hits the house of cards (#15)
 - The wrecking ball sweeps through the barrels instead of catching on the platform edge (#15)
 - Stone buildings (fortress, octagon, tower gate, …) break apart again: weapons and explosions could barely move their blocks after the switch to crashcat (#22)
+- Magneto, the harpoon reel-in and the earthquake get their full force again: after the switch to crashcat they only acted for a quarter of each frame, so held pieces barely lifted (#29)
 
 ## [0.2.0] - 2026-09-29
 
