@@ -190,3 +190,42 @@ test('reset_ClearsPushLogAndDisturbed', () => {
   sup.reset();
   assert.equal(sup.tick(0, pieces), 0);
 });
+// ---- tip spin, no pop ----
+
+function pushedTick() {
+  const fake = fakePhys();
+  const sup = createBarrelSupport({ phys: fake, floors: [0, 0.5] });
+  const pieces = piecesFrom(pyramid({ without: 'r1c2' }));
+  pieces[0].body._vel = { x: 0, y: 2, z: 0 };
+  sup.tick(0, pieces);
+  return fake.calls;
+}
+
+test('tick_Push_ImpulseHasNoUpwardComponent', () => {
+  const calls = pushedTick();
+  assert.equal(calls.applyImpulse.length, 2);
+  for (const i of calls.applyImpulse) assert.equal(i.y, 0);
+});
+test('tick_Push_SpinAxisHorizontal', () => {
+  const calls = pushedTick();
+  assert.equal(calls.setAngularVelocity.length, 2);
+  for (const s of calls.setAngularVelocity) assert.equal(s.y, 0);
+});
+test('tick_Push_SpinMagnitudeIsTipSpin', () => {
+  const calls = pushedTick();
+  assert.equal(calls.setAngularVelocity.length, 2);
+  for (const s of calls.setAngularVelocity) close(Math.hypot(s.x, s.y, s.z), SUPPORT.tipSpin);
+});
+test('tick_Push_SpinAxisPerpendicularToPushTipsTowardGap', () => {
+  const calls = pushedTick();
+  assert.equal(calls.setAngularVelocity.length, 2);
+  for (const s of calls.setAngularVelocity) {
+    const i = calls.applyImpulse.find(p => p.h === s.h);
+    close(s.x * i.x + s.z * i.z, 0);
+    // top moves along the push: (spin x up) . push > 0  with up = (0,1,0) -> spin x up = (-s.z, 0, s.x)
+    assert.ok(-s.z * i.x + s.x * i.z > 0);
+  }
+});
+test('tick_Push_NoQuaternionTeleport', () => {
+  assert.equal(pushedTick().setQuaternion.length, 0);
+});
