@@ -74,6 +74,8 @@ export function supportPatches(piece, others, floors, cfg = SUPPORT) {
   const eps = 1e-9;
   const pieceBot = piece.y - cfg.h / 2;
   let onFloor = false;
+  // Each floor is treated as an unbounded plane: a barrel knocked past the
+  // platform edge at platform height still counts as standing on it.
   for (const f of floors) {
     if (Math.abs(pieceBot - f) <= cfg.contactGap) { onFloor = true; break; }
   }
