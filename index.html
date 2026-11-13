@@ -61,6 +61,19 @@
   .ammo button:hover { background: rgba(245,239,228,0.18); }
   .ammo button.sel { background: rgba(245,239,228,0.22); border-color: rgba(245,239,228,0.7); }
   .ammo .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  #cam-pad {
+    position: fixed; right: 20px; bottom: 52px; display: flex; gap: 8px; align-items: center;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #cam-pad .dpad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 2px; }
+  #cam-pad .zoom { display: flex; flex-direction: column; gap: 6px; }
+  #cam-pad button {
+    width: 40px; height: 40px; padding: 0; font-size: 16px; font-family: inherit;
+    background: rgba(245,239,228,0.1); color: #f5efe4; border: 1px solid rgba(245,239,228,0.3);
+    border-radius: 6px; cursor: pointer; touch-action: none;
+  }
+  #cam-pad button:hover { background: rgba(245,239,228,0.22); }
+  #cam-pad button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
 </style>
   <!-- Umami: cookieless pageviews (stats.freaxnx01.ch); only counted on barrel-shooter.freax.games -->
   <script defer src="https://stats.freaxnx01.ch/g.js" data-website-id="912d311e-bbc0-4346-906e-93876ce3dd26" data-domains="barrel-shooter.freax.games" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>
@@ -117,9 +130,21 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint">Aim with mouse, click to fire · Right-drag to orbit · Scroll to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</div>
+<div class="hint">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</div>
 <button id="reset">Reset</button>
 <button id="autoplay">▶ Auto-Play</button>
+<div id="cam-pad" aria-label="Camera">
+  <div class="zoom">
+    <button data-cam="in" title="Zoom in">+</button>
+    <button data-cam="out" title="Zoom out">−</button>
+  </div>
+  <div class="dpad">
+    <button data-cam="up" title="Camera up (↑)" style="grid-area:1/2">▲</button>
+    <button data-cam="left" title="Turn left (←)" style="grid-area:2/1">◀</button>
+    <button data-cam="right" title="Turn right (→)" style="grid-area:2/3">▶</button>
+    <button data-cam="down" title="Camera down (↓)" style="grid-area:3/2">▼</button>
+  </div>
+</div>
 <div class="target" id="target">
   <div class="target-group">
     <div class="glabel">Stacks</div>
@@ -179,6 +204,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
+import { nudgeOrbit, heldNudge } from './camera/orbit.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 
@@ -1930,8 +1956,7 @@ canvas.addEventListener('pointermove', (e) => {
   mouseNDC.x = (e.clientX / innerWidth) * 2 - 1;
   mouseNDC.y = -(e.clientY / innerHeight) * 2 + 1;
   if (orbiting) {
-    orbit.theta -= (e.clientX - lastX) * 0.005;
-    orbit.phi = Math.min(Math.max(orbit.phi + (e.clientY - lastY) * 0.004, 0.02), 1.35);
+    nudgeOrbit(orbit, -(e.clientX - lastX) * 0.005, (e.clientY - lastY) * 0.004, 0);
     lastX = e.clientX; lastY = e.clientY;
     updateCamera();
   }
@@ -1961,9 +1986,35 @@ addEventListener('pointerup', (e) => {
   shootBall(aimDir(), t);
 });
 canvas.addEventListener('wheel', (e) => {
-  orbit.radius = Math.min(Math.max(orbit.radius + e.deltaY * 0.01, 5), 30);
+  nudgeOrbit(orbit, 0, 0, e.deltaY * 0.01);
   updateCamera();
 }, { passive: true });
+
+// ---------- Camera pad + arrow keys (hold to keep turning) ----------
+const CAM_AXES = { left: ['theta', -1], right: ['theta', 1], up: ['phi', 1], down: ['phi', -1], in: ['zoom', 1], out: ['zoom', -1] };
+const ARROW_CAM = { arrowleft: 'left', arrowright: 'right', arrowup: 'up', arrowdown: 'down' };
+const camHeld = { theta: 0, phi: 0, zoom: 0 };
+function holdCam(dir, on) {
+  const [axis, sign] = CAM_AXES[dir];
+  if (on) camHeld[axis] = sign;
+  else if (camHeld[axis] === sign) camHeld[axis] = 0;
+}
+for (const btn of document.querySelectorAll('#cam-pad button')) {
+  const dir = btn.dataset.cam;
+  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); btn.classList.add('held'); holdCam(dir, true); });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    btn.addEventListener(type, () => { btn.classList.remove('held'); holdCam(dir, false); });
+  }
+}
+addEventListener('keydown', (e) => {
+  const dir = ARROW_CAM[e.key.toLowerCase()];
+  if (dir) { holdCam(dir, true); e.preventDefault(); }
+});
+addEventListener('keyup', (e) => {
+  const dir = ARROW_CAM[e.key.toLowerCase()];
+  if (dir) holdCam(dir, false);
+});
+addEventListener('blur', () => { camHeld.theta = camHeld.phi = camHeld.zoom = 0; });
 
 // ---------- Score / reset ----------
 let shots = 0;
@@ -2120,6 +2171,8 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 1 / 30);
   const now = performance.now();
   phys.step(dt); // fixed 1/240 internal step (≤10 substeps) so fast projectiles don't tunnel through
+  const camNudge = heldNudge(camHeld, dt);
+  if (camNudge) { nudgeOrbit(orbit, camNudge.dTheta, camNudge.dPhi, camNudge.dRadius); updateCamera(); }
 
   // Harpoon tether: keep the rope drawn, and reel the barrel in while the player pulls.
   if (harpoonLink) {

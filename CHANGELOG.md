@@ -7,6 +7,7 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- Camera pad bottom-right (turn, tilt, zoom; hold to keep moving) and arrow keys for the camera, so it can be moved without a right mouse button, e.g. on a Chromebook touchpad or touchscreen
 - Tractor tire weapon (key T): rolls into the target, then tips over and lies flat (#8)
 - Hover over the version number to see when the game was last updated, in your own time zone, and how long ago
 - New targets: four frame buildings, two brick towers, four gates and a Spiral Tower; Spiral Stair rebuilt; target picker grouped (#24)
