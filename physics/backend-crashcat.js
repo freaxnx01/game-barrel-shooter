@@ -30,6 +30,7 @@ export function createCrashcatBackend(cc) {
   const collideCbs = new Map();      // handle → onCollide callback
   const joints = new Set();          // joint wrappers { raw, kind }
   const pendingCollisions = [];      // collide events queued during updateWorld
+  const pendingForces = new Map();   // handle → [fx, fy, fz]; crashcat clears forces after every updateWorld, so step() re-applies these per substep
 
   function makeShape(spec) {
     if (spec.kind === 'box') return cc.box.create({ halfExtents: spec.halfExtents });
@@ -97,6 +98,7 @@ export function createCrashcatBackend(cc) {
     if (!h || !handles.has(h)) return;
     handles.delete(h);
     collideCbs.delete(h);
+    pendingForces.delete(h);
     byId.delete(h.raw.id);
     cc.rigidBody.remove(world, h.raw);
   }
@@ -131,6 +133,7 @@ export function createCrashcatBackend(cc) {
     accumulator += dt;
     let n = 0;
     while (accumulator >= FIXED && n < 10) {
+      for (const [h, f] of pendingForces) cc.rigidBody.addForce(world, h.raw, f, true);
       cc.updateWorld(world, listener, FIXED);
       flushCollisions();
       wakeAroundMovers();
@@ -138,6 +141,7 @@ export function createCrashcatBackend(cc) {
       n++;
     }
     if (n === 10) accumulator = 0;
+    if (n > 0) pendingForces.clear(); // a step with no substep keeps them for the next one
   }
 
   function getVelocity(h) { const v = h.raw.motionProperties.linearVelocity; return { x: v[0], y: v[1], z: v[2] }; }
@@ -154,7 +158,8 @@ export function createCrashcatBackend(cc) {
   }
   function applyForce(h, x, y, z) {
     cc.rigidBody.wake(world, h.raw);
-    cc.rigidBody.addForce(world, h.raw, [x, y, z], true);
+    const f = pendingForces.get(h);
+    if (f) { f[0] += x; f[1] += y; f[2] += z; } else pendingForces.set(h, [x, y, z]);
   }
 
   function wake(h) { cc.rigidBody.wake(world, h.raw); }
@@ -245,6 +250,7 @@ export function createCrashcatBackend(cc) {
     for (const j of [...joints]) removeJoint(j);
     for (const h of [...handles]) removeBody(h);
     pendingCollisions.length = 0;
+    pendingForces.clear();
     accumulator = 0;
   }
 
