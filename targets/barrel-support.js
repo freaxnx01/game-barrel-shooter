@@ -4,7 +4,7 @@
 
 export const SUPPORT = {
   r: 0.4725, h: 1.1, comMargin: 0.015, contactGap: 0.06, uprightCos: 0.99,
-  maxSpeed: 0.3, periodMs: 120, pushSpeed: 0.01, tipSpin: 0.6, tipAngVel: 0,
+  maxSpeed: 0.3, periodMs: 120, pushSpeed: 0.01, tipSpin: 0.6,
   repushMs: 120, maxPushes: 60, activeMs: 10000,
 };
 
@@ -139,15 +139,6 @@ function restsOn(piece, sup, cfg) {
   return Math.hypot(sup.x - piece.x, sup.z - piece.z) < 2 * cfg.r;
 }
 
-function quatMul(a, b) {
-  return {
-    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
-  };
-}
-
 export function selectPushes(snaps, floors, now, log, cfg = SUPPORT) {
   const candidates = snaps.filter(s => s.upright && s.speed <= cfg.maxSpeed);
   const pushes = [];
@@ -206,24 +197,10 @@ export function createBarrelSupport({ phys, floors, cfg = SUPPORT }) {
     for (const push of pushes) {
       for (const id of push.wake) phys.wake(id);
       phys.applyImpulse(push.id, push.impulse.x, push.impulse.y, push.impulse.z);
-      // Kinematically tilt the barrel toward the gap to break the friction lock
-      // from the rows above (a small impulse alone can't), and give it angular
-      // velocity so it keeps rotating past the balance point where gravity takes
-      // over. The tilt is about a horizontal axis through the COM, so it never
-      // adds upward linear velocity (no pop) — #28.
-      const q = push.id.quaternion;
-      const ax = push.spin;
-      const ang = Math.hypot(ax.x, ax.y, ax.z);
-      if (ang > 1e-9) {
-        const ha = ang / 2, s = Math.sin(ha) / ang, c = Math.cos(ha);
-        const delta = { x: ax.x * s, y: ax.y * s, z: ax.z * s, w: c };
-        const nq = quatMul(delta, q);
-        phys.setQuaternion(push.id, nq.x, nq.y, nq.z, nq.w);
-        if (cfg.tipAngVel > 0) {
-          const k = cfg.tipAngVel / ang;
-          phys.setAngularVelocity(push.id, ax.x * k, ax.y * k, ax.z * k);
-        }
-      }
+      // Tip spin about the horizontal axis perpendicular to the push, so the
+      // top rotates toward the gap. Linear velocity gets only the horizontal
+      // impulse above, never an upward term (no pop) — #28.
+      phys.setAngularVelocity(push.id, push.spin.x, push.spin.y, push.spin.z);
     }
     if (pushes.length > 0) lastMotionAt = now;
     return pushes.length;
