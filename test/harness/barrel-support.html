@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Barrel Support</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<style>
+  body { background:#1a1611; color:#f5efe4; font-family: monospace; padding: 16px; }
+  pre { white-space: pre-wrap; }
+  .pass { color: #6dd96d; }
+  .fail { color: #e0483a; }
+  .info { color: #c9a13a; }
+</style>
+</head>
+<body>
+<!-- Barrel support acceptance harness (#28).
+     Builds the oil-barrel pyramid on the real crashcat backend (same body spec
+     as createBarrel/createWoodBarrel in index.html — the wooden pyramid shares
+     it, so these scenarios cover both) and checks that barrels which lose their
+     support topple instead of hanging in mid-air. Title becomes SUPPORT PASS/FAIL. -->
+<pre id="out">running…</pre>
+<script type="module">
+import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
+import { createBarrelSupport, isSupported, SUPPORT } from '../../targets/barrel-support.js';
+
+const out = document.getElementById('out');
+const lines = [];
+let allPass = true;
+function row(pass, name, detail) {
+  const cls = pass ? 'pass' : 'fail';
+  const tag = pass ? 'PASS' : 'FAIL';
+  if (!pass) allPass = false;
+  lines.push(`<span class="${cls}">[${tag}] ${name}: ${detail}</span>`);
+}
+
+const BARREL_R = 0.45, BARREL_H = 1.1;
+const platH = 0.5;
+const baseY = platH + BARREL_H / 2 + 0.01;
+const gap = BARREL_R * 2.3;
+const z = -6;
+const ROWS = [6, 5, 4, 3, 2, 1];
+
+function buildPyramid(phys) {
+  phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
+  phys.addBody({ shape: { kind: 'box', halfExtents: [4, platH / 2, 1.5] }, mass: 0, material: 'ground', position: { x: 0, y: platH / 2, z }, isStatic: true });
+  const barrels = [];
+  ROWS.forEach((count, row) => {
+    const y = baseY + row * (BARREL_H + 0.02);
+    const x0 = -((count - 1) * gap) / 2;
+    for (let i = 0; i < count; i++) {
+      const x = x0 + i * gap;
+      const body = phys.addBody({
+        shape: { kind: 'cylinder', radiusTop: BARREL_R * 1.05, radiusBottom: BARREL_R * 1.05, height: BARREL_H, segments: 12 },
+        mass: 8, material: 'barrel', position: { x, y, z }, startAsleep: true,
+      });
+      barrels.push({ body, row, i, home: { x, y, z } });
+    }
+  });
+  return barrels;
+}
+
+function tilt(b) {
+  const q = b.quaternion;
+  const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
+  return Math.acos(Math.min(1, Math.max(-1, upY))) * 180 / Math.PI;
+}
+function moved(b, home) {
+  return Math.hypot(b.position.x - home.x, b.position.y - home.y, b.position.z - home.z);
+}
+function findBarrel(barrels, row, i) {
+  return barrels.find(b => b.row === row && b.i === i);
+}
+function snapshot(barrels, phys) {
+  return barrels.map(b => {
+    const q = b.body.quaternion, v = phys.getVelocity(b.body);
+    return { id: b.body, x: b.body.position.x, y: b.body.position.y, z: b.body.position.z, upright: (1 - 2 * (q.x * q.x + q.z * q.z)) >= SUPPORT.uprightCos, speed: Math.hypot(v.x, v.y, v.z) };
+  });
+}
+
+async function fresh() {
+  const cc = await import('https://esm.sh/crashcat@0.0.5');
+  const phys = createCrashcatBackend(cc);
+  const barrels = buildPyramid(phys);
+  const sup = createBarrelSupport({ phys, floors: [0, platH] });
+  return { phys, barrels, sup };
+}
+function stepFrames(ctx, frames, tMs) {
+  const dt = 1 / 60;
+  for (let f = 0; f < frames; f++) {
+    ctx.phys.step(dt);
+    ctx.sup.tick(tMs + f * (dt * 1000), ctx.barrels);
+  }
+  return tMs + frames * (dt * 1000);
+}
+
+// ---- scenarios ----
+
+async function atRest_10s_NothingMoves() {
+  const ctx = await fresh();
+  let t = stepFrames(ctx, 60, 0);          // 1s settle
+  t = stepFrames(ctx, 600, t);            // 10s
+  const ok = ctx.barrels.every(b => moved(b.body, b.home) < 0.05 && tilt(b.body) < 3);
+  const maxOff = Math.max(...ctx.barrels.map(b => moved(b.body, b.home)));
+  const maxTilt = Math.max(...ctx.barrels.map(b => tilt(b.body)));
+  row(ok, 'atRest_10s_NothingMoves', `maxOff=${maxOff.toFixed(3)}m maxTilt=${maxTilt.toFixed(2)}°`);
+  ctx.phys.destroy();
+}
+
+async function issue28_KnockOut() {
+  const ctx = await fresh();
+  let t = stepFrames(ctx, 180, 0);         // 3s settle
+  const ko = findBarrel(ctx.barrels, 1, 2);
+  ctx.phys.applyImpulse(ko.body, 0, 0, -4 * 8);   // knock out backwards (wakes it)
+  let maxUp = 0, pushes = 0;
+  for (let f = 0; f < 180; f++) {          // 3s
+    ctx.phys.step(1 / 60);
+    pushes += ctx.sup.tick(t, ctx.barrels);
+    t += 1000 / 60;
+    for (const b of ctx.barrels) {
+      if (b === ko) continue;
+      const v = ctx.phys.getVelocity(b.body);
+      maxUp = Math.max(maxUp, v.y);
+    }
+  }
+  const t1 = findBarrel(ctx.barrels, 2, 1), t2 = findBarrel(ctx.barrels, 2, 2);
+  const tipped = (b) => tilt(b.body) > 15 || moved(b.body, b.home) > 0.45;
+  const ok = tipped(t1) && tipped(t2);
+  row(ok, 'issue28_Row2MiddleKnockedOut_Row3PairTips', `r3i1 tilt=${tilt(t1.body).toFixed(1)}° moved=${moved(t1.body,t1.home).toFixed(2)} | r3i2 tilt=${tilt(t2.body).toFixed(1)}° moved=${moved(t2.body,t2.home).toFixed(2)} pushes=${pushes}`);
+  row(maxUp < 1.0, 'noPop_KnockOut_MaxUpwardSpeed', `maxUp=${maxUp.toFixed(3)} m/s (limit 1.0)`);
+  ctx._settle = t;
+  return ctx;
+}
+
+async function issue28_Removed() {
+  const ctx = await fresh();
+  let t = stepFrames(ctx, 180, 0);         // 3s settle
+  const ko = findBarrel(ctx.barrels, 1, 2);
+  // brief jostle (the barrel was knocked away) then removed (it fell off)
+  ctx.phys.applyImpulse(ko.body, 0, 0, -2 * 8);
+  ctx.phys.step(1 / 60);
+  ctx.sup.tick(t, ctx.barrels);
+  t += 1000 / 60;
+  ctx.phys.removeBody(ko.body);
+  ctx.barrels = ctx.barrels.filter(b => b !== ko);
+  let maxUp = 0, pushes = 0;
+  for (let f = 0; f < 180; f++) {
+    ctx.phys.step(1 / 60);
+    pushes += ctx.sup.tick(t, ctx.barrels);
+    t += 1000 / 60;
+    for (const b of ctx.barrels) {
+      const v = ctx.phys.getVelocity(b.body);
+      maxUp = Math.max(maxUp, v.y);
+    }
+  }
+  const t1 = findBarrel(ctx.barrels, 2, 1), t2 = findBarrel(ctx.barrels, 2, 2);
+  const tipped = (b) => tilt(b.body) > 15 || moved(b.body, b.home) > 0.45;
+  const ok = tipped(t1) && tipped(t2);
+  row(ok, 'issue28_Removed_Row3PairTips', `r3i1 tilt=${tilt(t1.body).toFixed(1)}° moved=${moved(t1.body,t1.home).toFixed(2)} | r3i2 tilt=${tilt(t2.body).toFixed(1)}° moved=${moved(t2.body,t2.home).toFixed(2)} pushes=${pushes}`);
+  row(maxUp < 1.0, 'noPop_Removed_MaxUpwardSpeed', `maxUp=${maxUp.toFixed(3)} m/s (limit 1.0)`);
+  ctx.phys.destroy();
+}
+
+async function chain_SupportedBarrelsStay() {
+  const ctx = await issue28_KnockOut();    // reuse the knocked-out run
+  let t = ctx._settle;
+  for (let f = 0; f < 180; f++) {          // 3s more to settle the slump
+    ctx.phys.step(1 / 60);
+    ctx.sup.tick(t, ctx.barrels);
+    t += 1000 / 60;
+  }
+  const snaps = snapshot(ctx.barrels, ctx.phys);
+  const upright = ctx.barrels.filter(b => (1 - 2 * (b.body.quaternion.x ** 2 + b.body.quaternion.z ** 2)) >= SUPPORT.uprightCos);
+  let bad = 0;
+  for (const b of upright) {
+    const s = snaps.find(s => s.id === b.body);
+    const others = snaps.filter(o => o !== s);
+    if (!isSupported(s, others, [0, platH])) bad++;
+  }
+  row(bad === 0, 'chain_SupportedBarrelsStay', `${bad} upright barrel(s) failed support test`);
+  ctx.phys.destroy();
+}
+
+async function topRemoved_OthersStay() {
+  const ctx = await fresh();
+  let t = stepFrames(ctx, 180, 0);          // 3s settle
+  const top = findBarrel(ctx.barrels, 5, 0);
+  ctx.phys.removeBody(top.body);
+  ctx.barrels = ctx.barrels.filter(b => b !== top);
+  t = stepFrames(ctx, 180, t);             // 3s
+  const maxOff = Math.max(...ctx.barrels.map(b => moved(b.body, b.home)));
+  row(maxOff < 0.05, 'topRemoved_OthersStay', `maxOff=${maxOff.toFixed(3)}m (limit 0.05)`);
+  ctx.phys.destroy();
+}
+
+async function main() {
+  await atRest_10s_NothingMoves();
+  await issue28_Removed();
+  await chain_SupportedBarrelsStay();
+  await topRemoved_OthersStay();
+  out.innerHTML = lines.join('\n');
+  document.title = allPass ? 'SUPPORT PASS' : 'SUPPORT FAIL';
+}
+main();
+</script>
+</body>
+</html>
