@@ -20,6 +20,10 @@ export function runContract(phys) {
     bodyCountTracks,
     stack10Stands,
     unsupportedSleeperFalls,
+    forceHoldsAgainstGravity,
+    forceIsFrameRateIndependent,
+    forcesAddUpAndExpire,
+    removeBodyDropsPendingForce,
   ];
   for (const c of cases) {
     try {
@@ -277,6 +281,64 @@ function unsupportedSleeperFalls(phys) {
   cleanup(phys, [g, base, top]);
   const pass = topY < 1.0;
   return { name: 'unsupportedSleeperFalls', pass, detail: `topY=${topY.toFixed(4)} expected < 1 (fallen to the ground)` };
+}
+
+// Per frame: applyForce(...) then step(dt). (The game calls step first, which only adds a constant
+// one-frame lag of force, not a different rate; the tests start with the force to measure the rate.)
+function hoverDrift(phys, fps) {
+  const m = 5;
+  const b = phys.addBody({ shape: { kind: 'box', halfExtents: [0.5, 0.5, 0.5] }, mass: m, material: 'wood', position: { x: 0, y: 10, z: 0 } });
+  for (let i = 0; i < fps; i++) { phys.applyForce(b, 0, 9.82 * m, 0); phys.step(1 / fps); }
+  const dy = b.position.y - 10;
+  cleanup(phys, [b]);
+  return dy;
+}
+
+function forceHoldsAgainstGravity(phys) {
+  const drifts = [30, 60, 120].map((fps) => hoverDrift(phys, fps));
+  const pass = drifts.every((d) => Math.abs(d) < 0.05);
+  return { name: 'forceHoldsAgainstGravity', pass, detail: `dy@30/60/120fps=${drifts.map((d) => d.toFixed(3)).join('/')} expected ~0` };
+}
+
+function liftHeight(phys, fps) {
+  const m = 5;
+  const b = phys.addBody({ shape: { kind: 'box', halfExtents: [0.5, 0.5, 0.5] }, mass: m, material: 'wood', position: { x: 0, y: 10, z: 0 } });
+  for (let i = 0; i < fps * 0.5; i++) { phys.applyForce(b, 0, 30 * m + 9.82 * m, 0); phys.step(1 / fps); }
+  const y = b.position.y - 10;
+  cleanup(phys, [b]);
+  return y;
+}
+
+function forceIsFrameRateIndependent(phys) {
+  const ys = [30, 60, 120].map((fps) => liftHeight(phys, fps));
+  const ref = ys[1];
+  const pass = ref > 1 && ys.every((y) => Math.abs(y - ref) / ref < 0.05);
+  return { name: 'forceIsFrameRateIndependent', pass, detail: `lift@30/60/120fps=${ys.map((y) => y.toFixed(3)).join('/')} expected within 5%` };
+}
+
+function forcesAddUpAndExpire(phys) {
+  const m = 2;
+  const mk = () => phys.addBody({ shape: { kind: 'sphere', radius: 0.5 }, mass: m, material: 'ball', position: { x: 0, y: 50, z: 0 } });
+  const one = mk(), two = mk();
+  // gravity cancelled so only the test force acts
+  phys.applyForce(one, 10 * m, 9.82 * m, 0);
+  phys.applyForce(two, 5 * m, 9.82 * m / 2, 0); phys.applyForce(two, 5 * m, 9.82 * m / 2, 0);
+  phys.step(1 / 60);
+  const v1 = phys.getVelocity(one).x, v2 = phys.getVelocity(two).x;
+  phys.step(1 / 60); // no new applyForce: velocity must not grow
+  const v1b = phys.getVelocity(one).x;
+  cleanup(phys, [one, two]);
+  const pass = Math.abs(v1 - v2) < 0.02 && v1 > 0.1 && Math.abs(v1b - v1) < 0.02;
+  return { name: 'forcesAddUpAndExpire', pass, detail: `v1=${v1.toFixed(3)} v2=${v2.toFixed(3)} next=${v1b.toFixed(3)}` };
+}
+
+function removeBodyDropsPendingForce(phys) {
+  const b = phys.addBody({ shape: { kind: 'sphere', radius: 0.5 }, mass: 1, material: 'ball', position: { x: 0, y: 5, z: 0 } });
+  phys.applyForce(b, 1, 1, 1);
+  phys.removeBody(b);
+  let threw = null;
+  try { phys.step(1 / 60); } catch (e) { threw = e.message; }
+  return { name: 'removeBodyDropsPendingForce', pass: threw === null, detail: threw === null ? 'step ok' : 'threw: ' + threw };
 }
 
 function ground(phys) {
