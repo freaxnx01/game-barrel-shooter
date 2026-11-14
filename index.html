@@ -208,7 +208,7 @@ import { nudgeOrbit, heldNudge } from './camera/orbit.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
-import { SNIPER, sniperSpeed, isOutOfRange } from './weapons/sniper.js';
+import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -1428,15 +1428,23 @@ function shootBall(dir, power) {
       barb.position.set(s * 0.08, 0.6, 0); barb.rotation.z = s * 0.9; mesh.add(barb);
     }
   } else if (type === 'sniper') {
-    mesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: '#c9a94a', roughness: 0.3, metalness: 0.9 }));
-    mesh.scale.setScalar(0.14 / BALL_R);
+    // tracer: bright capsule core + additive streak behind it; +Y is the flight direction (like the spear)
+    mesh = new THREE.Group();
+    const core = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.5, 4, 8),
+      new THREE.MeshBasicMaterial({ color: '#fff1b0' }));
+    mesh.add(core);
+    const streakMat = new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.55,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    const streak = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.07, 1, 8, 1, true), streakMat);
+    mesh.add(streak);
+    mesh.userData.streak = streak;
   } else {
     mesh = new THREE.Mesh(ballGeo, bombMatl);
     const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
     fuse.position.y = BALL_R + 0.05;
     mesh.add(fuse);
   }
-  mesh.castShadow = true;
+  mesh.castShadow = type !== 'sniper';
   scene.add(mesh);
   const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos,
     muzzle: { x: start.x, y: start.y, z: start.z } };
@@ -2367,6 +2375,19 @@ function animate() {
     }
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
+    if (b.type === 'sniper') {
+      const sv = phys.getVelocity(b.body);
+      const sl = Math.hypot(sv.x, sv.y, sv.z);
+      if (sl > 5 && !b.hit) {
+        b.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(sv.x / sl, sv.y / sl, sv.z / sl));
+      }
+      const flown = Math.hypot(b.body.position.x - b.muzzle.x, b.body.position.y - b.muzzle.y, b.body.position.z - b.muzzle.z);
+      const len = streakLength(flown);
+      const st = b.mesh.userData.streak;
+      st.scale.set(1, Math.max(len, 0.001), 1);
+      st.position.y = -(0.25 + len / 2);
+      st.material.opacity = b.hit ? Math.max(0, 0.55 * (1 - (now - b.hitAt) / 120)) : 0.55;
+    }
     // stretch chain between anchor and wrecking ball
     if (b.chainMesh) {
       const a = b.anchorPos, p = b.body.position;
