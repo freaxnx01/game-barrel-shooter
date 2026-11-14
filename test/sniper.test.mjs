@@ -28,6 +28,6 @@ test('streakLength_JustFired_CappedToDistanceFlown', () => {
 });
 
 test('SNIPER_Tuning_MatchesSpec', () => {
-  assert.equal(SNIPER.mass, 1.0);
+  assert.equal(SNIPER.mass, 1.2);
   assert.equal(SNIPER.radius, 0.1);
 });

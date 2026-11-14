@@ -88,8 +88,10 @@ async function main() {
   const hits = [];
   for (const power of [0, 0.5, 1]) hits.push({ power, ...(await withWorld(cc, (phys) => hitBarrel(phys, power))) });
   row('hitsBarrel', hits.every((h) => h.hit), hits.map((h) => `p${h.power}=${h.hit}`).join(' '));
-  row('peakBarrelSpeed', hits.every((h) => h.peak >= 17 && h.peak <= 31),
-    hits.map((h) => `p${h.power} (${sniperSpeed(h.power)} m/s)=${h.peak.toFixed(1)} m/s`).join(', ') + ', expected 17-31');
+  // A lone barrel reacts ~15 % harder than the old 6 kg round (19-28 m/s), so that a barrel in the stack,
+  // where the barrels behind take part of the impulse, gets the old round's push (owner's call on PR #35).
+  row('peakBarrelSpeed', hits.every((h) => h.peak >= 20 && h.peak <= 36),
+    hits.map((h) => `p${h.power} (${sniperSpeed(h.power)} m/s)=${h.peak.toFixed(1)} m/s`).join(', ') + ', expected 20-36');
   await withWorld(cc, culled);
   out.innerHTML = lines.join('\n');
   document.title = allPass ? 'DONE PASS' : 'DONE FAIL';
