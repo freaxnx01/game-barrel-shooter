@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sniper Flight</title>
+<style>
+  body { background:#1a1611; color:#f5efe4; font-family: monospace; padding: 16px; }
+  pre { white-space: pre-wrap; }
+  .pass { color: #6dd96d; }
+  .fail { color: #e0483a; }
+</style>
+</head>
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+// Sniper round (#30) through the real facade: straight flight, barrel hit strength, range cull.
+import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
+import { SNIPER, sniperSpeed, isOutOfRange } from '../../weapons/sniper.js';
+
+const DT = 1 / 60;
+const MUZZLE = { x: 0, y: 0.56, z: 0 };
+const BARREL_R = 0.45, BARREL_H = 1.1;
+const out = document.getElementById('out');
+const lines = [];
+let allPass = true;
+
+function row(name, pass, detail) {
+  if (!pass) allPass = false;
+  lines.push(`<span class="${pass ? 'pass' : 'fail'}">[${pass ? 'PASS' : 'FAIL'}] ${name}: ${detail}</span>`);
+}
+
+function fireRound(phys, power) {
+  const b = phys.addBody({ shape: { kind: 'sphere', radius: SNIPER.radius }, mass: SNIPER.mass, material: 'heavy',
+    position: { ...MUZZLE }, fast: true, gravityFactor: 0 });
+  phys.setVelocity(b, 0, 0, -sniperSpeed(power));
+  return b;
+}
+
+function addGround(phys) {
+  return phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
+}
+
+function addBarrel(phys) {
+  return phys.addBody({ shape: { kind: 'cylinder', radiusTop: BARREL_R * 1.05, radiusBottom: BARREL_R * 1.05, height: BARREL_H, segments: 12 },
+    mass: 8, material: 'barrel', position: { x: 0, y: BARREL_H / 2, z: -20 } });
+}
+
+function speedOf(v) { return Math.hypot(v.x, v.y, v.z); }
+
+async function withWorld(cc, run) {
+  const phys = createCrashcatBackend(cc);
+  try { return run(phys); } finally { phys.destroy(); }
+}
+
+function straight(phys) {
+  addGround(phys);
+  const b = fireRound(phys, 0.5);
+  for (let i = 0; i < 6; i++) phys.step(DT);
+  const dy = b.position.y - MUZZLE.y, dz = b.position.z - MUZZLE.z;
+  row('straight', Math.abs(dy) < 0.001, `dy=${(dy * 1000).toFixed(3)} mm over ${(-dz).toFixed(2)} m`);
+}
+
+function hitBarrel(phys, power) {
+  addGround(phys);
+  const barrel = addBarrel(phys);
+  for (let i = 0; i < 60; i++) phys.step(DT);   // let the barrel settle
+  const b = fireRound(phys, power);
+  let hit = false, peak = 0;
+  phys.onCollide(b, (other) => { if (other === barrel) hit = true; });
+  for (let i = 0; i < 120; i++) {
+    phys.step(DT);
+    peak = Math.max(peak, speedOf(phys.getVelocity(barrel)));
+  }
+  return { hit, peak };
+}
+
+function culled(phys) {
+  const b = fireRound(phys, 0);
+  let t = 0;
+  while (t < 1.2 && !isOutOfRange(MUZZLE, b.position)) { phys.step(DT); t += DT; }
+  const out = isOutOfRange(MUZZLE, b.position);
+  row('culled', out, `out of range after ${t.toFixed(2)} s at power 0 (z=${b.position.z.toFixed(1)})`);
+}
+
+async function main() {
+  const cc = await import('https://esm.sh/crashcat@0.0.5');
+  await withWorld(cc, straight);
+  const hits = [];
+  for (const power of [0, 0.5, 1]) hits.push({ power, ...(await withWorld(cc, (phys) => hitBarrel(phys, power))) });
+  row('hitsBarrel', hits.every((h) => h.hit), hits.map((h) => `p${h.power}=${h.hit}`).join(' '));
+  row('peakBarrelSpeed', hits.every((h) => h.peak >= 17 && h.peak <= 31),
+    hits.map((h) => `p${h.power} (${sniperSpeed(h.power)} m/s)=${h.peak.toFixed(1)} m/s`).join(', ') + ', expected 17-31');
+  await withWorld(cc, culled);
+  out.innerHTML = lines.join('\n');
+  document.title = allPass ? 'DONE PASS' : 'DONE FAIL';
+}
+main().catch((e) => { out.textContent = 'ERROR ' + e.message; document.title = 'DONE FAIL'; });
+</script>
+</body>
+</html>
