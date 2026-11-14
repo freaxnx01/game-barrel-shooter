@@ -138,6 +138,11 @@
     .target.open { display: flex; }
     .target .glabel { width: 48px; }
   }
+  @media (max-width: 480px) {
+    /* the Star button with its count needs the room; the star links to the repo too */
+    #game-nav a[href="https://github.com/freaxnx01/game-barrel-shooter"]:not(.github-button),
+    #game-nav a[href="https://github.com/freaxnx01/game-barrel-shooter"]:not(.github-button) + span { display: none; }
+  }
   @media (max-width: 900px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
     #mob-bar { top: 10px; left: 150px; right: 140px; }
     .hint { top: 52px; left: 150px; }
