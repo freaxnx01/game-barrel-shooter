@@ -208,6 +208,7 @@ import { nudgeOrbit, heldNudge } from './camera/orbit.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
+import { SNIPER, sniperSpeed, isOutOfRange } from './weapons/sniper.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -1213,7 +1214,7 @@ function shootBall(dir, power) {
     anchor:      { mass: 20,  r: 0.5 },
     crt:         { mass: 9,   r: 0.4 },
     harpoon:     { mass: 3,   r: SPEAR_R },
-    sniper:      { mass: 6,   r: 0.14 },
+    sniper:      { mass: SNIPER.mass, r: SNIPER.radius },
   }[type];
   let shapeSpec;
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
@@ -1235,6 +1236,7 @@ function shootBall(dir, power) {
     shape: shapeSpec,
     position: { x: start.x, y: start.y, z: start.z },
     fast: fastProjectiles.has(type),
+    gravityFactor: type === 'sniper' ? 0 : undefined,
     angularDamping: orientProjectiles ? 0.9 : (type === 'hammer' ? 0.05 : undefined),
   });
   let speed = 18 + power * 22; // fast & flat
@@ -1254,7 +1256,7 @@ function shootBall(dir, power) {
   } else if (type === 'hammer') {
     speed = 16 + power * 18;
   } else if (type === 'sniper') {
-    speed = 42 + power * 18;   // fast, flat precision round
+    speed = sniperSpeed(power);   // 160-240 m/s tracer, no gravity until first contact (#30)
   } else if (type === 'harpoon') {
     speed = 30 + power * 12;
   }
@@ -1436,10 +1438,12 @@ function shootBall(dir, power) {
   }
   mesh.castShadow = true;
   scene.add(mesh);
-  const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos };
+  const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos,
+    muzzle: { x: start.x, y: start.y, z: start.z } };
   // sounds: launch now, clank/bounce on collision
   playShoot(power);
   phys.onCollide(body, (other, impactSpeed) => {
+    if (type === 'sniper' && !rec.hit) { rec.hit = true; rec.hitAt = performance.now(); phys.setGravityFactor(body, 1); }
     if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
     if (type === 'dynamite' && !rec.exploded) { explode(rec, 4.5, 600); return; }
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
@@ -2373,6 +2377,7 @@ function animate() {
       b.chainMesh.scale.set(1, len, 1);
       b.chainMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir3.normalize());
     }
+    if (b.type === 'sniper' && !b.hit && isOutOfRange(b.muzzle, b.body.position)) { removeProjectile(b); balls.splice(i, 1); continue; }
     const cullTime = b.type === 'wrecking' ? 25000 : 12000;
     if (!b.stuck && (now - b.born > cullTime || b.body.position.y < -5)) {
       removeProjectile(b);
