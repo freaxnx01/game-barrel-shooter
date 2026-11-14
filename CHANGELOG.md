@@ -11,6 +11,8 @@ All notable changes to this project are documented here, following
 - Tractor tire weapon (key T): rolls into the target, then tips over and lies flat (#8)
 - Hover over the version number to see when the game was last updated, in your own time zone, and how long ago
 - New targets: four frame buildings, two brick towers, four gates and a Spiral Tower; Spiral Stair rebuilt; target picker grouped (#24)
+- Mobile mode for phones and tablets: weapon and target lists open as sheets, Quake and Pull hold buttons, two-finger drag to orbit and pinch to zoom, a smaller camera pad; desktop layout unchanged (#37)
+- Web app manifest and icons, so "Add to Home Screen" opens the game fullscreen (#37)
 
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)

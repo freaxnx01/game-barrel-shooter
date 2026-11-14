@@ -23,7 +23,21 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Earthquake** | Hold `Shift` to shake the ground |
 | **Reset** | `R` key or the Reset button |
 
-> Designed for desktop browsers with a mouse — not built for touch.
+### On a phone or tablet
+
+On small or touch screens (`max-width: 900px` or a coarse pointer) the game switches to
+a mobile mode; the desktop layout is unchanged.
+
+| Action | Touch control |
+| --- | --- |
+| **Aim / fire** | Tap and hold on the scene to charge, let go to fire |
+| **Orbit / zoom** | Drag with two fingers to orbit, pinch to zoom (a second finger cancels a charge without firing); the smaller pad bottom-right still works |
+| **Switch weapon / target** | The 💥 and 🎯 buttons at the top open the list as a sheet; tap an entry to pick it, tap outside to close |
+| **Earthquake** | Hold the 🌋 Quake button bottom-left |
+| **Harpoon pull** | Hold the 🪝 Pull button, shown while a harpoon is stuck in a barrel |
+| **Help** | `?` shows the touch controls |
+
+"Add to Home Screen" installs it as a fullscreen app (`manifest.webmanifest`, icons in `icons/`).
 
 ## Physics engine
 
