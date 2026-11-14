@@ -13,6 +13,7 @@ All notable changes to this project are documented here, following
 - New targets: four frame buildings, two brick towers, four gates and a Spiral Tower; Spiral Stair rebuilt; target picker grouped (#24)
 
 ### Changed
+- The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
 - Physics now runs on crashcat instead of cannon-es: buildings stand still until hit and break apart piece by piece instead of bursting from a light touch (#9, #20)
 
 ### Fixed
