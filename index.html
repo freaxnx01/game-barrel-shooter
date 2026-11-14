@@ -4,6 +4,11 @@
 <link rel="icon" href="favicon.png" sizes="32x32" type="image/png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a1611">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Barrel Blast</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1611; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
@@ -74,6 +79,70 @@
   }
   #cam-pad button:hover { background: rgba(245,239,228,0.22); }
   #cam-pad button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
+
+  /* ---------- Mobile mode (#37): small or touch screens only ---------- */
+  #mob-bar, #act-bar, #sheet-backdrop, .hint .hint-touch { display: none; }
+  @media (max-width: 900px), (pointer: coarse) {
+    body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #c { touch-action: none; }
+    .hud { top: 10px; left: 12px; gap: 2px; }
+    .hud .score { font-size: 28px; }
+    .hud .label { font-size: 10px; }
+    .hud .balls { font-size: 13px; }
+    #reset, #autoplay { padding: 7px 12px; font-size: 12px; }
+    #reset { top: 10px; right: 12px; }
+    #autoplay { top: 46px; right: 12px; }
+
+    #mob-bar { display: flex; gap: 6px; position: fixed; top: 86px; left: 12px; right: 12px; }
+    #mob-bar button, #act-bar button {
+      font-family: inherit; color: #f5efe4; background: rgba(26,22,17,0.55);
+      border: 1px solid rgba(245,239,228,0.3); border-radius: 6px; cursor: pointer;
+    }
+    #mob-bar button { padding: 7px 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; touch-action: manipulation; }
+    #mob-help { flex: none; width: 34px; padding: 7px 0 !important; font-weight: 700; }
+
+    .hint { display: none; top: 128px; left: 12px; max-width: 280px; padding: 8px 10px; border-radius: 6px; background: rgba(26,22,17,0.8); opacity: 0.9; font-size: 12px; line-height: 1.5; }
+    .hint.show { display: block; }
+    .hint .hint-desk { display: none; }
+    .hint .hint-touch { display: inline; }
+
+    #act-bar { display: flex; gap: 8px; position: fixed; left: 12px; bottom: 46px; user-select: none; -webkit-user-select: none; touch-action: none; }
+    #act-bar button {
+      width: 60px; height: 60px; padding: 0; font-size: 22px; touch-action: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    }
+    #act-bar button span { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+    #act-bar button[hidden] { display: none; }
+    #act-bar button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
+
+    #cam-pad { right: 12px; bottom: 46px; gap: 6px; }
+    #cam-pad .dpad { grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px); }
+    #cam-pad .zoom { gap: 4px; }
+    #cam-pad button { width: 32px; height: 32px; font-size: 13px; }
+
+    #power { bottom: 160px; width: 160px; }
+
+    #game-nav { font-size: 11px !important; gap: 6px !important; padding: 4px 8px !important; bottom: 6px !important; right: 6px !important; white-space: nowrap; }
+
+    /* the two lists become sheets, opened from #mob-bar */
+    .ammo, .target { display: none; }
+    #sheet-backdrop.open { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,0.45); }
+    .ammo.open, .target.open {
+      position: fixed; z-index: 20; top: 8px; left: 8px; right: 8px; bottom: auto; max-width: none;
+      max-height: calc(100% - 56px); overflow-y: auto; box-sizing: border-box; padding: 12px;
+      background: rgba(26,22,17,0.96); border: 1px solid rgba(245,239,228,0.25); border-radius: 10px; color: #f5efe4;
+    }
+    .ammo.open { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: start; }
+    .ammo.open button { width: 100%; }
+    .ammo button span:not(.dot) { display: none; }
+    .target.open { display: flex; }
+    .target .glabel { width: 48px; }
+  }
+  @media (max-width: 900px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
+    #mob-bar { top: 10px; left: 150px; right: 140px; }
+    .hint { top: 52px; left: 150px; }
+    #power { bottom: 56px; }
+  }
 </style>
   <!-- Umami: cookieless pageviews (stats.freaxnx01.ch); only counted on barrel-shooter.freax.games -->
   <script defer src="https://stats.freaxnx01.ch/g.js" data-website-id="912d311e-bbc0-4346-906e-93876ce3dd26" data-domains="barrel-shooter.freax.games" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>
@@ -130,7 +199,17 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in</span></div>
+<div id="mob-bar">
+  <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
+  <button id="mob-weapon" aria-controls="ammo">💥 <span id="mob-weapon-name">Basketball</span></button>
+  <button id="mob-help" aria-controls="hint" title="Controls">?</button>
+</div>
+<div id="act-bar">
+  <button id="act-quake" title="Hold for an earthquake">🌋<span>Quake</span></button>
+  <button id="act-pull" title="Hold to reel the harpooned barrel in" hidden>🪝<span>Pull</span></button>
+</div>
+<div id="sheet-backdrop"></div>
 <button id="reset">Reset</button>
 <button id="autoplay">▶ Auto-Play</button>
 <div id="cam-pad" aria-label="Camera">
@@ -205,6 +284,7 @@
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { nudgeOrbit, heldNudge } from './camera/orbit.js';
+import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
@@ -1700,6 +1780,7 @@ function harpoonStick(rec, other) {
     new THREE.MeshStandardMaterial({ map: makeRopeTexture(), roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide }));
   scene.add(rope);
   harpoonLink = { rec, barrel: other, constraint, rope };
+  pullBtn.hidden = false;
   playBounce(6);
 }
 
@@ -1712,6 +1793,7 @@ function detachHarpoon() {
   if (harpoonLink.rec) harpoonLink.rec.stuck = false;   // let it be culled normally now
   harpoonLink = null;
   pulling = false;
+  pullBtn.hidden = true;
 }
 
 // ---------- Hurricane: a wandering tornado at the aim point ----------
@@ -1960,6 +2042,7 @@ const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2(0, 0);
 let charging = false, chargeStart = 0;
 let harpoonLink = null, pulling = false;   // a harpoon stuck in a barrel; hold Space to reel it in
+const pullBtn = document.getElementById('act-pull');   // mobile Pull button, shown only while a harpoon is attached
 const powerEl = document.getElementById('power');
 const powerFill = document.getElementById('powerFill');
 
@@ -1968,9 +2051,47 @@ function aimDir() {
   return raycaster.ray.direction.clone().normalize();
 }
 
-canvas.addEventListener('pointermove', (e) => {
+function setAim(e) {
   mouseNDC.x = (e.clientX / innerWidth) * 2 - 1;
   mouseNDC.y = -(e.clientY / innerHeight) * 2 + 1;
+}
+
+// Fingers on the canvas: one aims and fires, a second turns the pair into an orbit/zoom gesture.
+const touches = new Map();   // pointerId -> { x, y }
+let pinch = null;            // touchPair while a two-finger gesture runs
+function currentPair() {
+  const [a, b] = touches.values();
+  return touchPair(a, b);
+}
+function cancelCharge() {
+  charging = false;
+  magnetoActive = false;
+  powerEl.style.opacity = 0;
+}
+function trackTouchDown(e) {
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size < 2) return false;
+  cancelCharge();
+  pinch = currentPair();
+  return true;
+}
+function trackTouchMove(e) {
+  if (!touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!pinch || touches.size < 2) return;
+  const next = currentPair();
+  const n = pairNudge(pinch, next);
+  nudgeOrbit(orbit, n.dTheta, n.dPhi, n.dRadius);
+  updateCamera();
+  pinch = next;
+}
+function trackTouchUp(e) {
+  if (touches.delete(e.pointerId) && touches.size < 2) pinch = null;
+}
+
+canvas.addEventListener('pointermove', (e) => {
+  setAim(e);
+  trackTouchMove(e);
   if (orbiting) {
     nudgeOrbit(orbit, -(e.clientX - lastX) * 0.005, (e.clientY - lastY) * 0.004, 0);
     lastX = e.clientX; lastY = e.clientY;
@@ -1978,6 +2099,8 @@ canvas.addEventListener('pointermove', (e) => {
   }
 });
 canvas.addEventListener('pointerdown', (e) => {
+  setAim(e);
+  if (e.pointerType === 'touch' && trackTouchDown(e)) return;
   if (e.button === 2) {
     orbiting = true;
     lastX = e.clientX; lastY = e.clientY;
@@ -1991,7 +2114,9 @@ canvas.addEventListener('pointerdown', (e) => {
   chargeStart = performance.now();
   powerEl.style.opacity = 1;
 });
+addEventListener('pointercancel', trackTouchUp);
 addEventListener('pointerup', (e) => {
+  trackTouchUp(e);
   if (e.button === 2) { orbiting = false; return; }
   if (autoPlay) return;
   if (magnetoActive) { magnetoActive = false; return; }
@@ -2108,6 +2233,50 @@ addEventListener('keyup', (e) => {
   if (e.key === ' ') pulling = false;
   if (e.key === 'Shift') quakeActive = false;
 });
+
+// ---------- Mobile mode (#37): list sheets, hint toggle, hold buttons ----------
+const mobileQuery = matchMedia('(max-width: 900px), (pointer: coarse)');
+const sheetBackdrop = document.getElementById('sheet-backdrop');
+const hintEl = document.getElementById('hint');
+function closeSheets() {
+  for (const el of [ammoEl, targetEl, sheetBackdrop]) el.classList.remove('open');
+}
+function openSheet(el) {
+  closeSheets();
+  el.classList.add('open');
+  sheetBackdrop.classList.add('open');
+}
+function buttonName(btn) {
+  return [...btn.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim();
+}
+function syncSheetLabels() {
+  document.getElementById('mob-weapon-name').textContent = buttonName(ammoEl.querySelector('button.sel'));
+  document.getElementById('mob-target-name').textContent = buttonName(targetEl.querySelector('button.sel'));
+}
+document.getElementById('mob-weapon').addEventListener('click', () => openSheet(ammoEl));
+document.getElementById('mob-target').addEventListener('click', () => openSheet(targetEl));
+document.getElementById('mob-help').addEventListener('click', () => hintEl.classList.toggle('show'));
+sheetBackdrop.addEventListener('click', closeSheets);
+for (const el of [ammoEl, targetEl]) {
+  el.addEventListener('click', (e) => { if (e.target.closest('button')) closeSheets(); });
+  new MutationObserver(syncSheetLabels).observe(el, { subtree: true, attributeFilter: ['class'] });
+}
+mobileQuery.addEventListener('change', closeSheets);
+syncSheetLabels();
+
+// Hold-to-act buttons, with pointer capture like #cam-pad: Quake = holding Shift, Pull = holding Space.
+function holdButton(btn, press, release) {
+  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); btn.classList.add('held'); press(); });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    btn.addEventListener(type, () => { btn.classList.remove('held'); release(); });
+  }
+}
+holdButton(document.getElementById('act-quake'), () => {
+  if (autoPlay || quakeActive) return;
+  quakeActive = true;
+  quakeStart = performance.now();
+}, () => { quakeActive = false; });
+holdButton(pullBtn, () => { if (!autoPlay && harpoonLink) pulling = true; }, () => { pulling = false; });
 
 // ---------- Auto-play ----------
 let autoPlay = false;
