@@ -25,6 +25,9 @@ export function runContract(phys) {
     forceIsFrameRateIndependent,
     forcesAddUpAndExpire,
     removeBodyDropsPendingForce,
+    zeroGravityFliesStraight,
+    setGravityFactorRestoresFall,
+    fastSphereDoesNotTunnelThinWall,
   ];
   for (const c of cases) {
     try {
@@ -364,6 +367,47 @@ function removeBodyDropsPendingForce(phys) {
   let threw = null;
   try { phys.step(1 / 60); } catch (e) { threw = e.message; }
   return { name: 'removeBodyDropsPendingForce', pass: threw === null, detail: threw === null ? 'step ok' : 'threw: ' + threw };
+}
+
+function zeroGravityFliesStraight(phys) {
+  const b = phys.addBody({ shape: { kind: 'sphere', radius: 0.1 }, mass: 1, material: 'heavy',
+    position: { x: 0, y: 5, z: 0 }, fast: true, gravityFactor: 0 });
+  phys.setVelocity(b, 0, 0, -200);
+  step(phys, 0.1);
+  const y = b.position.y, z = b.position.z;
+  cleanup(phys, [b]);
+  const pass = Math.abs(y - 5) < 0.001 && z < -19 && z > -21;
+  return { name: 'zeroGravityFliesStraight', pass, detail: `y=${y.toFixed(4)} z=${z.toFixed(2)} expected y=5, z~-20` };
+}
+
+function setGravityFactorRestoresFall(phys) {
+  const b = phys.addBody({ shape: { kind: 'sphere', radius: 0.1 }, mass: 1, material: 'heavy',
+    position: { x: 0, y: 50, z: 0 }, gravityFactor: 0 });
+  step(phys, 0.5);
+  const hovered = b.position.y;
+  phys.setGravityFactor(b, 1);
+  step(phys, 0.5);
+  const fell = b.position.y;
+  cleanup(phys, [b]);
+  const pass = Math.abs(hovered - 50) < 0.001 && fell < 50 - 1;
+  return { name: 'setGravityFactorRestoresFall', pass, detail: `hover y=${hovered.toFixed(3)}, after y=${fell.toFixed(3)}` };
+}
+
+function fastSphereDoesNotTunnelThinWall(phys) {
+  // 240 m/s moves 1 m per 1/240 s step; the wall is 0.1 m thick. Sweep the start phase over one step.
+  let stopped = 0, n = 0;
+  for (let d = 8; d < 8.84; d += 0.021) {
+    n++;
+    const wall = phys.addBody({ shape: { kind: 'box', halfExtents: [3, 3, 0.05] }, mass: 0, isStatic: true,
+      material: 'stone', position: { x: 0, y: 1, z: -d } });
+    const b = phys.addBody({ shape: { kind: 'sphere', radius: 0.14 }, mass: 1.2, material: 'heavy',
+      position: { x: 0, y: 1, z: 0 }, fast: true, gravityFactor: 0 });
+    phys.setVelocity(b, 0, 0, -240);
+    step(phys, 0.5);
+    if (b.position.z > -d) stopped++;
+    cleanup(phys, [b, wall]);
+  }
+  return { name: 'fastSphereDoesNotTunnelThinWall', pass: stopped === n, detail: `stopped ${stopped}/${n}` };
 }
 
 function ground(phys) {

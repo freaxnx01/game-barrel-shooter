@@ -64,6 +64,7 @@ export function createCrashcatBackend(cc) {
       if (spec.angularDamping != null) opts.angularDamping = spec.angularDamping;
     }
     if (spec.fast) opts.motionQuality = cc.MotionQuality.LINEAR_CAST;
+    if (spec.gravityFactor != null) opts.gravityFactor = spec.gravityFactor;
     if (spec.friction != null) opts.friction = spec.friction;
     if (spec.restitution != null) opts.restitution = spec.restitution;
     const body = cc.rigidBody.create(world, opts);
@@ -170,6 +171,11 @@ export function createCrashcatBackend(cc) {
 
   function wake(h) { cc.rigidBody.wake(world, h.raw); }
   function isSleeping(h) { return !!h.raw.sleeping; }
+  // Wakes the body: a hovering zero-gravity body falls asleep and would ignore the new factor.
+  function setGravityFactor(h, factor) {
+    h.raw.motionProperties.gravityFactor = factor;
+    wake(h);
+  }
 
   function onCollide(h, cb) { collideCbs.set(h, cb); }
 
@@ -271,7 +277,7 @@ export function createCrashcatBackend(cc) {
     setPosition, setQuaternion,
     applyImpulse, applyForce,
     setFriction, restoreFriction,
-    wake, isSleeping,
+    wake, isSleeping, setGravityFactor,
     onCollide,
     addDistanceJoint, addFixedJoint, removeJoint,
     destroy,
