@@ -288,7 +288,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
-import { nudgeOrbit, heldNudge } from './camera/orbit.js';
+import { nudgeOrbit, heldNudge, fitOrbitRadius } from './camera/orbit.js';
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
@@ -316,9 +316,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#20242e');
-scene.fog = new THREE.Fog('#20242e', 45, 140);
+const FOG_NEAR = 45, FOG_FAR = 140, CAM_FAR = 200, DEFAULT_FOV = 55;
+scene.fog = new THREE.Fog('#20242e', FOG_NEAR, FOG_FAR);
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.1, CAM_FAR);
 
 // Lights
 scene.add(new THREE.HemisphereLight('#b8c4d8', '#3a3128', 0.7));
@@ -1090,12 +1091,37 @@ function buildTargets() {
   TSCALE = ['barrels', 'woodbarrels', 'cards', 'fortress', 'colosseum'].includes(targetMode) ? 1 : 2;
   const camScale = TSCALE === 1 ? 1 : 1.5;
   setPlatform(cfg.plat);
-  orbit.radius = cfg.r * camScale;
+  targetBaseRadius = cfg.r * camScale;
+  orbit.radius = targetBaseRadius;
   orbit.target.set(0, cfg.ty * TSCALE, cfg.tz * TSCALE);
   updateCamera();
   cfg.build();
+  targetExtent = measureTargetExtent();
+  fitCamera();
   document.getElementById('scoreLabel').textContent =
     targetMode === 'barrels' || targetMode === 'woodbarrels' ? 'Barrels down' : targetMode === 'cards' ? 'Cards down' : targetMode === 'bowling' ? 'Pins down' : 'Blocks down';
+}
+// Wide targets in a narrow (portrait) view: pull the camera back until they fit, and the fog with it (#39).
+let targetBaseRadius = 15.5, targetExtent = null;
+function measureTargetExtent() {
+  const box = new THREE.Box3();
+  for (const b of barrels) {   // a new piece's mesh still sits at the origin until the loop syncs it to its body
+    b.mesh.position.copy(b.body.position);
+    b.mesh.quaternion.copy(b.body.quaternion);
+    box.expandByObject(b.mesh);
+  }
+  const t = orbit.target;
+  return { halfWidth: Math.max(box.max.x - t.x, t.x - box.min.x), nearDepth: Math.max(box.max.z - t.z, 0) };
+}
+function fitCamera() {
+  // the default FOV, not the sniper's zoomed one, so picking the sniper doesn't move the camera
+  orbit.radius = orbit.fitRadius = fitOrbitRadius(targetBaseRadius, targetExtent, DEFAULT_FOV, camera.aspect);
+  const pushBack = orbit.radius - targetBaseRadius;
+  scene.fog.near = FOG_NEAR + pushBack;
+  scene.fog.far = FOG_FAR + pushBack;
+  camera.far = CAM_FAR + pushBack;
+  camera.updateProjectionMatrix();
+  updateCamera();
 }
 targetEl.addEventListener('click', (e) => {
   if (autoPlay) return;
@@ -1150,7 +1176,7 @@ function setAmmo(type) {
   ammoType = type;
   for (const b of ammoEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.type === type);
   // Sniper lens zooms the view for precision; other ammo restores the default FOV.
-  const fov = type === 'sniper' ? 26 : 55;
+  const fov = type === 'sniper' ? 26 : DEFAULT_FOV;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 ammoEl.addEventListener('click', (e) => {
@@ -2039,6 +2065,7 @@ function updateCamera() {
   camera.lookAt(target);
 }
 updateCamera();
+targetExtent = measureTargetExtent();   // the start target; fitted on the first resize(), once the aspect is known
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -2351,7 +2378,7 @@ function resize() {
   if (canvas.width !== w * renderer.getPixelRatio() || canvas.height !== h * renderer.getPixelRatio()) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    fitCamera();   // re-fit after turning the phone
   }
 }
 
