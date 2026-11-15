@@ -37,6 +37,9 @@ a mobile mode; the desktop layout is unchanged.
 | **Harpoon pull** | Hold the 🪝 Pull button, shown while a harpoon is stuck in a barrel |
 | **Help** | `?` shows the touch controls |
 
+In portrait the camera starts far enough back for wide targets (Fortress, Colosseum, Pyramid, …) to fit
+the screen, and turning the phone re-fits the view.
+
 "Add to Home Screen" installs it as a fullscreen app (`manifest.webmanifest`, icons in `icons/`).
 
 ## Physics engine
