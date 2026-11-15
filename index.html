@@ -3,7 +3,7 @@
 <head>
 <link rel="icon" href="favicon.png" sizes="32x32" type="image/png">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1a1611">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,28 +11,33 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Barrel Blast</title>
 <style>
+  /* safe-area insets (#40): 0 on desktop, the notch / Android nav bar on phones */
+  :root {
+    --sa-t: env(safe-area-inset-top, 0px); --sa-r: env(safe-area-inset-right, 0px);
+    --sa-b: env(safe-area-inset-bottom, 0px); --sa-l: env(safe-area-inset-left, 0px);
+  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1611; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
   #c { display: block; width: 100%; height: 100%; cursor: crosshair; }
   .hud {
-    position: fixed; top: 20px; left: 20px; color: #f5efe4; user-select: none;
+    position: fixed; top: calc(20px + var(--sa-t)); left: calc(20px + var(--sa-l)); color: #f5efe4; user-select: none;
     display: flex; flex-direction: column; gap: 6px; pointer-events: none;
   }
   .hud .score { font-size: 42px; font-weight: 700; letter-spacing: -1px; }
   .hud .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; }
   .hud .balls { font-size: 16px; opacity: 0.85; }
   .hint {
-    position: fixed; top: 120px; left: 22px; max-width: 260px;
+    position: fixed; top: calc(120px + var(--sa-t)); left: calc(22px + var(--sa-l)); max-width: 260px;
     color: #f5efe4; opacity: 0.5; font-size: 13px; letter-spacing: 0.5px; line-height: 1.6;
     user-select: none; pointer-events: none; text-align: left; z-index: 5;
   }
   #power {
-    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: calc(60px + var(--sa-b)); left: 50%; transform: translateX(-50%);
     width: 220px; height: 10px; border-radius: 5px; background: rgba(245,239,228,0.15);
     overflow: hidden; opacity: 0; transition: opacity 0.15s;
   }
   #power .fill { height: 100%; width: 0%; background: oklch(0.72 0.17 55); border-radius: 5px; }
-  #reset { position: fixed; top: 20px; right: 20px; }
-  #autoplay { position: fixed; top: 66px; right: 20px; }
+  #reset { position: fixed; top: calc(20px + var(--sa-t)); right: calc(20px + var(--sa-r)); }
+  #autoplay { position: fixed; top: calc(66px + var(--sa-t)); right: calc(20px + var(--sa-r)); }
   #reset, .target button, #autoplay {
     padding: 10px 20px; font-size: 14px;
     background: rgba(245,239,228,0.1); color: #f5efe4; border: 1px solid rgba(245,239,228,0.3);
@@ -41,7 +46,7 @@
   }
   #reset:hover, .target button:hover, #autoplay:hover { background: rgba(245,239,228,0.22); }
   #autoplay.active { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
-  .target { position: fixed; top: 20px; right: 236px; display: flex; flex-direction: column; gap: 6px; max-width: min(620px, calc(100vw - 560px)); }
+  .target { position: fixed; top: calc(20px + var(--sa-t)); right: calc(236px + var(--sa-r)); display: flex; flex-direction: column; gap: 6px; max-width: min(620px, calc(100vw - 560px)); }
   .target-group { display: flex; align-items: flex-start; gap: 8px; }
   .target-group .glabel {
     flex: none; width: 54px; padding-top: 7px; text-align: right;
@@ -51,7 +56,7 @@
   .target button { padding: 5px 9px; font-size: 11px; }
   .target button.sel { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
   .ammo {
-    position: fixed; bottom: 24px; left: 24px; display: flex; gap: 16px; align-items: flex-end; user-select: none;
+    position: fixed; bottom: calc(24px + var(--sa-b)); left: calc(24px + var(--sa-l)); display: flex; gap: 16px; align-items: flex-end; user-select: none;
   }
   .ammo-group { display: flex; flex-direction: column; gap: 5px; }
   .ammo-group .glabel {
@@ -67,7 +72,7 @@
   .ammo button.sel { background: rgba(245,239,228,0.22); border-color: rgba(245,239,228,0.7); }
   .ammo .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
   #cam-pad {
-    position: fixed; right: 20px; bottom: 52px; display: flex; gap: 8px; align-items: center;
+    position: fixed; right: calc(20px + var(--sa-r)); bottom: calc(52px + var(--sa-b)); display: flex; gap: 8px; align-items: center;
     user-select: none; -webkit-user-select: none; touch-action: none;
   }
   #cam-pad .dpad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 2px; }
@@ -85,15 +90,15 @@
   @media (max-width: 900px), (pointer: coarse) {
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #c { touch-action: none; }
-    .hud { top: 10px; left: 12px; gap: 2px; }
+    .hud { top: calc(10px + var(--sa-t)); left: calc(12px + var(--sa-l)); gap: 2px; }
     .hud .score { font-size: 28px; }
     .hud .label { font-size: 10px; }
     .hud .balls { font-size: 13px; }
     #reset, #autoplay { padding: 7px 12px; font-size: 12px; }
-    #reset { top: 10px; right: 12px; }
-    #autoplay { top: 46px; right: 12px; }
+    #reset { top: calc(10px + var(--sa-t)); right: calc(12px + var(--sa-r)); }
+    #autoplay { top: calc(46px + var(--sa-t)); right: calc(12px + var(--sa-r)); }
 
-    #mob-bar { display: flex; gap: 6px; position: fixed; top: 86px; left: 12px; right: 12px; }
+    #mob-bar { display: flex; gap: 6px; position: fixed; top: calc(86px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: calc(12px + var(--sa-r)); }
     #mob-bar button, #act-bar button {
       font-family: inherit; color: #f5efe4; background: rgba(26,22,17,0.55);
       border: 1px solid rgba(245,239,228,0.3); border-radius: 6px; cursor: pointer;
@@ -101,12 +106,12 @@
     #mob-bar button { padding: 7px 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; touch-action: manipulation; }
     #mob-help { flex: none; width: 34px; padding: 7px 0 !important; font-weight: 700; }
 
-    .hint { display: none; top: 128px; left: 12px; max-width: 280px; padding: 8px 10px; border-radius: 6px; background: rgba(26,22,17,0.8); opacity: 0.9; font-size: 12px; line-height: 1.5; }
+    .hint { display: none; top: calc(128px + var(--sa-t)); left: calc(12px + var(--sa-l)); max-width: 280px; padding: 8px 10px; border-radius: 6px; background: rgba(26,22,17,0.8); opacity: 0.9; font-size: 12px; line-height: 1.5; }
     .hint.show { display: block; }
     .hint .hint-desk { display: none; }
     .hint .hint-touch { display: inline; }
 
-    #act-bar { display: flex; gap: 8px; position: fixed; left: 12px; bottom: 46px; user-select: none; -webkit-user-select: none; touch-action: none; }
+    #act-bar { display: flex; gap: 8px; position: fixed; left: calc(12px + var(--sa-l)); bottom: calc(46px + var(--sa-b)); user-select: none; -webkit-user-select: none; touch-action: none; }
     #act-bar button {
       width: 60px; height: 60px; padding: 0; font-size: 22px; touch-action: none;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
@@ -115,21 +120,21 @@
     #act-bar button[hidden] { display: none; }
     #act-bar button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
 
-    #cam-pad { right: 12px; bottom: 46px; gap: 6px; }
+    #cam-pad { right: calc(12px + var(--sa-r)); bottom: calc(46px + var(--sa-b)); gap: 6px; }
     #cam-pad .dpad { grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px); }
     #cam-pad .zoom { gap: 4px; }
     #cam-pad button { width: 32px; height: 32px; font-size: 13px; }
 
-    #power { bottom: 160px; width: 160px; }
+    #power { bottom: calc(160px + var(--sa-b)); width: 160px; }
 
-    #game-nav { font-size: 11px !important; gap: 6px !important; padding: 4px 8px !important; bottom: 6px !important; right: 6px !important; white-space: nowrap; }
+    #game-nav { font-size: 11px !important; gap: 6px !important; padding: 4px 8px !important; bottom: calc(6px + var(--sa-b)) !important; right: calc(6px + var(--sa-r)) !important; white-space: nowrap; }
 
     /* the two lists become sheets, opened from #mob-bar */
     .ammo, .target { display: none; }
     #sheet-backdrop.open { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,0.45); }
     .ammo.open, .target.open {
-      position: fixed; z-index: 20; top: 8px; left: 8px; right: 8px; bottom: auto; max-width: none;
-      max-height: calc(100% - 56px); overflow-y: auto; box-sizing: border-box; padding: 12px;
+      position: fixed; z-index: 20; top: calc(8px + var(--sa-t)); left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); bottom: auto; max-width: none;
+      max-height: calc(100% - 56px - var(--sa-t) - var(--sa-b)); overflow-y: auto; box-sizing: border-box; padding: 12px;
       background: rgba(26,22,17,0.96); border: 1px solid rgba(245,239,228,0.25); border-radius: 10px; color: #f5efe4;
     }
     .ammo.open { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: start; }
@@ -144,9 +149,9 @@
     #game-nav a[href="https://github.com/freaxnx01/game-barrel-shooter"]:not(.github-button) + span { display: none; }
   }
   @media (max-width: 900px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
-    #mob-bar { top: 10px; left: 150px; right: 140px; }
-    .hint { top: 52px; left: 150px; }
-    #power { bottom: 56px; }
+    #mob-bar { top: calc(10px + var(--sa-t)); left: calc(150px + var(--sa-l)); right: calc(140px + var(--sa-r)); }
+    .hint { top: calc(52px + var(--sa-t)); left: calc(150px + var(--sa-l)); }
+    #power { bottom: calc(56px + var(--sa-b)); }
   }
 </style>
   <!-- Umami: cookieless pageviews (stats.freaxnx01.ch); only counted on barrel-shooter.freax.games -->
@@ -315,15 +320,15 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#20242e');
+scene.background = new THREE.Color('#3b4356');
 const FOG_NEAR = 45, FOG_FAR = 140, CAM_FAR = 200, DEFAULT_FOV = 55;
-scene.fog = new THREE.Fog('#20242e', FOG_NEAR, FOG_FAR);
+scene.fog = new THREE.Fog('#3b4356', FOG_NEAR, FOG_FAR);
 
 const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.1, CAM_FAR);
 
 // Lights
-scene.add(new THREE.HemisphereLight('#b8c4d8', '#3a3128', 0.7));
-const sun = new THREE.DirectionalLight('#ffe8c4', 1.6);
+scene.add(new THREE.HemisphereLight('#c4cfe0', '#4a4034', 1.6));
+const sun = new THREE.DirectionalLight('#ffe8c4', 3.2);
 sun.position.set(8, 14, 6);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -338,7 +343,7 @@ scene.add(sun);
 
 const groundMesh = new THREE.Mesh(
   new THREE.CircleGeometry(60, 48),
-  new THREE.MeshStandardMaterial({ color: '#5a5348', roughness: 0.95 })
+  new THREE.MeshStandardMaterial({ color: '#6b6355', roughness: 0.95 })
 );
 groundMesh.rotation.x = -Math.PI / 2;
 groundMesh.receiveShadow = true;
@@ -2643,7 +2648,7 @@ function animate() {
 animate();
 
 </script>
-<nav id="game-nav" aria-label="Game navigation" style="position:fixed;right:10px;bottom:8px;z-index:2147483647;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
+<nav id="game-nav" aria-label="Game navigation" style="position:fixed;right:calc(10px + var(--sa-r));bottom:calc(8px + var(--sa-b));z-index:2147483647;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
   <span id="version-badge" title="Version" style="color:#5a6072"></span>
   <span style="color:#5a6072" aria-hidden="true">·</span>
   <a href="https://github.freaxnx01.ch/games/" style="color:#8fd8e8;text-decoration:none">More Games…</a>

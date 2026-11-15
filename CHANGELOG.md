@@ -17,6 +17,7 @@ All notable changes to this project are documented here, following
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
 - Physics now runs on crashcat instead of cannon-es: buildings stand still until hit and break apart piece by piece instead of bursting from a light touch (#9, #20)
+- Brighter scene on every device: stronger sky and sun light, a lighter sky, fog and ground; shadows and barrel colours stay as they were (#40)
 
 ### Fixed
 - Barrels that lose their support now slide off and fall instead of hanging in mid-air (#28)
@@ -27,6 +28,7 @@ All notable changes to this project are documented here, following
 - Stone buildings (fortress, octagon, tower gate, …) break apart again: weapons and explosions could barely move their blocks after the switch to crashcat (#22)
 - Magneto, the harpoon reel-in and the earthquake get their full force again: after the switch to crashcat they only acted for a quarter of each frame, so held pieces barely lifted (#29)
 - On a phone in portrait, wide targets such as Fortress, Colosseum and Pyramid fit the screen instead of being cut off at the sides; turning the phone re-fits the view, and zooming out is no longer capped below the starting distance (#39)
+- On phones with a notch or an on-screen navigation bar, the game navigation, the Quake/Pull buttons, the camera pad and the top controls no longer sit under the system bars (#40)
 
 ## [0.2.0] - 2026-09-29
 
