@@ -2,13 +2,24 @@
 
 export const ORBIT_LIMITS = { phiMin: 0.02, phiMax: 1.35, radiusMin: 5, radiusMax: 30 };
 export const CAM_SPEED = { theta: 1.6, phi: 0.8, zoom: 12 };   // rad/s, rad/s, units/s while a control is held
+export const FIT_MARGIN = 0.08;   // share of the half-screen left free beside a fitted target
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 export function nudgeOrbit(orbit, dTheta, dPhi, dRadius) {
   orbit.theta += dTheta;
   orbit.phi = clamp(orbit.phi + dPhi, ORBIT_LIMITS.phiMin, ORBIT_LIMITS.phiMax);
-  orbit.radius = clamp(orbit.radius + dRadius, ORBIT_LIMITS.radiusMin, ORBIT_LIMITS.radiusMax);
+  const radiusMax = Math.max(ORBIT_LIMITS.radiusMax, orbit.fitRadius ?? 0);   // never snap a fitted camera back in
+  orbit.radius = clamp(orbit.radius + dRadius, ORBIT_LIMITS.radiusMin, radiusMax);
+}
+
+// Smallest orbit radius at which a target fits the horizontal field of view, never below baseRadius
+// (the per-target desktop framing). extent: halfWidth either side of the look-at point and nearDepth,
+// how far its nearest face sits in front of it. On a narrow portrait screen this pulls the camera back.
+export function fitOrbitRadius(baseRadius, extent, vFovDeg, aspect) {
+  const tanHalfHFov = Math.tan(vFovDeg * Math.PI / 360) * aspect;
+  const needed = extent.halfWidth / (tanHalfHFov * (1 - FIT_MARGIN)) + extent.nearDepth;
+  return Math.max(baseRadius, needed);
 }
 
 // held: -1/0/1 per axis (zoom 1 = in). Returns null when nothing is held. `0 -` keeps an idle zoom at +0, not -0.
