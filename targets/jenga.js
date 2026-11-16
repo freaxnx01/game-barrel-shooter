@@ -11,8 +11,8 @@ export const JENGA = {
   layers: 18,
   clearance: 0.001,
   mass: 6,
-  pushSpeed: 0.6,           // m/s target speed of a held block along its long axis
-  gain: 20,                 // 1/s, speed controller gain
+  pushSpeed: 1.0,           // m/s target speed of a held block along its long axis
+  gain: 100,                // 1/s, speed controller gain; high, so the cap (not the gain) decides what sticks
   maxPushForceFactor: 1.5,  // force cap in block weights; the cap lets loaded blocks stick
   pulledFraction: 0.8,      // pulled once moved this fraction of its length from home
   groundEps: 0.05,

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jenga</title>
+<style>
+  body { background:#1a1611; color:#f5efe4; font-family: monospace; padding: 16px; }
+  pre { white-space: pre-wrap; }
+  .pass { color: #6dd96d; }
+  .fail { color: #e0483a; }
+  .info { color: #c9a13a; }
+</style>
+</head>
+<body>
+<!-- Jenga acceptance harness (#34).
+     Builds the 18-layer tower on the real crashcat backend with the real material
+     table (same body spec as setupJenga in index.html) and holds the capped push
+     force on single blocks. Title becomes JENGA PASS/FAIL.
+     Layers are 1-based in the check names (as in the spec): layer 9 is layer === 8.
+     Tuning: ?mu=&cap=&speed=&gain=&mass= override jenga|jenga friction and the JENGA
+     push constants for this page only, to re-measure the friction window.
+     Measured 2026-11-16 (cap 1.5 W, mass 6, gain 100, pushSpeed 0.8-1.0):
+       checks 1-3 pass for every mu tried (0.01-0.07); check 4 always passes, because
+       a layer-1 block sits on the ground (jenga|ground 0.5) and slides 0.001;
+       check 5 passes for mu 0.025-0.045 and fails from 0.05 (the last middle block,
+       carrying the whole tower, no longer slides under the cap).
+       A layer-2 middle block (jenga contacts only, ~33 W load) only sticks from
+       mu ~0.05, so it cannot stick together with check 5: shipped mu = 0.03. -->
+<pre id="out">running…</pre>
+<script type="module">
+import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
+import { contactFor } from '../../physics/materials.js';
+import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from '../../targets/jenga.js';
+
+const out = document.getElementById('out');
+const lines = [];
+let allPass = true;
+function row(pass, name, detail, required = true) {
+  const cls = pass ? 'pass' : (required ? 'fail' : 'info');
+  const tag = pass ? 'PASS' : (required ? 'FAIL' : 'INFO');
+  if (!pass && required) allPass = false;
+  lines.push(`<span class="${cls}">[${tag}] ${name}: ${detail}</span>`);
+}
+
+applyTuningOverrides(new URLSearchParams(location.search));
+function applyTuningOverrides(q) {
+  if (q.has('mu')) contactFor('jenga', 'jenga').friction = Number(q.get('mu'));
+  if (q.has('cap')) JENGA.maxPushForceFactor = Number(q.get('cap'));
+  if (q.has('speed')) JENGA.pushSpeed = Number(q.get('speed'));
+  if (q.has('gain')) JENGA.gain = Number(q.get('gain'));
+  if (q.has('mass')) JENGA.mass = Number(q.get('mass'));
+}
+
+const DT = 1 / 60;
+let cc;
+
+function quatY(ry) {
+  return { x: 0, y: Math.sin(ry / 2), z: 0, w: Math.cos(ry / 2) };
+}
+
+async function fresh() {
+  cc ??= await import('https://esm.sh/crashcat@0.0.5');
+  const phys = createCrashcatBackend(cc);
+  phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
+  const blocks = jengaTower().map(b => ({
+    ...b,
+    axis: blockAxis(b.ry),
+    home: { x: b.x, y: b.y, z: b.z },
+    pulled: false,
+    body: phys.addBody({
+      shape: { kind: 'box', halfExtents: [b.hx, b.hy, b.hz] },
+      mass: JENGA.mass, material: 'jenga', startAsleep: true,
+      position: { x: b.x, y: b.y, z: b.z }, quaternion: quatY(b.ry),
+      linearDamping: 0.15, angularDamping: 0.3, sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+    }),
+  }));
+  return { phys, blocks };
+}
+
+const idx = (ctx, layer1, i) => ctx.blocks.findIndex(b => b.layer === layer1 - 1 && Math.round(dotSide(b)) === i);
+function dotSide(b) {
+  // -1, 0, +1 = position of the block within its layer
+  const s = [Math.sin(b.ry), Math.cos(b.ry)];
+  return (b.home.x * s[0] + b.home.z * s[1]) / (JENGA.width + JENGA.clearance);
+}
+function moved(b) {
+  const p = b.body.position;
+  return Math.hypot(p.x - b.home.x, p.y - b.home.y, p.z - b.home.z);
+}
+function slid(b) {
+  const p = b.body.position;
+  return Math.abs((p.x - b.home.x) * b.axis[0] + (p.z - b.home.z) * b.axis[1]);
+}
+function markPulled(ctx) {
+  for (const b of ctx.blocks) {
+    if (!b.pulled && isPulled(b.home, b.body.position, b.axis)) b.pulled = true;
+  }
+}
+function fallen(ctx, activeIndex) {
+  return hasFallen(ctx.blocks.map(b => ({ layer: b.layer, homeY: b.home.y, y: b.body.position.y, hy: b.hy, pulled: b.pulled })), activeIndex);
+}
+function stepFrames(ctx, frames, onFrame) {
+  for (let f = 0; f < frames; f++) {
+    onFrame?.();
+    ctx.phys.step(DT);
+    markPulled(ctx);
+  }
+}
+
+// Same as the game: touch at the block's +x end, so the sign is decided once and the
+// block is pushed away from that end with the capped speed-controller force.
+function applyPush(ctx, i, sign) {
+  const b = ctx.blocks[i];
+  const v = ctx.phys.getVelocity(b.body);
+  const vAlong = (v.x * b.axis[0] + v.z * b.axis[1]) * sign;
+  const f = sign * pushForce(vAlong, JENGA.mass);
+  ctx.phys.applyForce(b.body, f * b.axis[0], 0, f * b.axis[1]);
+}
+// Holds the push until done(b) (default: the block counts as pulled) or maxSeconds
+// pass; returns seconds held.
+function holdPush(ctx, i, maxSeconds, onFrame, done = (b) => b.pulled) {
+  const b = ctx.blocks[i];
+  const hit = { x: b.home.x + b.axis[0] * b.hx, z: b.home.z + b.axis[1] * b.hx };
+  const sign = pushSign(b.axis, b.body.position, hit);
+  let frames = 0;
+  while (frames < maxSeconds / DT && !done(b)) {
+    applyPush(ctx, i, sign);
+    ctx.phys.step(DT);
+    markPulled(ctx);
+    onFrame?.();
+    frames++;
+  }
+  return frames * DT;
+}
+function maxMovedOfLayer(ctx, layer1) {
+  return Math.max(...ctx.blocks.filter(b => b.layer === layer1 - 1).map(moved));
+}
+
+// ---- checks ----
+
+async function stable() {
+  const ctx = await fresh();
+  for (const b of ctx.blocks) ctx.phys.wake(b.body);
+  stepFrames(ctx, 300);
+  const maxOff = Math.max(...ctx.blocks.map(moved));
+  row(maxOff < 0.02, '1 stable', `all blocks woken, after 5 s maxOff=${maxOff.toFixed(4)} (limit 0.02)`);
+  ctx.phys.destroy();
+}
+
+async function pushMiddle() {
+  const ctx = await fresh();
+  const i = idx(ctx, 9, 0);
+  let above = 0;
+  const t = holdPush(ctx, i, 6, () => { above = Math.max(above, maxMovedOfLayer(ctx, 10)); });
+  const pulled = ctx.blocks[i].pulled;
+  stepFrames(ctx, 120, () => { above = Math.max(above, maxMovedOfLayer(ctx, 10)); });
+  const fell = fallen(ctx, -1);
+  row(pulled && above < 0.1 && !fell, '2 push-middle',
+    `layer 9 middle pulled=${pulled} after ${t.toFixed(2)} s (limit 6), slid ${slid(ctx.blocks[i]).toFixed(3)}, layer 10 max move=${above.toFixed(4)} (limit 0.1), fallen=${fell}`);
+  ctx.phys.destroy();
+}
+
+async function pushSide() {
+  const ctx = await fresh();
+  const i = idx(ctx, 9, 1);
+  let above = 0;
+  const t = holdPush(ctx, i, 6, () => { above = Math.max(above, maxMovedOfLayer(ctx, 10)); });
+  const pulled = ctx.blocks[i].pulled;
+  stepFrames(ctx, 120);
+  const fell = fallen(ctx, -1);
+  row(pulled && !fell, '3 push-side',
+    `layer 9 side pulled=${pulled} after ${t.toFixed(2)} s (limit 6), slid ${slid(ctx.blocks[i]).toFixed(3)}, layer 10 max move=${above.toFixed(4)}, fallen=${fell}`);
+  ctx.phys.destroy();
+}
+
+async function stuck(name, layer1, required) {
+  const ctx = await fresh();
+  const i = idx(ctx, layer1, 0);
+  const t = holdPush(ctx, i, 3);
+  const b = ctx.blocks[i];
+  // stuck = not pulled and barely moved: at a slow pushSpeed, 3 s could not pull it anyway
+  row(!b.pulled && slid(b) < 0.1, name,
+    `layer ${layer1} middle held ${t.toFixed(2)} s: pulled=${b.pulled}, slid ${slid(b).toFixed(3)} along its axis (stuck below 0.1, pulled at ${(JENGA.pulledFraction * JENGA.length).toFixed(2)})`, required);
+  ctx.phys.destroy();
+}
+
+async function collapse() {
+  const ctx = await fresh();
+  const order = [idx(ctx, 9, -1), idx(ctx, 9, 1), idx(ctx, 9, 0)];
+  let left = 15;
+  const times = [];
+  // A player keeps holding until the block is out: "pulled" (0.8 × length) still
+  // leaves 0.6 under the tower, which can prop it up at a tilt. Hold until the block
+  // has slid a full length, so it is clear of the layer.
+  const clear = (b) => slid(b) >= JENGA.length;
+  for (const i of order) {
+    if (left <= 0) break;
+    const t = holdPush(ctx, i, left, undefined, clear);
+    times.push(t.toFixed(2));
+    left -= t;
+  }
+  const allPulled = order.every(i => ctx.blocks[i].pulled);
+  stepFrames(ctx, 180);
+  const fell = fallen(ctx, -1);
+  const l10 = ctx.blocks.filter(b => b.layer === 9);
+  const drop10 = l10.reduce((s, b) => s + b.home.y - b.body.position.y, 0) / l10.length;
+  const asleep10 = l10.filter(b => ctx.phys.isSleeping(b.body)).length;
+  row(fell, '5 collapse', `layer 9 pulled in order side, side, middle: times=[${times.join(', ')}] s, all pulled=${allPulled}, layer 10 mean drop=${drop10.toFixed(3)} (${asleep10}/3 asleep), fallen after 3 s=${fell}`);
+  ctx.phys.destroy();
+}
+
+async function main() {
+  lines.push(`mu=${contactFor('jenga', 'jenga').friction} cap=${JENGA.maxPushForceFactor}W mass=${JENGA.mass} pushSpeed=${JENGA.pushSpeed} gain=${JENGA.gain}`);
+  await stable();
+  await pushMiddle();
+  await pushSide();
+  await stuck('4 stuck-bottom', 1, true);
+  // info only: layer 2 has no ground contact, so it shows where jenga|jenga alone puts a ~33 W load
+  await stuck('info stuck-layer2', 2, false);
+  await collapse();
+  out.innerHTML = lines.join('\n');
+  document.title = allPass ? 'JENGA PASS' : 'JENGA FAIL';
+}
+main().catch(e => { out.textContent = 'ERROR ' + e.stack; document.title = 'JENGA FAIL'; });
+</script>
+</body>
+</html>
