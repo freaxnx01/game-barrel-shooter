@@ -38,13 +38,15 @@
   #power .fill { height: 100%; width: 0%; background: oklch(0.72 0.17 55); border-radius: 5px; }
   #reset { position: fixed; top: calc(20px + var(--sa-t)); right: calc(20px + var(--sa-r)); }
   #autoplay { position: fixed; top: calc(66px + var(--sa-t)); right: calc(20px + var(--sa-r)); }
-  #reset, .target button, #autoplay {
+  #jenga-shoot { position: fixed; top: calc(112px + var(--sa-t)); right: calc(20px + var(--sa-r)); }
+  #reset, .target button, #autoplay, #jenga-shoot {
     padding: 10px 20px; font-size: 14px;
     background: rgba(245,239,228,0.1); color: #f5efe4; border: 1px solid rgba(245,239,228,0.3);
     border-radius: 6px; cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
     font-family: inherit;
   }
-  #reset:hover, .target button:hover, #autoplay:hover { background: rgba(245,239,228,0.22); }
+  #reset:hover, .target button:hover, #autoplay:hover, #jenga-shoot:hover { background: rgba(245,239,228,0.22); }
+  #jenga-shoot[hidden], #mob-jenga-shoot[hidden] { display: none; }
   #autoplay.active { background: rgba(245,239,228,0.28); border-color: rgba(245,239,228,0.7); }
   .target { position: fixed; top: calc(20px + var(--sa-t)); right: calc(236px + var(--sa-r)); display: flex; flex-direction: column; gap: 6px; max-width: min(620px, calc(100vw - 560px)); }
   .target-group { display: flex; align-items: flex-start; gap: 8px; }
@@ -97,6 +99,7 @@
     #reset, #autoplay { padding: 7px 12px; font-size: 12px; }
     #reset { top: calc(10px + var(--sa-t)); right: calc(12px + var(--sa-r)); }
     #autoplay { top: calc(46px + var(--sa-t)); right: calc(12px + var(--sa-r)); }
+    #jenga-shoot { display: none; }   /* mobile: the toggle lives in #mob-bar */
 
     #mob-bar { display: flex; gap: 6px; position: fixed; top: calc(86px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: calc(12px + var(--sa-r)); }
     #mob-bar button, #act-bar button {
@@ -209,10 +212,11 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in</span></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
   <button id="mob-weapon" aria-controls="ammo">💥 <span id="mob-weapon-name">Basketball</span></button>
+  <button id="mob-jenga-shoot" hidden>🔫 Shoot</button>
   <button id="mob-help" aria-controls="hint" title="Controls">?</button>
 </div>
 <div id="act-bar">
@@ -222,6 +226,7 @@
 <div id="sheet-backdrop"></div>
 <button id="reset">Reset</button>
 <button id="autoplay">▶ Auto-Play</button>
+<button id="jenga-shoot" hidden>🔫 Shoot</button>
 <div id="cam-pad" aria-label="Camera">
   <div class="zoom">
     <button data-cam="in" title="Zoom in">+</button>
@@ -266,6 +271,7 @@
       <button data-mode="poletower">Pole Tower</button>
       <button data-mode="brickbox">Brick Box</button>
       <button data-mode="bricktower">Brick Tower</button>
+      <button data-mode="jenga">Jenga</button>
     </div>
   </div>
   <div class="target-group">
@@ -298,6 +304,7 @@ import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
+import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
@@ -828,6 +835,35 @@ function placeLayout(boxes, zC) {
   for (const b of boxes) addBlock(b.hx, b.hy, b.hz, m(), massFor(b), b.x, b.y, b.z + zC, b.ry, 0);
 }
 
+// Jenga tower (#34): wooden blocks, own 'jenga' material, no MASONRY_MASS_SCALE
+const jengaMatls = ['#e2c69a', '#d8b986', '#e8cfa6', '#cfae7a'].map(c =>
+  new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 }));
+const jengaHeldMatl = new THREE.MeshStandardMaterial({ color: '#f2d9ad', roughness: 0.6, emissive: '#7a4a12', emissiveIntensity: 0.6 });
+function setupJenga() {
+  const zC = -6;
+  jengaTower().forEach((b, i) => {
+    const body = phys.addBody({
+      shape: { kind: 'box', halfExtents: [b.hx, b.hy, b.hz] },
+      mass: JENGA.mass,
+      startAsleep: true,
+      material: 'jenga',
+      position: { x: b.x, y: b.y, z: b.z + zC },
+      quaternion: fromEulerXYZ(0, b.ry, 0),
+      linearDamping: 0.15, angularDamping: 0.3,
+      sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+    });
+    const mesh = new THREE.Mesh(unitBoxGeo, jengaMatls[(i * 7 + b.layer) % jengaMatls.length]);
+    mesh.scale.set(b.hx * 2, b.hy * 2, b.hz * 2);
+    mesh.castShadow = mesh.receiveShadow = true;
+    scene.add(mesh);
+    const q = body.quaternion;
+    barrels.push({
+      body, mesh, home: { x: b.x, y: b.y, z: b.z + zC }, homeQ: { x: q.x, y: q.y, z: q.z, w: q.w }, down: false,
+      jenga: { layer: b.layer, axis: blockAxis(b.ry), hy: b.hy, pulled: false },
+    });
+  });
+}
+
 function setupSpiral() {
   placeLayout(LAYOUTS.spiral(), -6);
 }
@@ -1085,15 +1121,17 @@ const camCfg = {
   doublegate:      { r: 24, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.doubleGate(), -6) },
   castlegate:      { r: 24, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGate(), -6) },
   castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
+  jenga:     { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupJenga },
 };
 function buildTargets() {
+  stopPush();        // a held Jenga block is about to be removed
   detachHarpoon();   // a tethered harpoon references a barrel body we're about to remove
   barrelSupport.reset();
   clearTargets();
   for (const h of hurricanes) scene.remove(h.group);
   hurricanes.length = 0;
   const cfg = camCfg[targetMode];
-  TSCALE = ['barrels', 'woodbarrels', 'cards', 'fortress', 'colosseum'].includes(targetMode) ? 1 : 2;
+  TSCALE = ['barrels', 'woodbarrels', 'cards', 'fortress', 'colosseum', 'jenga'].includes(targetMode) ? 1 : 2;
   const camScale = TSCALE === 1 ? 1 : 1.5;
   setPlatform(cfg.plat);
   targetBaseRadius = cfg.r * camScale;
@@ -1104,7 +1142,8 @@ function buildTargets() {
   targetExtent = measureTargetExtent();
   fitCamera();
   document.getElementById('scoreLabel').textContent =
-    targetMode === 'barrels' || targetMode === 'woodbarrels' ? 'Barrels down' : targetMode === 'cards' ? 'Cards down' : targetMode === 'bowling' ? 'Pins down' : 'Blocks down';
+    targetMode === 'barrels' || targetMode === 'woodbarrels' ? 'Barrels down' : targetMode === 'cards' ? 'Cards down' : targetMode === 'bowling' ? 'Pins down' : targetMode === 'jenga' ? 'Blocks pulled' : 'Blocks down';
+  syncJengaToggle();
 }
 // Wide targets in a narrow (portrait) view: pull the camera back until they fit, and the fog with it (#39).
 let targetBaseRadius = 15.5, targetExtent = null;
@@ -2104,6 +2143,78 @@ function cancelCharge() {
   charging = false;
   magnetoActive = false;
   powerEl.style.opacity = 0;
+  stopPush();
+}
+
+// ---------- Jenga push mode (#34): hold a block to push it out along its long axis ----------
+let jengaShoot = false;   // Shoot toggle: false = push mode; Reset keeps it
+let jengaOver = false;
+let pushState = null;     // { index, sign } while a block is held
+const jengaShootEls = [document.getElementById('jenga-shoot'), document.getElementById('mob-jenga-shoot')];
+function inPushMode() {
+  return targetMode === 'jenga' && !jengaShoot && !autoPlay && !jengaOver;
+}
+function startPush() {
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hit = raycaster.intersectObjects(barrels.map(b => b.mesh), false)[0];
+  if (!hit) return;
+  const index = barrels.findIndex(b => b.mesh === hit.object);
+  const b = barrels[index];
+  pushState = { index, sign: pushSign(b.jenga.axis, b.body.position, hit.point) };
+  b.restMatl = b.mesh.material;
+  b.mesh.material = jengaHeldMatl;
+}
+function stopPush() {
+  if (!pushState) return;
+  const b = barrels[pushState.index];
+  if (b?.restMatl) b.mesh.material = b.restMatl;
+  pushState = null;
+}
+function applyJengaPush() {
+  if (!pushState) return;
+  const b = barrels[pushState.index];
+  const [ax, az] = b.jenga.axis, sign = pushState.sign;
+  const v = phys.getVelocity(b.body);
+  const f = sign * pushForce((v.x * ax + v.z * az) * sign, JENGA.mass);
+  phys.applyForce(b.body, f * ax, 0, f * az);
+}
+// After the mesh sync: check whether the tower fell, then count newly pulled blocks.
+// The fall check comes first, so blocks of a collapsing tower don't count as pulled.
+function updateJengaRules() {
+  if (targetMode !== 'jenga' || jengaOver) return;
+  if (hasFallen(jengaSnapshot(), pushState?.index ?? -1)) {
+    jengaOver = true;
+    stopPush();
+    updateHud();
+    return;
+  }
+  let changed = false;
+  for (const b of barrels) {
+    if (b.jenga.pulled || !isPulled(b.home, b.body.position, b.jenga.axis)) continue;
+    b.jenga.pulled = b.down = true;
+    changed = true;
+  }
+  if (changed) updateHud();
+}
+function jengaSnapshot() {
+  return barrels.map(b => {
+    const p = b.body.position;
+    return { layer: b.jenga.layer, homeX: b.home.x, homeY: b.home.y, homeZ: b.home.z, x: p.x, y: p.y, z: p.z, hy: b.jenga.hy, pulled: b.jenga.pulled };
+  });
+}
+function syncJengaToggle() {
+  for (const el of jengaShootEls) {
+    el.hidden = targetMode !== 'jenga';
+    el.textContent = jengaShoot ? '✋ Push' : '🔫 Shoot';
+  }
+}
+for (const el of jengaShootEls) {
+  el.addEventListener('click', () => {
+    jengaShoot = !jengaShoot;
+    stopPush();
+    syncJengaToggle();
+    el.blur();
+  });
 }
 function trackTouchDown(e) {
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2146,15 +2257,17 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (autoPlay) return;
   if (e.button !== 0) return;
+  if (targetMode === 'jenga' && !jengaShoot) { if (inPushMode()) startPush(); return; }
   if (ammoType === 'magneto') { magnetoActive = true; return; }
   charging = true;
   chargeStart = performance.now();
   powerEl.style.opacity = 1;
 });
-addEventListener('pointercancel', trackTouchUp);
+addEventListener('pointercancel', (e) => { trackTouchUp(e); stopPush(); });
 addEventListener('pointerup', (e) => {
   trackTouchUp(e);
   if (e.button === 2) { orbiting = false; return; }
+  stopPush();
   if (autoPlay) return;
   if (magnetoActive) { magnetoActive = false; return; }
   if (!charging) return;
@@ -2200,6 +2313,7 @@ const scoreEl = document.getElementById('score');
 const ballsEl = document.getElementById('balls');
 
 function updateHud() {
+  if (targetMode === 'jenga') { updateJengaHud(); return; }
   const down = barrels.filter(b => b.down).length;
   scoreEl.innerHTML = down + '<span style="opacity:0.4">/' + barrels.length + '</span>';
   ballsEl.textContent = 'Shots: ' + shots;
@@ -2207,6 +2321,13 @@ function updateHud() {
     scoreEl.dataset.won = '1';
     scoreEl.style.color = 'oklch(0.8 0.17 145)';
   }
+}
+function updateJengaHud() {
+  const n = barrels.filter(b => b.jenga.pulled).length;
+  scoreEl.textContent = n;
+  ballsEl.textContent = 'Shots: ' + shots;
+  document.getElementById('scoreLabel').textContent = jengaOver ? `Tower fell! ${n} blocks pulled` : 'Blocks pulled';
+  if (jengaOver) scoreEl.style.color = 'oklch(0.65 0.2 25)';
 }
 updateHud();
 
@@ -2226,6 +2347,7 @@ function reset() {
   balls.length = 0;
   for (const h of hurricanes) scene.remove(h.group);
   hurricanes.length = 0;
+  jengaOver = false;
   buildTargets(); // full rebuild — restores frozen state for cards
   shots = 0;
   delete scoreEl.dataset.won;
@@ -2367,6 +2489,7 @@ function updateAutoPlay(now) {
 
 autoPlayEl.addEventListener('click', () => {
   if (autoPlay) { stopAutoPlay(); return; }
+  stopPush();
   autoPlay = true;
   autoPlayState = 'aiming';
   autoPlayEl.classList.add('active');
@@ -2392,6 +2515,7 @@ function animate() {
   resize();
   const dt = Math.min(clock.getDelta(), 1 / 30);
   const now = performance.now();
+  applyJengaPush();
   phys.step(dt); // fixed 1/240 internal step (≤10 substeps) so fast projectiles don't tunnel through
   const camNudge = heldNudge(camHeld, dt);
   if (camNudge) { nudgeOrbit(orbit, camNudge.dTheta, camNudge.dPhi, camNudge.dRadius); updateCamera(); }
@@ -2436,7 +2560,7 @@ function animate() {
   for (const b of barrels) {
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
-    if (!b.down) {
+    if (!b.down && !b.jenga) {   // on Jenga, down means pulled (updateJengaRules)
       // deviation from home orientation, or displaced from home spot
       const qd = Math.abs(
         b.body.quaternion.x * b.homeQ.x + b.body.quaternion.y * b.homeQ.y +
@@ -2447,6 +2571,7 @@ function animate() {
     }
   }
   if (changed) updateHud();
+  updateJengaRules();
   if (camCfg[targetMode].support) barrelSupport.tick(now, barrels);
   updateAutoPlay(now);
 
