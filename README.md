@@ -19,8 +19,9 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag, arrow keys, or the pad bottom-right (hold to keep turning); scroll wheel or the pad's `+`/`−` to zoom. On a Chromebook touchpad, Alt + press and drag works as right-drag |
 | **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire) |
-| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
+| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
+| **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
 | **Reset** | `R` key or the Reset button |
 
 ### On a phone or tablet
@@ -35,6 +36,7 @@ a mobile mode; the desktop layout is unchanged.
 | **Switch weapon / target** | The 💥 and 🎯 buttons at the top open the list as a sheet; tap an entry to pick it, tap outside to close |
 | **Earthquake** | Hold the 🌋 Quake button bottom-left |
 | **Harpoon pull** | Hold the 🪝 Pull button, shown while a harpoon is stuck in a barrel |
+| **Jenga: push a block** | Tap and hold a block; a second finger cancels the push. The 🔫 Shoot button in the top bar switches to the weapons |
 | **Help** | `?` shows the touch controls |
 
 In portrait the camera starts far enough back for wide targets (Fortress, Colosseum, Pyramid, …) to fit
@@ -56,6 +58,8 @@ Tests: `node --test test/*.test.mjs` runs the pure-module tests (no
 backend contract runs in the browser: serve the repo and open
 `test/harness/physics-contract.html` (title becomes `CONTRACT PASS`/`FAIL`).
 `test/harness/barrel-support.html` checks that barrels which lose their support topple (title `SUPPORT PASS`/`FAIL`).
+`test/harness/jenga.html` checks the Jenga push: the tower stands, single blocks slide out, the
+bottom layer sticks and pushing out a whole layer ends the round (title `JENGA PASS`/`FAIL`).
 
 ## Game Content
 
@@ -70,7 +74,8 @@ backend contract runs in the browser: serve the repo and open
 colosseum; step pyramid; tower gate; gate wall; spiral staircase; pole tower; octagon tower;
 stacked crosses; Eiffel-style matchstick truss; bowling pins; cylindrical brick tower; arch, double
 and castle gates; hollow brick box and brick tower; four post-and-beam frame buildings; spiral
-tower.
+tower; Jenga tower of 18 crosswise layers of 3 wooden blocks, where you push blocks out
+instead of shooting (the HUD counts blocks pulled; the round ends when the tower falls).
 
 **Feedback:** score HUD (targets knocked down / total), shot counter, and synthesized
 Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thunder, wind).

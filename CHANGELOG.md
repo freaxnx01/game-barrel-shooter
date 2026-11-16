@@ -13,6 +13,7 @@ All notable changes to this project are documented here, following
 - New targets: four frame buildings, two brick towers, four gates and a Spiral Tower; Spiral Stair rebuilt; target picker grouped (#24)
 - Mobile mode for phones and tablets: weapon and target lists open as sheets, Quake and Pull hold buttons, two-finger drag to orbit and pinch to zoom, a smaller camera pad; desktop layout unchanged (#37)
 - Web app manifest and icons, so "Add to Home Screen" opens the game fullscreen (#37)
+- Jenga tower: hold a block to push it out; the round ends when the tower falls (#34)
 
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
