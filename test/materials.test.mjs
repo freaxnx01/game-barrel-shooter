@@ -19,4 +19,9 @@ test('contactFor_Masonry_SlipperierThanStone', () => {
   assert.deepEqual(contactFor('masonry', 'ball'), contactFor('stone', 'ball'));
   assert.deepEqual(contactFor('masonry', 'heavy'), contactFor('stone', 'heavy'));
 });
-test('CONTACT_PAIRS_HasSeventeenPairs', () => assert.equal(CONTACT_PAIRS.length, 17));
+test('contactFor_Jenga_SlipperyWood', () => {
+  assert.deepEqual(contactFor('jenga', 'jenga'), { friction: 0.06, restitution: 0.0 });
+  assert.deepEqual(contactFor('jenga', 'ground'), { friction: 0.5, restitution: 0.0 });
+  assert.deepEqual(contactFor('ball', 'jenga'), { friction: 0.4, restitution: 0.2 });
+});
+test('CONTACT_PAIRS_HasTwentyTwoPairs', () => assert.equal(CONTACT_PAIRS.length, 22));

@@ -4,7 +4,7 @@
 
 export const DEFAULT_CONTACT = { friction: 0.3, restitution: 0 };
 
-export const MATERIALS = ['ground', 'barrel', 'ball', 'heavy', 'card', 'stone', 'masonry'];
+export const MATERIALS = ['ground', 'barrel', 'ball', 'heavy', 'card', 'stone', 'masonry', 'jenga'];
 
 export const CONTACT_PAIRS = [
   ['heavy', 'ground', { friction: 0.6, restitution: 0.15 }],
@@ -26,6 +26,13 @@ export const CONTACT_PAIRS = [
   ['masonry', 'masonry', { friction: 0.35, restitution: 0.0 }],
   ['masonry', 'ball', { friction: 0.4, restitution: 0.2 }],
   ['masonry', 'heavy', { friction: 0.5, restitution: 0.05 }],
+  // Jenga blocks: slippery wood so an unloaded block slides out under a capped push
+  // while a heavily loaded one sticks (#34)
+  ['jenga', 'jenga', { friction: 0.06, restitution: 0.0 }],
+  ['jenga', 'ground', { friction: 0.5, restitution: 0.0 }],
+  ['jenga', 'ball', { friction: 0.4, restitution: 0.2 }],
+  ['jenga', 'heavy', { friction: 0.5, restitution: 0.05 }],
+  ['jenga', 'barrel', { friction: 0.4, restitution: 0.1 }],
 ];
 
 const lookup = new Map();
