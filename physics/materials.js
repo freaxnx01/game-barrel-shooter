@@ -26,9 +26,9 @@ export const CONTACT_PAIRS = [
   ['masonry', 'masonry', { friction: 0.35, restitution: 0.0 }],
   ['masonry', 'ball', { friction: 0.4, restitution: 0.2 }],
   ['masonry', 'heavy', { friction: 0.5, restitution: 0.05 }],
-  // Jenga blocks: slippery wood so an unloaded block slides out under a capped push
-  // while a heavily loaded one sticks (#34)
-  ['jenga', 'jenga', { friction: 0.06, restitution: 0.0 }],
+  // Jenga blocks: slippery wood so a held block slides out under the capped push; the
+  // bottom layer sticks on the grippier ground. Tuned with test/harness/jenga.html (#34)
+  ['jenga', 'jenga', { friction: 0.03, restitution: 0.0 }],
   ['jenga', 'ground', { friction: 0.5, restitution: 0.0 }],
   ['jenga', 'ball', { friction: 0.4, restitution: 0.2 }],
   ['jenga', 'heavy', { friction: 0.5, restitution: 0.05 }],
