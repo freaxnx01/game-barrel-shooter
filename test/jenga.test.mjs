@@ -54,7 +54,7 @@ test('isPulled_Threshold', () => {
   assert.equal(isPulled(home, { x: -(0.8 * 3.0 + 0.01), z: 0 }, ax), true);
   assert.equal(isPulled(home, { x: 0, z: 5 }, ax), false);
 });
-const blk = (layer, dy = 0, extra = {}) => ({ layer, homeY: layer * 0.6 + 0.3, y: layer * 0.6 + 0.3 + dy, hy: 0.3, pulled: false, ...extra });
+const blk = (layer, dy = 0, extra = {}) => ({ layer, homeX: 0, homeZ: 0, x: 0, z: 0, homeY: layer * 0.6 + 0.3, y: layer * 0.6 + 0.3 + dy, hy: 0.3, pulled: false, ...extra });
 test('hasFallen_IntactTower_False', () => {
   const bs = []; for (let k = 0; k < 18; k++) for (let i = 0; i < 3; i++) bs.push(blk(k));
   assert.equal(hasFallen(bs, -1), false);
@@ -72,4 +72,17 @@ test('hasFallen_PulledBlockOnGround_False', () => {
 test('hasFallen_TopLayerSinksHalfBlock_True', () => {
   assert.equal(hasFallen([blk(0), blk(17, -0.31), blk(17, -0.31), blk(17, -0.31)], -1), true);
   assert.equal(hasFallen([blk(0), blk(17, -0.29), blk(17, -0.29), blk(17, -0.29)], -1), false);
+});
+// Pushing the last block of a layer drags the whole tower above it along (measured in
+// the game, #34): the top layer slides off sideways before it sinks.
+test('hasFallen_TopLayerDriftsHalfABlockLength_True', () => {
+  const far = { x: 1.6 }, near = { x: 1.4 };
+  assert.equal(hasFallen([blk(0), blk(17, -0.1, far), blk(17, -0.1, far), blk(17, -0.1, far)], -1), true);
+  assert.equal(hasFallen([blk(0), blk(17, -0.1, near), blk(17, -0.1, near), blk(17, -0.1, near)], -1), false);
+});
+test('hasFallen_OneTopBlockKnockedSideways_False', () => {
+  assert.equal(hasFallen([blk(0), blk(17, 0, { z: 2 }), blk(17), blk(17)], -1), false);
+});
+test('hasFallen_ActiveTopBlockPushedOut_False', () => {
+  assert.equal(hasFallen([blk(0), blk(17, 0, { x: 2.3 }), blk(17, 0, { x: 0.01 }), blk(17)], 1), false);
 });

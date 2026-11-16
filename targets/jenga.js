@@ -68,19 +68,39 @@ export function isPulled(home, pos, axis) {
   return Math.abs(dotXZ(pos.x - home.x, pos.z - home.z, axis)) > JENGA.pulledFraction * JENGA.length;
 }
 
-// blocks: [{ layer, homeY, y, hy, pulled }]; activeIndex = the block being pushed or -1.
+// blocks: [{ layer, homeX, homeY, homeZ, x, y, z, hy, pulled }]; activeIndex = the block
+// being pushed or -1.
 export function hasFallen(blocks, activeIndex) {
-  return foreignBlockOnGround(blocks, activeIndex) || topLayerSank(blocks);
+  return foreignBlockOnGround(blocks, activeIndex) || topLayerSank(blocks) || topLayerDrifted(blocks, activeIndex);
 }
 
 function foreignBlockOnGround(blocks, activeIndex) {
   return blocks.some((b, i) => i !== activeIndex && !b.pulled && b.layer >= 1 && b.y - b.hy < JENGA.groundEps);
 }
 
-function topLayerSank(blocks) {
+function topLayerOf(blocks) {
   const top = Math.max(...blocks.map(b => b.layer));
-  const tops = blocks.filter(b => b.layer === top && !b.pulled);
+  return blocks.filter(b => b.layer === top && !b.pulled);
+}
+
+function topLayerSank(blocks) {
+  const tops = topLayerOf(blocks);
   if (tops.length === 0) return false;
   const mean = (key) => tops.reduce((s, b) => s + b[key], 0) / tops.length;
   return mean('homeY') - mean('y') > JENGA.height / 2;
+}
+
+// Pushing the last block of a layer drags the tower above it along: the top layer slides
+// off sideways before it sinks, and its blocks would count as pulled. Half a block length
+// of drift puts the upper tower's centre over the edge of the layer below. The median
+// ignores one top block knocked or pushed on its own.
+function topLayerDrifted(blocks, activeIndex) {
+  const tops = topLayerOf(blocks).filter(b => b !== blocks[activeIndex]);
+  if (tops.length === 0) return false;
+  return median(tops.map(b => Math.hypot(b.x - b.homeX, b.z - b.homeZ))) > JENGA.length / 2;
+}
+
+function median(values) {
+  const v = [...values].sort((a, b) => a - b), m = v.length >> 1;
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
