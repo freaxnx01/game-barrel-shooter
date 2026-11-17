@@ -178,6 +178,7 @@
     <button data-type="bowlingball"><span class="dot" style="background:#232a4d"></span>Bowling <span style="opacity:0.5">5</span></button>
     <button data-type="cannonball"><span class="dot" style="background:#585c63"></span>Cannonball <span style="opacity:0.5">2</span></button>
     <button data-type="medball"><span class="dot" style="background:#7a2e2e"></span>Medicine ball <span style="opacity:0.5">E</span></button>
+    <button data-type="football"><span class="dot" style="background:#7a4524;width:18px;height:11px;border-radius:50%;border:1px solid #f5efe4;box-sizing:border-box;transform:rotate(-25deg)"></span>Football <span style="opacity:0.5">F</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Explosives</div>
@@ -308,6 +309,7 @@ import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen 
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
 import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
+import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -1292,6 +1294,35 @@ function makeSoccerballTexture() {
   return tex;
 }
 
+// American football (#45): brown leather, four panel seams, white laces on one seam and a white
+// stripe near each tip. The sphere's poles are the tips (long axis +Y), so U runs around the ball.
+function makeFootballTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#7a4524';
+  g.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 1400; i++) {   // pebbled leather
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,220,180,0.06)';
+    g.fillRect(Math.random() * 512, Math.random() * 256, 2, 2);
+  }
+  g.strokeStyle = 'rgba(30,14,6,0.8)'; g.lineWidth = 3;
+  for (const x of [0, 128, 256, 384]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 256); g.stroke(); }
+  g.fillStyle = '#f2ede2';
+  for (const y of [40, 206]) g.fillRect(0, y, 512, 10);   // stripes near the tips
+  g.fillRect(124, 88, 8, 80);                             // lace seam
+  for (let y = 92; y <= 164; y += 9) g.fillRect(112, y, 32, 4);   // cross laces
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const footballGeo = new THREE.SphereGeometry(1, 32, 20);
+footballGeo.scale(FOOTBALL.radius, FOOTBALL.halfLength, FOOTBALL.radius);
+const footballMatl = new THREE.MeshStandardMaterial({ map: makeFootballTexture(), roughness: 0.75 });
+function makeFootballMesh() {
+  return new THREE.Mesh(footballGeo, footballMatl);
+}
+
 function makeTireMesh() {
   const g = new THREE.Group();
   const rubber = new THREE.MeshStandardMaterial({ color: '#1a1a1d', roughness: 0.92 });
@@ -1379,6 +1410,7 @@ function shootBall(dir, power) {
     crt:         { mass: 9,   r: 0.4 },
     harpoon:     { mass: 3,   r: SPEAR_R },
     sniper:      { mass: SNIPER.mass, r: SNIPER.radius },
+    football:    { mass: FOOTBALL.mass, r: FOOTBALL.radius },
   }[type];
   let shapeSpec;
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
@@ -1389,6 +1421,8 @@ function shootBall(dir, power) {
     shapeSpec = { kind: 'box', halfExtents: [0.12, 0.34, 0.12] };
   } else if (type === 'crt') {
     shapeSpec = { kind: 'box', halfExtents: [0.34, 0.28, 0.3] };
+  } else if (type === 'football') {
+    shapeSpec = { kind: 'spheroid', halfLength: FOOTBALL.halfLength, radius: FOOTBALL.radius };
   } else {
     shapeSpec = { kind: 'sphere', radius: cfg.r };
   }
@@ -1396,7 +1430,7 @@ function shootBall(dir, power) {
   const orientProjectiles = type === 'spear' || type === 'f16' || type === 'harpoon';
   const body = phys.addBody({
     mass: cfg.mass,
-    material: (type === 'basketball' || type === 'soccerball' || type === 'tennisball') ? 'ball' : 'heavy',
+    material: (type === 'basketball' || type === 'soccerball' || type === 'tennisball' || type === 'football') ? 'ball' : 'heavy',
     shape: shapeSpec,
     position: { x: start.x, y: start.y, z: start.z },
     fast: fastProjectiles.has(type),
@@ -1423,11 +1457,18 @@ function shootBall(dir, power) {
     speed = sniperSpeed(power);   // 160-240 m/s tracer, no gravity until first contact (#30)
   } else if (type === 'harpoon') {
     speed = 30 + power * 12;
+  } else if (type === 'football') {
+    speed = footballSpeed(power);
   }
   phys.setVelocity(body, vdir.x * speed, vdir.y * speed, vdir.z * speed);
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dir.x, dir.y, dir.z));
     phys.setQuaternion(body, q.x, q.y, q.z, q.w);
+  } else if (type === 'football') {
+    // spiral pass: nose along the aim, spinning about the long axis (#45)
+    const { quaternion: q, angularVelocity: w } = footballLaunch(dir, power);
+    phys.setQuaternion(body, q.x, q.y, q.z, q.w);
+    phys.setAngularVelocity(body, w.x, w.y, w.z);
   } else if (type === 'hammer') {
     // tumble end-over-end about a horizontal axis perpendicular to flight
     const ax = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
@@ -1591,6 +1632,8 @@ function shootBall(dir, power) {
       const barb = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 6), tipMat);
       barb.position.set(s * 0.08, 0.6, 0); barb.rotation.z = s * 0.9; mesh.add(barb);
     }
+  } else if (type === 'football') {
+    mesh = makeFootballMesh();
   } else if (type === 'sniper') {
     // tracer: bright capsule core + additive streak behind it; +Y is the flight direction (like the spear)
     mesh = new THREE.Group();
@@ -1621,6 +1664,7 @@ function shootBall(dir, power) {
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
     if (type === 'harpoon' && !rec.hit) harpoonStick(rec, other);
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
+    if (type === 'football') rec.hit = true;   // the first touch ends the spiral; from then on it hops freely
     if (Math.abs(impactSpeed) < 1.5) return;
     if (!other) return;
     if (other.material === 'barrel') (other.userData && other.userData.wood ? playWoodKnock : playClank)(Math.abs(impactSpeed));
@@ -2506,6 +2550,7 @@ addEventListener('keydown', (e) => {
   if (k === 'x') setAmmo('laser');
   if (k === 'v') setAmmo('disruptor');
   if (k === 'q') setAmmo('sniper');
+  if (k === 'f') setAmmo('football');
   if (e.key === ' ' && harpoonLink) { pulling = true; e.preventDefault(); }  // hold Space = elephant pull
   if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
 });
@@ -2843,6 +2888,11 @@ function animate() {
       st.scale.set(1, Math.max(len, 0.001), 1);
       st.position.y = -(0.25 + len / 2);
       st.material.opacity = b.hit ? Math.max(0, 0.55 * (1 - (now - b.hitAt) / 120)) : 0.55;
+    }
+    if (b.type === 'football' && !b.hit) {
+      // spiral pass: a light stabilising turn keeps the nose along the flight path (#45)
+      const w = flightAngularVelocity(longAxis(b.body.quaternion), phys.getAngularVelocity(b.body), phys.getVelocity(b.body));
+      phys.setAngularVelocity(b.body, w.x, w.y, w.z);
     }
     // stretch chain between anchor and wrecking ball
     if (b.chainMesh) {
