@@ -28,6 +28,9 @@ export function runContract(phys) {
     zeroGravityFliesStraight,
     setGravityFactorRestoresFall,
     fastSphereDoesNotTunnelThinWall,
+    spheroidLiesOnItsSide,
+    spheroidOnItsTipFallsOver,
+    spheroidHonoursMass,
   ];
   for (const c of cases) {
     try {
@@ -408,6 +411,48 @@ function fastSphereDoesNotTunnelThinWall(phys) {
     cleanup(phys, [b, wall]);
   }
   return { name: 'fastSphereDoesNotTunnelThinWall', pass: stopped === n, detail: `stopped ${stopped}/${n}` };
+}
+
+// 'spheroid' (#45): a convex hull of a prolate spheroid, long axis along local Y.
+const SPHEROID = { kind: 'spheroid', halfLength: 0.34, radius: 0.2 };
+const QUARTER_X = { x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 };   // long axis horizontal
+
+function spheroid(phys, y, quaternion) {
+  return phys.addBody({ shape: SPHEROID, mass: 0.4, material: 'ball', position: { x: 0, y, z: 0 }, quaternion });
+}
+
+function upTilt(q) {
+  return Math.acos(Math.min(1, Math.abs(1 - 2 * (q.x * q.x + q.z * q.z)))) * 180 / Math.PI;
+}
+
+function spheroidLiesOnItsSide(phys) {
+  const g = ground(phys);
+  const b = spheroid(phys, 1, QUARTER_X);
+  step(phys, 4);
+  const y = b.position.y, tilt = upTilt(b.quaternion);
+  cleanup(phys, [g, b]);
+  const pass = Math.abs(y - SPHEROID.radius) < 0.02 && tilt > 80;
+  return { name: 'spheroidLiesOnItsSide', pass, detail: `y=${y.toFixed(4)} expected ~${SPHEROID.radius}, axis ${tilt.toFixed(1)}° from vertical` };
+}
+
+// Stood on its tip with a 3° lean, an egg falls over; a sphere or a box would not tell.
+function spheroidOnItsTipFallsOver(phys) {
+  const g = ground(phys);
+  const lean = 3 * Math.PI / 180;
+  const b = spheroid(phys, SPHEROID.halfLength + 0.01, { x: Math.sin(lean / 2), y: 0, z: 0, w: Math.cos(lean / 2) });
+  step(phys, 4);
+  const y = b.position.y, tilt = upTilt(b.quaternion);
+  cleanup(phys, [g, b]);
+  const pass = y < SPHEROID.radius + 0.03 && tilt > 80;
+  return { name: 'spheroidOnItsTipFallsOver', pass, detail: `y=${y.toFixed(4)} axis ${tilt.toFixed(1)}° from vertical` };
+}
+
+function spheroidHonoursMass(phys) {
+  const b = spheroid(phys, 50);
+  phys.applyImpulse(b, 0.4, 0, 0);
+  const vx = phys.getVelocity(b).x;
+  cleanup(phys, [b]);
+  return { name: 'spheroidHonoursMass', pass: Math.abs(vx - 1) < 0.01, detail: `impulse 0.4 → vx=${vx.toFixed(4)} expected 1 (mass 0.4)` };
 }
 
 function ground(phys) {
