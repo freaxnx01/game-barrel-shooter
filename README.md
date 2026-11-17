@@ -60,6 +60,8 @@ backend contract runs in the browser: serve the repo and open
 `test/harness/barrel-support.html` checks that barrels which lose their support topple (title `SUPPORT PASS`/`FAIL`).
 `test/harness/jenga.html` checks the Jenga push: the tower stands, single blocks slide out, the
 bottom layer sticks and pushing out a whole layer ends the round (title `JENGA PASS`/`FAIL`).
+`test/harness/magneto-hum.html` renders the Magneto hum with an OfflineAudioContext and checks it is
+audible, does not clip, rises with held pieces and fades out within 0.2 s (title `HUM PASS`/`FAIL`).
 
 ## Game Content
 
