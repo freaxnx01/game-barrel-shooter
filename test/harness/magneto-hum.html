@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Magneto Hum</title>
+<style>
+  body { background:#1a1611; color:#f5efe4; font-family: monospace; padding: 16px; }
+  pre { white-space: pre-wrap; }
+  .pass { color: #6dd96d; }
+  .fail { color: #e0483a; }
+</style>
+</head>
+<body>
+<!-- Magneto hum acceptance harness (#44).
+     Renders the hum with an OfflineAudioContext: start at 0 s with nothing held, 12 pieces
+     held from 0.6 s, stop at 1.2 s. Checks it is audible, does not clip, gets louder with
+     held pieces and fades out within 0.2 s. Title becomes HUM PASS/FAIL. -->
+<pre id="out">running…</pre>
+<script type="module">
+import { createMagnetoHum, HUM } from '../../audio/magneto-hum.js';
+
+const RATE = 44100, HOLD_AT = 0.6, STOP_AT = 1.2, LENGTH = 1.6;
+const lines = [];
+let allPass = true;
+function row(pass, name, detail) {
+  if (!pass) allPass = false;
+  lines.push(`<span class="${pass ? 'pass' : 'fail'}">[${pass ? 'PASS' : 'FAIL'}] ${name}: ${detail}</span>`);
+}
+
+function rms(d, from, to) {
+  let sum = 0;
+  const a = Math.floor(from * RATE), b = Math.floor(to * RATE);
+  for (let i = a; i < b; i++) sum += d[i] * d[i];
+  return Math.sqrt(sum / (b - a));
+}
+function peak(d) {
+  let p = 0;
+  for (let i = 0; i < d.length; i++) p = Math.max(p, Math.abs(d[i]));
+  return p;
+}
+
+async function render() {
+  const ac = new OfflineAudioContext(1, RATE * LENGTH, RATE);
+  const hum = createMagnetoHum(ac, ac.destination);
+  ac.suspend(HOLD_AT).then(() => { hum.setHeld(HUM.fullAt); ac.resume(); });
+  ac.suspend(STOP_AT).then(() => { hum.stop(); ac.resume(); });
+  return (await ac.startRendering()).getChannelData(0);
+}
+
+const d = await render();
+const idle = rms(d, 0.4, HOLD_AT), held = rms(d, 1.0, STOP_AT), tail = rms(d, STOP_AT + 0.2, STOP_AT + 0.3);
+const p = peak(d);
+row(idle > 0.01, 'audible', `rms with nothing held ${idle.toFixed(4)}`);
+row(p < 1, 'no clipping', `peak ${p.toFixed(3)}`);
+row(held > idle * 1.5, 'louder with held pieces', `rms ${idle.toFixed(4)} → ${held.toFixed(4)}`);
+row(tail < held * 0.02, 'fades out within 0.2 s', `rms 0.2 s after stop ${tail.toFixed(5)} (held ${held.toFixed(4)})`);
+const stats = { idleRms: idle, heldRms: held, tailRms: tail, peak: p };
+window.__humStats = stats;
+document.getElementById('out').innerHTML = lines.join('\n');
+document.title = allPass ? 'HUM PASS' : 'HUM FAIL';
+</script>
+</body>
+</html>

@@ -306,6 +306,8 @@ import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, 
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
+import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
+import { createMagnetoHum } from './audio/magneto-hum.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -476,6 +478,7 @@ function createWoodBarrel(x, y, z) {
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.6,
     userData: { wood: true },
   });
+  addImpactSound(body, 'wood');
 
   const group = new THREE.Group();
   const staveMatl = new THREE.MeshStandardMaterial({ map: makeWoodTexture(), roughness: 0.85, metalness: 0.05 });
@@ -500,6 +503,7 @@ function createBarrel(x, y, z, colorIdx) {
     position: { x, y, z },
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.6,
   });
+  addImpactSound(body, 'metal');
 
   const group = new THREE.Group();
   const color = drumColors[colorIdx % drumColors.length];
@@ -588,6 +592,7 @@ function addCard(shapeHalf, geo, x, y, z, rotZ) {
     linearDamping: 0.2, angularDamping: 0.4,
     sleepSpeedLimit: 0.25, sleepTimeLimit: 0.4,
   });
+  addImpactSound(body, 'card');
   const mesh = new THREE.Mesh(geo, cardFaceMatl);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
@@ -652,6 +657,7 @@ function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
     sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
     userData: { specMass: mass },
   });
+  addImpactSound(body, 'stone');
   const mesh = new THREE.Mesh(unitBoxGeo, matl3);
   mesh.scale.set(hx * 2, hy * 2, hz * 2);
   mesh.castShadow = mesh.receiveShadow = true;
@@ -852,6 +858,7 @@ function setupJenga() {
       linearDamping: 0.15, angularDamping: 0.3,
       sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
     });
+    addImpactSound(body, 'wood');
     const mesh = new THREE.Mesh(unitBoxGeo, jengaMatls[(i * 7 + b.layer) % jengaMatls.length]);
     mesh.scale.set(b.hx * 2, b.hy * 2, b.hz * 2);
     mesh.castShadow = mesh.receiveShadow = true;
@@ -923,8 +930,8 @@ function setupCrosses() {
 }
 
 // ---------- More buildings: Eiffel (matchsticks), bowling pins, cylindrical tower ----------
-// generic asleep-until-hit body with a custom shape + pre-sized mesh
-function addTargetBody(shapeSpec, mesh, mass, pos, quat) {
+// generic asleep-until-hit body with a custom shape + pre-sized mesh; sound is its impact kind
+function addTargetBody(shapeSpec, mesh, mass, pos, quat, sound) {
   const body = phys.addBody({
     shape: shapeSpec,
     mass,
@@ -935,6 +942,7 @@ function addTargetBody(shapeSpec, mesh, mass, pos, quat) {
     linearDamping: 0.15, angularDamping: 0.3, sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
     userData: { specMass: mass },
   });
+  addImpactSound(body, sound);
   mesh.position.copy(body.position);
   mesh.quaternion.copy(body.quaternion);
   mesh.castShadow = mesh.receiveShadow = true;
@@ -956,7 +964,7 @@ function addStick(p1, p2, thick, mass) {
     new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize());
   const mesh = new THREE.Mesh(unitBoxGeo, matchMatl);
   mesh.scale.set(thick, len, thick);
-  addTargetBody({ kind: 'box', halfExtents: [thick / 2, len / 2, thick / 2] }, mesh, mass, mid, { x: q.x, y: q.y, z: q.z, w: q.w });
+  addTargetBody({ kind: 'box', halfExtents: [thick / 2, len / 2, thick / 2] }, mesh, mass, mid, { x: q.x, y: q.y, z: q.z, w: q.w }, 'wood');
 }
 
 function setupEiffel() {
@@ -1031,7 +1039,7 @@ function setupBowling() {
       const z = zC - r * rowGap;      // apex (head pin) toward the camera
       const mesh = makePin();
       mesh.scale.setScalar(S);
-      addTargetBody({ kind: 'cylinder', radiusTop: 0.14 * S, radiusBottom: 0.14 * S, height: PIN_H * S, segments: 12 }, mesh, 1.8, [x * S, PIN_H / 2 * S, z * S], null);
+      addTargetBody({ kind: 'cylinder', radiusTop: 0.14 * S, radiusBottom: 0.14 * S, height: PIN_H * S, segments: 12 }, mesh, 1.8, [x * S, PIN_H / 2 * S, z * S], null, 'pin');
     }
   }
 }
@@ -1091,6 +1099,7 @@ const targetEl = document.getElementById('target');
 function clearTargets() {
   for (const b of barrels) { phys.removeBody(b.body); scene.remove(b.mesh); }
   barrels.length = 0;
+  impactThrottle.reset();
   for (const s of paintSplats) scene.remove(s);
   paintSplats.length = 0;
 }
@@ -1997,7 +2006,7 @@ function playShoot(power) {
   src.connect(f).connect(g).connect(ac.destination);
   src.start(t);
 }
-function playClank(impact) {
+function playClank(impact, out = ctx().destination) {
   const ac = ctx(), t = ac.currentTime;
   const vol = Math.min(impact / 14, 1) * 0.5;
   // metallic: a few inharmonic partials, fast decay
@@ -2009,7 +2018,7 @@ function playClank(impact) {
     const g = ac.createGain();
     g.gain.setValueAtTime(vol * amp, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.28 + Math.random() * 0.15);
-    o.connect(g).connect(ac.destination);
+    o.connect(g).connect(out);
     o.start(t); o.stop(t + 0.5);
   }
   // impact thud
@@ -2019,10 +2028,10 @@ function playClank(impact) {
   const g = ac.createGain();
   g.gain.setValueAtTime(vol * 0.8, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-  o.connect(g).connect(ac.destination);
+  o.connect(g).connect(out);
   o.start(t); o.stop(t + 0.2);
 }
-function playWoodKnock(impact) {
+function playWoodKnock(impact, out = ctx().destination) {
   const ac = ctx(), t = ac.currentTime;
   const vol = Math.min(impact / 12, 1) * 0.55;
   if (vol < 0.02) return;
@@ -2036,7 +2045,7 @@ function playWoodKnock(impact) {
     const g = ac.createGain();
     g.gain.setValueAtTime(vol * amp, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dec);
-    o.connect(g).connect(ac.destination);
+    o.connect(g).connect(out);
     o.start(t); o.stop(t + dec + 0.05);
   }
   // dry surface click (no metallic ring)
@@ -2049,7 +2058,7 @@ function playWoodKnock(impact) {
   const g = ac.createGain();
   g.gain.setValueAtTime(vol * 0.6, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(ac.destination);
+  src.connect(f).connect(g).connect(out);
   src.start(t);
 }
 function playBounce(impact) {
@@ -2093,6 +2102,118 @@ function startRumble() {
       setTimeout(() => { try { src.stop(); } catch (e) {} }, 120);
     },
   };
+}
+// a decaying noise burst through one filter, the building block of the new impact voices
+function noiseHit(ac, out, t, dur, type, freq, q, level) {
+  const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * dur), ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = ac.createGain(); g.gain.value = level;
+  src.connect(f).connect(g).connect(out);
+  src.start(t);
+}
+function playStoneThud(out) {
+  const ac = ctx(), t = ac.currentTime;
+  // dull, heavy: a sinking low thump, a short rumble and a little grit, no ring
+  const o = ac.createOscillator();
+  o.type = 'sine'; o.frequency.setValueAtTime(70 + Math.random() * 20, t);
+  o.frequency.exponentialRampToValueAtTime(32, t + 0.22);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.7, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  o.connect(g).connect(out);
+  o.start(t); o.stop(t + 0.3);
+  noiseHit(ac, out, t, 0.32, 'lowpass', 260, 0.7, 0.9);
+  noiseHit(ac, out, t, 0.05, 'bandpass', 1400, 0.8, 0.25);
+}
+function playPinClack(out) {
+  const ac = ctx(), t = ac.currentTime;
+  // hollow maple pin: a hard click and a few short, bright wooden resonances
+  const base = 380 + Math.random() * 60;
+  for (const [ratio, amp, dec] of [[1, 0.6, 0.12], [2.4, 0.45, 0.07], [4.1, 0.3, 0.04]]) {
+    const o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = base * ratio;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(amp, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dec);
+    o.connect(g).connect(out);
+    o.start(t); o.stop(t + dec + 0.03);
+  }
+  noiseHit(ac, out, t, 0.02, 'bandpass', 3000, 1.2, 0.8);
+}
+function playCardRustle(out) {
+  const ac = ctx(), t = ac.currentTime;
+  // soft flick: two or three quick, airy noise brushes
+  const n = 2 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < n; i++) {
+    noiseHit(ac, out, t + i * 0.035, 0.06, 'bandpass', 3500 + Math.random() * 2000, 0.9, 0.45 - i * 0.1);
+  }
+}
+
+// ---------- Target impact sounds (#44) ----------
+// Every target body sounds when it hits the ground or another target. audio/impact-throttle.js
+// keeps it from turning into noise: a threshold per kind, a cooldown per body, at most 8 voices.
+const impactThrottle = createImpactThrottle();
+const PROJECTILE_MATERIALS = new Set(['ball', 'heavy']);   // projectiles play their own hit sound
+const TARGET_LEVEL = 0.8;                                    // falling pieces a bit under a direct hit
+const IMPACT_VOICES = {
+  metal: (out) => playClank(14, out),       // full scale; the voice gain carries the volume
+  wood: (out) => playWoodKnock(12, out),
+  stone: playStoneThud,
+  pin: playPinClack,
+  card: playCardRustle,
+};
+const impactGains = new Map();   // voice id → its gain node, so the throttle can cut it
+const devAudio = new URLSearchParams(location.search).get('dev') === '1' ? (window.__bsAudio = { impacts: [], hum: [] }) : null;
+
+function addImpactSound(body, kind) {
+  phys.onCollide(body, (other, impactSpeed) => targetImpact(body, kind, other, impactSpeed));
+}
+function targetImpact(body, kind, other, speed) {
+  if (!other || PROJECTILE_MATERIALS.has(other.material)) return;
+  const now = performance.now();
+  const voice = impactThrottle.admit(body, kind, speed, now, other.mass > 0 ? other : undefined);
+  if (!voice) return;
+  if (voice.evict) cutImpactVoice(voice.evict);
+  playImpactVoice(voice, kind);
+  devAudio?.impacts.push({ t: now, id: voice.id, kind, body: body.raw.id, speed, volume: voice.volume, evict: voice.evict, active: impactThrottle.activeCount(now) });
+}
+function playImpactVoice(voice, kind) {
+  const ac = ctx();
+  const g = ac.createGain();
+  g.gain.value = voice.volume * TARGET_LEVEL;
+  g.connect(ac.destination);
+  IMPACT_VOICES[kind](g);
+  impactGains.set(voice.id, g);
+  setTimeout(() => { impactGains.delete(voice.id); g.disconnect(); }, IMPACT.kinds[kind].voiceMs + 150);
+}
+function cutImpactVoice(id) {
+  const g = impactGains.get(id);
+  if (!g) return;
+  g.gain.setTargetAtTime(0, ctx().currentTime, 0.01);
+}
+
+// ---------- Magneto hum (#44) ----------
+let magnetoHum = null, humHeld = -1;
+function updateMagnetoHum(held) {
+  if (magnetoActive && !magnetoHum) {
+    const ac = ctx();
+    magnetoHum = createMagnetoHum(ac, ac.destination);
+    humHeld = -1;
+    devAudio?.hum.push({ t: performance.now(), event: 'start' });
+  }
+  if (!magnetoActive && magnetoHum) {
+    magnetoHum.stop();
+    magnetoHum = null;
+    devAudio?.hum.push({ t: performance.now(), event: 'stop' });
+  }
+  if (!magnetoHum || held === humHeld) return;
+  humHeld = held;
+  magnetoHum.setHeld(held);
+  devAudio?.hum.push({ t: performance.now(), event: 'held', held });
 }
 
 // ---------- Camera orbit (right-drag) ----------
@@ -2499,6 +2620,7 @@ autoPlayEl.addEventListener('click', () => {
 const clock = new THREE.Clock();
 let shake = 0;
 let magnetoActive = false;
+const MAGNETO_HOLD_R = 3;   // a piece this close to the aim point counts as held (hum level)
 let quakeActive = false, quakeStart = 0;
 
 function resize() {
@@ -2576,6 +2698,7 @@ function animate() {
   updateAutoPlay(now);
 
   // Magneto: while held, lift every piece and gather it toward the aim point ("led by thoughts")
+  let magnetoHeld = 0;
   if (magnetoActive) {
     raycaster.setFromCamera(mouseNDC, camera);
     const r = raycaster.ray;
@@ -2586,6 +2709,7 @@ function animate() {
       phys.wake(b.body);
       let toPx = target.x - b.body.position.x, toPy = target.y - b.body.position.y, toPz = target.z - b.body.position.z;
       const d = Math.max(Math.hypot(toPx, toPy, toPz), 0.3); toPx /= d; toPy /= d; toPz /= d;
+      if (d < MAGNETO_HOLD_R) magnetoHeld++;
       const F = Math.min(d, 6) * 16;
       const m = b.body.mass || 1;
       phys.applyForce(b.body, toPx * F * m, toPy * F * m + 9.82 * m, toPz * F * m);
@@ -2593,6 +2717,7 @@ function animate() {
       phys.setVelocity(b.body, v.x * 0.9, v.y * 0.9, v.z * 0.9);
     }
   }
+  updateMagnetoHum(magnetoHeld);
 
   // Earthquake while Shift held: rattle every piece; intensity builds toward the middle of the shake
   if (quakeActive) {
