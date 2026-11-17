@@ -17,6 +17,7 @@ All notable changes to this project are documented here, following
 - Falling targets make sounds when they hit the ground or each other: oil barrels clank, wooden barrels, Jenga and the Eiffel truss knock, stone buildings thud, bowling pins clack and cards rustle; louder for harder hits, at most 8 at once, and silent while a fresh target settles (#44)
 - Magneto hums while held: an electric mains hum with a pulsing, crackling buzz that grows louder and higher the more pieces it holds, and fades out on release (#44)
 - American football (key F): a spiral pass that flies nose-first, then hops off in unpredictable directions; light enough to tip single barrels rather than the whole pyramid (#45)
+- Reload button: "⟳ Reload" in the mobile "?" panel and a small ⟳ next to the version in the footer, so the fullscreen home-screen app can be reloaded and picks up a new version right away (#46)
 
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
