@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Aim** | Move the mouse — the projectile fires toward the cursor |
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag, arrow keys, or the pad bottom-right (hold to keep turning); scroll wheel or the pad's `+`/`−` to zoom. On a Chromebook touchpad, Alt + press and drag works as right-drag |
-| **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire) |
+| **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football) |
 | **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
 | **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
@@ -62,11 +62,13 @@ backend contract runs in the browser: serve the repo and open
 bottom layer sticks and pushing out a whole layer ends the round (title `JENGA PASS`/`FAIL`).
 `test/harness/magneto-hum.html` renders the Magneto hum with an OfflineAudioContext and checks it is
 audible, does not clip, rises with held pieces and fades out within 0.2 s (title `HUM PASS`/`FAIL`).
+`test/harness/football-flight.html` checks the American football: nose along the flight path, spin,
+irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
 
 ## Game Content
 
 **Ammo (grouped in the bottom-left picker):**
-- *Balls* — basketball, soccerball, tennis ball, bowling ball, cannonball
+- *Balls* — basketball, soccerball, tennis ball, bowling ball, cannonball, American football (a light 0.4 kg spiral pass that flies nose-first and hops off unpredictably when it lands; it tips single barrels rather than clearing the pyramid)
 - *Explosives* — bomb (explodes on contact), grenade (timed fuse), paintball (splats)
 - *Heavy & melee* — wrecking ball (swings on a chain), hammer (tumbles end-over-end), spear (flies point-first), tractor tire (rolls into the target, slows, and tips over)
 - *Launchers* — catapult (high lobbed rock), slingshot (fast pellet), mini F-16 (flies nose-first)
