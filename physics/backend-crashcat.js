@@ -4,6 +4,7 @@
 // returned handle.
 
 import { contactFor, DEFAULT_CONTACT } from './materials.js';
+import { spheroidPoints } from './spheroid.js';
 
 // Half-extent of the ground box: large enough to act like an infinite plane.
 const GROUND_HALF = 1000;
@@ -36,6 +37,8 @@ export function createCrashcatBackend(cc) {
     if (spec.kind === 'box') return cc.box.create({ halfExtents: spec.halfExtents });
     if (spec.kind === 'sphere') return cc.sphere.create({ radius: spec.radius });
     if (spec.kind === 'cylinder') return cc.cylinder.create({ halfHeight: spec.height / 2, radius: spec.radiusTop });
+    // prolate spheroid (football), long axis along local Y: a convex hull, so it rolls and hops like an egg (#45)
+    if (spec.kind === 'spheroid') return cc.convexHull.create({ positions: spheroidPoints(spec.halfLength, spec.radius) });
     if (spec.kind === 'ground') return cc.box.create({ halfExtents: [GROUND_HALF, 0.5, GROUND_HALF] });
     if (spec.kind === 'none') return cc.emptyShape.create();
     throw new Error('unknown shape kind: ' + spec.kind);
