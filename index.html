@@ -88,7 +88,7 @@
   #cam-pad button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
 
   /* ---------- Mobile mode (#37): small or touch screens only ---------- */
-  #mob-bar, #act-bar, #sheet-backdrop, .hint .hint-touch { display: none; }
+  #mob-bar, #act-bar, #sheet-backdrop, .hint .hint-touch, .hint .hint-reload { display: none; }
   @media (max-width: 900px), (pointer: coarse) {
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #c { touch-action: none; }
@@ -113,6 +113,12 @@
     .hint.show { display: block; }
     .hint .hint-desk { display: none; }
     .hint .hint-touch { display: inline; }
+    /* #46: the fullscreen home-screen app has no browser bar to reload from */
+    .hint .hint-reload {
+      display: block; margin-top: 8px; padding: 7px 12px; pointer-events: auto; touch-action: manipulation; cursor: pointer;
+      font: inherit; font-size: 13px; letter-spacing: 0; color: #f5efe4; background: rgba(26,22,17,0.55);
+      border: 1px solid rgba(245,239,228,0.3); border-radius: 6px;
+    }
 
     #act-bar { display: flex; gap: 8px; position: fixed; left: calc(12px + var(--sa-l)); bottom: calc(46px + var(--sa-b)); user-select: none; -webkit-user-select: none; touch-action: none; }
     #act-bar button {
@@ -213,7 +219,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
   <button id="mob-weapon" aria-controls="ammo">💥 <span id="mob-weapon-name">Basketball</span></button>
@@ -2949,6 +2955,7 @@ animate();
 
 </script>
 <nav id="game-nav" aria-label="Game navigation" style="position:fixed;right:calc(10px + var(--sa-r));bottom:calc(8px + var(--sa-b));z-index:2147483647;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
+  <button id="reload-btn" type="button" title="Reload" aria-label="Reload" onclick="location.reload()" style="background:none;border:0;padding:0;margin:0;cursor:pointer;color:#8fd8e8;font:inherit;line-height:1">⟳</button>
   <span id="version-badge" title="Version" style="color:#5a6072"></span>
   <span style="color:#5a6072" aria-hidden="true">·</span>
   <a href="https://github.freaxnx01.ch/games/" style="color:#8fd8e8;text-decoration:none">More Games…</a>
