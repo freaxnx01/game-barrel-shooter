@@ -42,7 +42,10 @@ a mobile mode; the desktop layout is unchanged.
 In portrait the camera starts far enough back for wide targets (Fortress, Colosseum, Pyramid, …) to fit
 the screen, and turning the phone re-fits the view.
 
-"Add to Home Screen" installs it as a fullscreen app (`manifest.webmanifest`, icons in `icons/`).
+"Add to Home Screen" installs it as a fullscreen app (`manifest.webmanifest`, icons in `icons/`, including a
+maskable one for Android launchers). iOS Safari has no install button, so on an iPhone or iPad in the browser
+a dismissible tip below the top bar shows the route, **Share ⬆ → Add to Home Screen**, and the `?` panel repeats it
+(`pwa/iosinstall.js`). It never shows in the installed app or on other devices.
 
 ## Physics engine
 
