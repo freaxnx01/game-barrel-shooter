@@ -18,6 +18,8 @@ All notable changes to this project are documented here, following
 - Magneto hums while held: an electric mains hum with a pulsing, crackling buzz that grows louder and higher the more pieces it holds, and fades out on release (#44)
 - American football (key F): a spiral pass that flies nose-first, then hops off in unpredictable directions; light enough to tip single barrels rather than the whole pyramid (#45)
 - Reload button: "⟳ Reload" in the mobile "?" panel and a small ⟳ next to the version in the footer, so the fullscreen home-screen app can be reloaded and picks up a new version right away (#46)
+- On an iPhone or iPad in the browser, a tip shows how to play Barrel Blast as an app: "Share ⬆ → Add to Home Screen"; × hides it for good, the "?" panel keeps the line, and it never shows in the installed app or on other devices (#50)
+- Maskable app icon, so Android launchers show the barrel pyramid in a full round or squircle icon instead of a small one on a white plate; the browser bar colour now matches the app colour
 
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)

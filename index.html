@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#1a1611">
+<meta name="theme-color" content="#3b4356">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -87,8 +87,20 @@
   #cam-pad button:hover { background: rgba(245,239,228,0.22); }
   #cam-pad button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
 
+  /* #50: iPhone/iPad in the browser: how to add the game to the home screen (an iPad with a trackpad can get the desktop layout) */
+  #ioshint {
+    position: fixed; z-index: 6; top: calc(158px + var(--sa-t)); right: calc(20px + var(--sa-r)); max-width: 196px;
+    display: flex; align-items: center; padding-left: 12px; border-radius: 14px; box-sizing: border-box;
+    background: rgba(26,22,17,0.8); border: 1px solid rgba(245,239,228,0.3); color: #f5efe4; font-size: 13px; line-height: 1.35;
+  }
+  #ioshint[hidden], .hint.show ~ #ioshint { display: none; }
+  #ioshintx {
+    flex: none; min-width: 44px; min-height: 44px; padding: 0; font: inherit; font-size: 22px; line-height: 1;
+    color: #f5efe4; background: none; border: 0; cursor: pointer; touch-action: manipulation;
+  }
+
   /* ---------- Mobile mode (#37): small or touch screens only ---------- */
-  #mob-bar, #act-bar, #sheet-backdrop, .hint .hint-touch, .hint .hint-reload { display: none; }
+  #mob-bar, #act-bar, #sheet-backdrop, .hint .hint-touch, .hint .hint-reload, .hint .hint-ios { display: none; }
   @media (max-width: 900px), (pointer: coarse) {
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #c { touch-action: none; }
@@ -119,6 +131,9 @@
       font: inherit; font-size: 13px; letter-spacing: 0; color: #f5efe4; background: rgba(26,22,17,0.55);
       border: 1px solid rgba(245,239,228,0.3); border-radius: 6px;
     }
+    html.ios-browser .hint .hint-ios { display: block; margin-top: 8px; }
+    /* #50: the free strip below #mob-bar, where the "?" panel opens; hidden while that panel shows (it carries the same line) */
+    #ioshint { top: calc(128px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: auto; max-width: calc(100% - 24px - var(--sa-l) - var(--sa-r)); border-radius: 22px; font-size: 12px; }
 
     #act-bar { display: flex; gap: 8px; position: fixed; left: calc(12px + var(--sa-l)); bottom: calc(46px + var(--sa-b)); user-select: none; -webkit-user-select: none; touch-action: none; }
     #act-bar button {
@@ -160,6 +175,7 @@
   @media (max-width: 900px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
     #mob-bar { top: calc(10px + var(--sa-t)); left: calc(150px + var(--sa-l)); right: calc(140px + var(--sa-r)); }
     .hint { top: calc(52px + var(--sa-t)); left: calc(150px + var(--sa-l)); }
+    #ioshint { top: calc(52px + var(--sa-t)); left: calc(150px + var(--sa-l)); max-width: calc(100% - 290px - var(--sa-l) - var(--sa-r)); }
     #power { bottom: calc(56px + var(--sa-b)); }
   }
 </style>
@@ -219,7 +235,8 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div id="ioshint" role="note" hidden><span>Play as an app: Share ⬆ → Add to Home Screen</span><button id="ioshintx" type="button" aria-label="Dismiss the home-screen tip">×</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
   <button id="mob-weapon" aria-controls="ammo">💥 <span id="mob-weapon-name">Basketball</span></button>
@@ -2953,6 +2970,24 @@ function animate() {
 }
 animate();
 
+</script>
+<script type="module">
+// #50: iPhone/iPad in the browser: how to add the game to the home screen. Decided once at boot.
+// After the importmap and the game module: a module script before the importmap would disable it.
+// Its own module, so a failed physics-engine load in the game module cannot keep it from running.
+import { isIos, shouldShowIosHint } from './pwa/iosinstall.js';
+const IOS_HINT_KEY = 'barrel-blast.iosHintDismissed';
+const iosHint = document.getElementById('ioshint');
+const device = { ua: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints };
+const installed = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
+let dismissed = false;
+try { dismissed = localStorage.getItem(IOS_HINT_KEY) === '1'; } catch (e) { /* storage blocked: the tip shows again next visit */ }
+document.documentElement.classList.toggle('ios-browser', isIos(device) && !installed);
+iosHint.hidden = !shouldShowIosHint({ ...device, installed, dismissed });
+document.getElementById('ioshintx').addEventListener('click', () => {
+  iosHint.hidden = true;
+  try { localStorage.setItem(IOS_HINT_KEY, '1'); } catch (e) { /* storage blocked: gone for this visit only */ }
+});
 </script>
 <nav id="game-nav" aria-label="Game navigation" style="position:fixed;right:calc(10px + var(--sa-r));bottom:calc(8px + var(--sa-b));z-index:2147483647;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
   <button id="reload-btn" type="button" title="Reload" aria-label="Reload" onclick="location.reload()" style="background:none;border:0;padding:0;margin:0;cursor:pointer;color:#8fd8e8;font:inherit;line-height:1">⟳</button>
