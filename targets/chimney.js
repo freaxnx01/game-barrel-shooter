@@ -24,7 +24,8 @@ export const CHIMNEY = {
   clearance: 0.002,         // tangential clearance per ring brick (#9)
 };
 
-const ROW_GAP = 0.001;   // courses rest on each other instead of hovering a gap apart (#9)
+const CLR = 0.001;      // horizontal clearance between plinth blocks (#9)
+const ROW_GAP = 0;      // courses touch exactly so waking the stack doesn't settle (#55)
 
 export function chimneyLayout() {
   const boxes = [];
@@ -36,6 +37,10 @@ export function chimneyLayout() {
 
 export function coursePitch() {
   return CHIMNEY.courseHeight + ROW_GAP;
+}
+
+export function plinthPitch() {
+  return CHIMNEY.plinthHeight + ROW_GAP;
 }
 
 function lerp(a, b, t) {
@@ -62,7 +67,7 @@ export function isSoot(box) {
 // Solid 3×3 grid of stone blocks per course; returns the y of the plinth's top face plus gap.
 function addPlinth(boxes) {
   const { plinthCourses, plinthBlock, plinthHeight } = CHIMNEY;
-  const pitch = plinthBlock + ROW_GAP;
+  const pitch = plinthBlock + CLR;
   const rowPitch = plinthHeight + ROW_GAP;
   for (let course = 0; course < plinthCourses; course++) {
     for (let i = -1; i <= 1; i++) {

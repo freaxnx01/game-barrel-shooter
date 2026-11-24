@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot } from '../targets/chimney.js';
+import { CHIMNEY, chimneyLayout, coursePitch, plinthPitch, shaftRadius, shaftWall, isSoot } from '../targets/chimney.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const byPart = (part) => chimneyLayout().filter(b => b.part === part);
@@ -61,9 +61,9 @@ test('chimneyLayout_FirstRingInsidePlinth', () => {
 });
 test('chimneyLayout_TopOfCrownHeight', () => {
   const top = Math.max(...chimneyLayout().map(b => b.y + b.hy));
-  const expected = CHIMNEY.plinthCourses * (CHIMNEY.plinthHeight + 0.001) + (CHIMNEY.shaftCourses + CHIMNEY.crownCourses - 1) * coursePitch() + CHIMNEY.courseHeight;
+  const expected = CHIMNEY.plinthCourses * plinthPitch() + (CHIMNEY.shaftCourses + CHIMNEY.crownCourses - 1) * coursePitch() + CHIMNEY.courseHeight;
   assert.ok(Math.abs(top - expected) < 1e-9);
-  assert.ok(Math.abs(top - 10.027) < 0.01);
+  assert.ok(Math.abs(top - 10.0) < 0.01);
 });
 test('shaftRadiusAndWall_Endpoints', () => {
   assert.equal(shaftRadius(0), CHIMNEY.radiusBottom);
