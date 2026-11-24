@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag, arrow keys, or the pad bottom-right (hold to keep turning); scroll wheel or the pad's `+`/`−` to zoom. On a Chromebook touchpad, Alt + press and drag works as right-drag |
 | **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football) |
-| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
+| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga / Chimney · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
 | **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
 | **Reset** | `R` key or the Reset button |
@@ -67,6 +67,7 @@ bottom layer sticks and pushing out a whole layer ends the round (title `JENGA P
 audible, does not clip, rises with held pieces and fades out within 0.2 s (title `HUM PASS`/`FAIL`).
 `test/harness/football-flight.html` checks the American football: nose along the flight path, spin,
 irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
+`test/harness/chimney.html` checks the brick chimney: it stands still, two cannonballs at the foot bring it down and a light ball does not (title `CHIMNEY PASS`/`FAIL`).
 
 ## Game Content
 
@@ -82,7 +83,9 @@ colosseum; step pyramid; tower gate; gate wall; spiral staircase; pole tower; oc
 stacked crosses; Eiffel-style matchstick truss; bowling pins; cylindrical brick tower; arch, double
 and castle gates; hollow brick box and brick tower; four post-and-beam frame buildings; spiral
 tower; Jenga tower of 18 crosswise layers of 3 wooden blocks, where you push blocks out
-instead of shooting (the HUD counts blocks pulled; the round ends when the tower falls).
+instead of shooting (the HUD counts blocks pulled; the round ends when the tower falls);
+tall brick industrial chimney on a stone plinth, tapering to a soot-blackened crown, that tips
+over and breaks apart when hit at the foot.
 
 **Feedback:** score HUD (targets knocked down / total), shot counter, and synthesized
 Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thunder, wind).
