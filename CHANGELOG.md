@@ -20,6 +20,7 @@ All notable changes to this project are documented here, following
 - Reload button: "⟳ Reload" in the mobile "?" panel and a small ⟳ next to the version in the footer, so the fullscreen home-screen app can be reloaded and picks up a new version right away (#46)
 - On an iPhone or iPad in the browser, a tip shows how to play Barrel Blast as an app: "Share ⬆ → Add to Home Screen"; × hides it for good, the "?" panel keeps the line, and it never shows in the installed app or on other devices (#50)
 - Maskable app icon, so Android launchers show the barrel pyramid in a full round or squircle icon instead of a small one on a white plate; the browser bar colour now matches the app colour
+- Brick industrial chimney target: a tapering factory chimney of red brick on a stone plinth with a soot-blackened crown; hit it at the foot and it tips over and breaks apart (#55)
 
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
