@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chimney</title>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+  body { background:#1a1611; color:#f5efe4; font-family: monospace; padding: 16px; }
+  pre { white-space: pre-wrap; }
+  .pass { color: #6dd96d; }
+  .fail { color: #e0483a; }
+  .info { color: #c9a13a; }
+</style>
+</head>
+<body>
+<!-- Brick chimney collapse harness (#55). Builds the chimney on the real crashcat backend
+     with the same body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE)
+     and checks: it stands still, two cannonballs at the foot bring it down, a light ball
+     does not. Title becomes CHIMNEY PASS/FAIL.
+     Measured 2026-11-24 (segments 10, shaftCourses 24, wallBottom 0.30, wallTop 0.18, ROW_GAP 0):
+       stable: max displacement 0.0079 after 5 s (all woken, < 0.02)
+       base-hit: two cannonballs (mass 9, r 0.29, 40 m/s) at shaft course 1 bring crown
+                 mean y to 0.39 of home 19.30 (< 50 %) within 12 s; tip-over radial 2.95
+       light-hit: mass 0.6 ball at 25 m/s mid-shaft leaves crown at 99.9 % and 0 bricks moved
+       Ball x offset 0.4 hits a ring brick (odd courses have a gap at x=0 through the hollow centre) -->
+<pre id="out">running…</pre>
+<script type="module">
+import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
+import { CHIMNEY, chimneyLayout, coursePitch, plinthPitch } from '../../targets/chimney.js';
+import { massFor } from '../../targets/apk-layouts.js';
+
+const out = document.getElementById('out');
+const lines = [];
+let allPass = true;
+function row(pass, name, detail, required = true) {
+  const cls = pass ? 'pass' : (required ? 'fail' : 'info');
+  const tag = pass ? 'PASS' : (required ? 'FAIL' : 'INFO');
+  if (!pass && required) allPass = false;
+  lines.push(`<span class="${cls}">[${tag}] ${name}: ${detail}</span>`);
+}
+
+const DT = 1 / 60, S = 2, MASONRY_MASS_SCALE = 0.25, ZC = -6;
+let cc;
+
+function quatY(ry) {
+  return { x: 0, y: Math.sin(ry / 2), z: 0, w: Math.cos(ry / 2) };
+}
+
+async function fresh() {
+  cc ??= await import('https://esm.sh/crashcat@0.0.5');
+  const phys = createCrashcatBackend(cc);
+  phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
+  const bricks = chimneyLayout().map(b => {
+    const home = { x: b.x * S, y: b.y * S, z: b.z * S + ZC };
+    return {
+      ...b, home,
+      body: phys.addBody({
+        shape: { kind: 'box', halfExtents: [b.hx * S, b.hy * S, b.hz * S] },
+        mass: massFor(b) * MASONRY_MASS_SCALE, material: 'masonry', startAsleep: true,
+        position: home, quaternion: quatY(b.ry),
+        linearDamping: 0.15, angularDamping: 0.3, sleepSpeedLimit: 0.3, sleepTimeLimit: 0.5,
+      }),
+    };
+  });
+  return { phys, bricks };
+}
+
+function moved(b) {
+  const p = b.body.position;
+  return Math.hypot(p.x - b.home.x, p.y - b.home.y, p.z - b.home.z);
+}
+function crownOf(ctx) { return ctx.bricks.filter(b => b.part === 'crown'); }
+function crownMeanY(ctx) { const c = crownOf(ctx); return c.reduce((s, b) => s + b.body.position.y, 0) / c.length; }
+function crownHomeY(ctx) { const c = crownOf(ctx); return c.reduce((s, b) => s + b.home.y, 0) / c.length; }
+function crownMeanRadial(ctx) {
+  const c = crownOf(ctx);
+  return c.reduce((s, b) => s + Math.hypot(b.body.position.x, b.body.position.z - ZC), 0) / c.length;
+}
+function shaftCourseY(course) {
+  return (CHIMNEY.plinthCourses * plinthPitch() + course * coursePitch() + CHIMNEY.courseHeight / 2) * S;
+}
+function stepSeconds(ctx, seconds, onFrame) {
+  for (let f = 0; f < seconds / DT; f++) { onFrame?.(f * DT); ctx.phys.step(DT); }
+}
+// A ball flying along -z from z = ZC + 12 toward the chimney at height y.
+// Offset x to hit a ring brick, not the hollow centre (odd courses have a gap at x=0).
+function fire(ctx, { mass, radius, speed, y, x = 0.4 }) {
+  const body = ctx.phys.addBody({
+    shape: { kind: 'sphere', radius }, mass, material: 'ball', fast: true,
+    position: { x, y, z: ZC + 12 },
+  });
+  ctx.phys.setVelocity(body, 0, 0, -speed);
+  return body;
+}
+
+async function checkStable() {
+  const ctx = await fresh();
+  for (const b of ctx.bricks) ctx.phys.wake(b.body);
+  stepSeconds(ctx, 5);
+  const worst = Math.max(...ctx.bricks.map(moved));
+  row(worst < 0.02, 'stable', `max displacement after 5 s (all woken): ${worst.toFixed(4)} (< 0.02)`);
+  ctx.phys.destroy();
+}
+
+async function checkBaseHit() {
+  const ctx = await fresh();
+  const homeY = crownHomeY(ctx), y = shaftCourseY(1);
+  const cannon = { mass: 9, radius: 0.29, speed: 40, y };
+  fire(ctx, cannon);
+  stepSeconds(ctx, 1);
+  fire(ctx, cannon);
+  let tipRadial = null, lowest = Infinity;
+  stepSeconds(ctx, 12, () => {
+    const my = crownMeanY(ctx);
+    lowest = Math.min(lowest, my);
+    if (tipRadial === null && my < 0.9 * homeY) tipRadial = crownMeanRadial(ctx);
+  });
+  row(lowest < 0.5 * homeY, 'base-hit', `crown mean y min ${lowest.toFixed(2)} of home ${homeY.toFixed(2)} (< 50 %)`);
+  row(tipRadial !== null && tipRadial > 2.0, 'tip-over', `crown mean radial offset when first below 90 %: ${tipRadial === null ? 'never' : tipRadial.toFixed(2)} (> 2.0 means it toppled sideways)`, false);
+  ctx.phys.destroy();
+}
+
+async function checkLightHit() {
+  const ctx = await fresh();
+  const homeY = crownHomeY(ctx);
+  fire(ctx, { mass: 0.6, radius: 0.33, speed: 25, y: shaftCourseY(Math.floor(CHIMNEY.shaftCourses / 2)) });
+  stepSeconds(ctx, 6);
+  const my = crownMeanY(ctx);
+  const down = ctx.bricks.filter(b => moved(b) > 0.45).length;
+  row(my > 0.8 * homeY && down < 28, 'light-hit', `crown mean y ${my.toFixed(2)} of ${homeY.toFixed(2)} (> 80 %), bricks moved > 0.45: ${down} (< 28)`);
+  ctx.phys.destroy();
+}
+
+async function main() {
+  await checkStable();
+  await checkBaseHit();
+  await checkLightHit();
+  out.innerHTML = lines.join('\n');
+  document.title = allPass ? 'CHIMNEY PASS' : 'CHIMNEY FAIL';
+}
+main().catch(e => { out.textContent = 'ERROR ' + e.stack; document.title = 'CHIMNEY FAIL'; });
+</script>
+</body>
+</html>
