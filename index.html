@@ -296,6 +296,7 @@
       <button data-mode="brickbox">Brick Box</button>
       <button data-mode="bricktower">Brick Tower</button>
       <button data-mode="jenga">Jenga</button>
+      <button data-mode="chimney">Chimney</button>
     </div>
   </div>
   <div class="target-group">
@@ -326,6 +327,7 @@ import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { nudgeOrbit, heldNudge, fitOrbitRadius } from './camera/orbit.js';
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
+import { CHIMNEY, chimneyLayout, isSoot } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
@@ -866,6 +868,38 @@ function placeLayout(boxes, zC) {
   for (const b of boxes) addBlock(b.hx, b.hy, b.hz, m(), massFor(b), b.x, b.y, b.z + zC, b.ry, 0);
 }
 
+// Brick chimney (#55): one brick per body; the mortar joint is a frame drawn on every face
+// of the brick texture, so courses read as brickwork. Tints vary per brick, soot on top.
+function makeBrickTexture(brick, mortar) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = mortar; g.fillRect(0, 0, 128, 64);
+  g.fillStyle = brick; g.fillRect(5, 5, 118, 54);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.10)';
+    g.fillRect(6 + rnd() * 116, 6 + rnd() * 52, 1 + rnd() * 3, 1 + rnd() * 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const brickMatls = ['#9b4a35', '#a85a40', '#8c3f2d', '#b0654a'].map(c =>
+  new THREE.MeshStandardMaterial({ map: makeBrickTexture(c, '#bfb5a3'), roughness: 0.9 }));
+const sootMatls = ['#4a3a34', '#5a4640'].map(c =>
+  new THREE.MeshStandardMaterial({ map: makeBrickTexture(c, '#6a625a'), roughness: 0.9 }));
+function chimneyMatl(b, i) {
+  if (b.part === 'plinth') return stoneMatls[i % stoneMatls.length];
+  const set = isSoot(b) ? sootMatls : brickMatls;
+  return set[(i * 7 + b.course) % set.length];
+}
+function setupChimney() {
+  const zC = -6;
+  chimneyLayout().forEach((b, i) => addBlock(b.hx, b.hy, b.hz, chimneyMatl(b, i), massFor(b), b.x, b.y, b.z + zC, b.ry, 0));
+}
+
 // Jenga tower (#34): wooden blocks, own 'jenga' material, no MASONRY_MASS_SCALE
 const jengaMatls = ['#e2c69a', '#d8b986', '#e8cfa6', '#cfae7a'].map(c =>
   new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 }));
@@ -1156,6 +1190,7 @@ const camCfg = {
   castlegate:      { r: 24, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGate(), -6) },
   castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
   jenga:     { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupJenga },
+  chimney:   { r: 30,   ty: 5,   tz: -6, plat: false, build: setupChimney },
 };
 function buildTargets() {
   stopPush();        // a held Jenga block is about to be removed
