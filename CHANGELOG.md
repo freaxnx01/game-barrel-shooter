@@ -21,6 +21,9 @@ All notable changes to this project are documented here, following
 - On an iPhone or iPad in the browser, a tip shows how to play Barrel Blast as an app: "Share ⬆ → Add to Home Screen"; × hides it for good, the "?" panel keeps the line, and it never shows in the installed app or on other devices (#50)
 - Maskable app icon, so Android launchers show the barrel pyramid in a full round or squircle icon instead of a small one on a white plate; the browser bar colour now matches the app colour
 - Brick industrial chimney target: a tapering factory chimney of red brick on a stone plinth with a soot-blackened crown; hit it at the foot and it tips over and breaks apart (#55)
+- Remote charge (key B) that lies where it lands until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw (#54)
+- Heavy net (key N): catches up to six pieces where it lands; hold Space or Pull to drag them in (#54)
+- Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
 
 ### Changed
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)

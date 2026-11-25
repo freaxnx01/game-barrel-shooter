@@ -18,9 +18,10 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Aim** | Move the mouse — the projectile fires toward the cursor |
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag, arrow keys, or the pad bottom-right (hold to keep turning); scroll wheel or the pad's `+`/`−` to zoom. On a Chromebook touchpad, Alt + press and drag works as right-drag |
-| **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football) |
+| **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball; `P` again cycles the colour), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football), `B` (remote charge), `Z` (timed charge), `N` (heavy net) |
 | **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga / Chimney · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
+| **Detonate** | `K` blows up all placed remote charges |
 | **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
 | **Reset** | `R` key or the Reset button |
 
@@ -35,7 +36,8 @@ a mobile mode; the desktop layout is unchanged.
 | **Orbit / zoom** | Drag with two fingers to orbit, pinch to zoom (a second finger cancels a charge without firing); the smaller pad bottom-right still works |
 | **Switch weapon / target** | The 💥 and 🎯 buttons at the top open the list as a sheet; tap an entry to pick it, tap outside to close |
 | **Earthquake** | Hold the 🌋 Quake button bottom-left |
-| **Harpoon pull** | Hold the 🪝 Pull button, shown while a harpoon is stuck in a barrel |
+| **Harpoon / net pull** | Hold the 🪝 Pull button, shown while a harpoon or net holds something |
+| **Detonate** | Tap the 💥 Boom button bottom-left, shown while remote charges are placed |
 | **Jenga: push a block** | Tap and hold a block; a second finger cancels the push. The 🔫 Shoot button in the top bar switches to the weapons |
 | **Help** | `?` shows the touch controls |
 
@@ -73,9 +75,9 @@ irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
 
 **Ammo (grouped in the bottom-left picker):**
 - *Balls* — basketball, soccerball, tennis ball, bowling ball, cannonball, American football (a light 0.4 kg spiral pass that flies nose-first and hops off unpredictably when it lands; it tips single barrels rather than clearing the pyramid)
-- *Explosives* — bomb (explodes on contact), grenade (timed fuse), paintball (splats)
+- *Explosives* — bomb (explodes on contact), grenade (timed fuse), paintball (splats; pick a colour or 🎲 random), remote charge (lies still until you press K / Boom; up to 6), timed charge (explodes 4 s after the throw, LED blinks faster)
 - *Heavy & melee* — wrecking ball (swings on a chain), hammer (tumbles end-over-end), spear (flies point-first), tractor tire (rolls into the target, slows, and tips over)
-- *Launchers* — catapult (high lobbed rock), slingshot (fast pellet), mini F-16 (flies nose-first)
+- *Launchers* — catapult (high lobbed rock), slingshot (fast pellet), mini F-16 (flies nose-first), heavy net (catches up to 6 pieces, hold Space / Pull to drag them in)
 - *Powers* — lightning (strikes the aim point), hurricane (wandering tornado funnel that lifts debris), magneto (hold left mouse to gather pieces toward the cursor)
 
 **Targets:** barrel pyramid on a platform; 6-level house of cards; stone fortress and ruined
