@@ -7,6 +7,7 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- Action buttons on desktop: Pull, Boom and a new Cut button (key O) that lets go of a harpoon or heavy net, each shown only while it applies; Cut is on mobile too (#63)
 - Camera pad bottom-right (turn, tilt, zoom; hold to keep moving) and arrow keys for the camera, so it can be moved without a right mouse button, e.g. on a Chromebook touchpad or touchscreen
 - Tractor tire weapon (key T): rolls into the target, then tips over and lies flat (#8)
 - Hover over the version number to see when the game was last updated, in your own time zone, and how long ago
