@@ -67,6 +67,7 @@ export function resetCloth(cloth, centre, scale, velocity) {
       cloth.prev[o + 2] = cloth.pos[o + 2] - velocity.z * h;
     }
   }
+  cloth.rest = NET.meshSpacing * scale;   // start relaxed at the caught spacing, then open the rest of the way
   cloth.pending = 0;
 }
 
@@ -95,7 +96,12 @@ export function stepCloth(cloth, dt, world) {
   }
 }
 
+// the rest length grows to the full mesh spacing at the net's own opening rate, so a net caught
+// half open keeps opening over the catch instead of snapping apart
+const REST_GROWTH = NET.meshSpacing * CLOTH.substep * 1000 / NET.openMs;
+
 function substep(cloth, world) {
+  if (cloth.rest < NET.meshSpacing) cloth.rest = Math.min(NET.meshSpacing, cloth.rest + REST_GROWTH);
   integrate(cloth);
   for (let it = 0; it < CLOTH.iterations; it++) solveDistances(cloth);
   for (let k = 0; k < cloth.count; k++) {

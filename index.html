@@ -2266,9 +2266,12 @@ function detachNet() {
 
 const NET_STILL = { x: 0, y: 0, z: 0 };
 // collision proxies for the cloth: every caught piece (live pose and velocity) plus the target platform
-function netProxies(bodies) {
+const NET_NEIGHBOUR_R2 = (NET.openSize * 0.75) ** 2;   // uncaught pieces this close can be under the overhanging edges
+function netProxies(bodies, centre) {
   const proxies = [];
-  for (const body of bodies) {
+  const near = barrels.map((b) => b.body).filter((body) => !bodies.includes(body)
+    && (body.position.x - centre.x) ** 2 + (body.position.y - centre.y) ** 2 + (body.position.z - centre.z) ** 2 < NET_NEIGHBOUR_R2);
+  for (const body of [...bodies, ...near]) {
     const p = proxyFor(body.shape, body.position, body.quaternion, phys.getVelocity(body));
     if (p) proxies.push(p);
   }
@@ -2281,7 +2284,7 @@ function updateNet(dt) {
   if (!netLink.bodies.length) { detachNet(); return; }
   const from = launcherPoint();
   const centre = centroid(netLink.bodies.map((body) => body.position));
-  stepCloth(netCloth, dt, { proxies: netProxies(netLink.bodies), leashCentre: centre });
+  stepCloth(netCloth, dt, { proxies: netProxies(netLink.bodies, centre), leashCentre: centre });
   syncNetClothMesh();
   drawRope(netLink.rope, from, new THREE.Vector3().fromArray(netCloth.pos, netLink.ropeNode * 3));
   if (!pulling) return;

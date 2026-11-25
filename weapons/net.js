@@ -48,10 +48,6 @@ export function centroid(points) {
   return { x: sum.x / points.length, y: sum.y / points.length, z: sum.z / points.length };
 }
 
-export function spread(points, centre) {
-  return points.reduce((m, p) => Math.max(m, distance(p, centre)), 0);
-}
-
 export function pullForce(from, pos, mass) {
   const dx = from.x - pos.x, dy = from.y - pos.y, dz = from.z - pos.z;
   const dist = Math.hypot(dx, dy, dz) || 1;

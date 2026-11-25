@@ -122,3 +122,21 @@ test('nearestCorner_LauncherInFront_CornerOnThatSide', () => {
   assert.equal(nearestCorner(c, { x: 5, y: 1, z: 5 }), 80);
   assert.equal(nearestCorner(c, { x: -5, y: 1, z: -5 }), 0);
 });
+
+test('stepCloth_CaughtHalfOpen_OpensGentlyToFullRest', () => {
+  // a catch before the net is fully open must not snap the cloth apart (#72 review)
+  const cloth = createCloth();
+  resetCloth(cloth, { x: 0, y: 3, z: 0 }, 0.5, { x: 0, y: 0, z: 0 });
+  let maxStep = 0;
+  for (let f = 0; f < 60; f++) {
+    const before = Float64Array.from(cloth.pos);
+    stepCloth(cloth, 1 / 60, { proxies: [], leashCentre: null });
+    for (let k = 0; k < cloth.count; k++) {
+      const o = k * 3;
+      maxStep = Math.max(maxStep, Math.sqrt((cloth.pos[o] - before[o]) ** 2 + (cloth.pos[o + 1] - before[o + 1]) ** 2 + (cloth.pos[o + 2] - before[o + 2]) ** 2));
+    }
+  }
+  assert.ok(maxStep * 60 < 12, `peak node speed ${(maxStep * 60).toFixed(1)} m/s`);
+  assert.equal(cloth.rest, NET.meshSpacing);
+});
+
