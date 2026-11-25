@@ -263,7 +263,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon and heavy net — hold Space to reel the catch in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K detonates remote charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon and net: hold Pull to reel the catch in · Boom detonates remote charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · 🎯 and 💥 (top left) pick target and weapon, the keys still work · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon and heavy net — hold Space to reel the catch in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K detonates remote charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon and net: hold Pull to reel the catch in · Boom detonates remote charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
 <div id="ioshint" role="note" hidden><span>Play as an app: Share ⬆ → Add to Home Screen</span><button id="ioshintx" type="button" aria-label="Dismiss the home-screen tip">×</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
@@ -367,6 +367,7 @@ import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/snipe
 import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
 import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
+import { sheetAfter } from './ui/sheet.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -2844,13 +2845,12 @@ addEventListener('keyup', (e) => {
 const mobileQuery = matchMedia('(max-width: 900px), (pointer: coarse)');
 const sheetBackdrop = document.getElementById('sheet-backdrop');
 const hintEl = document.getElementById('hint');
-function closeSheets() {
-  for (const el of [ammoEl, targetEl, sheetBackdrop]) el.classList.remove('open');
-}
-function openSheet(el) {
-  closeSheets();
-  el.classList.add('open');
-  sheetBackdrop.classList.add('open');
+let sheetOpen = null;
+function applySheet(event) {
+  sheetOpen = sheetAfter(sheetOpen, event);
+  ammoEl.classList.toggle('open', sheetOpen === 'ammo');
+  targetEl.classList.toggle('open', sheetOpen === 'target');
+  sheetBackdrop.classList.toggle('open', sheetOpen !== null);
 }
 function buttonName(btn) {
   return [...btn.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim();
@@ -2859,15 +2859,16 @@ function syncSheetLabels() {
   document.getElementById('mob-weapon-name').textContent = buttonName(ammoEl.querySelector('button.sel'));
   document.getElementById('mob-target-name').textContent = buttonName(targetEl.querySelector('button.sel'));
 }
-document.getElementById('mob-weapon').addEventListener('click', () => openSheet(ammoEl));
-document.getElementById('mob-target').addEventListener('click', () => openSheet(targetEl));
+document.getElementById('mob-weapon').addEventListener('click', () => applySheet('open-ammo'));
+document.getElementById('mob-target').addEventListener('click', () => applySheet('open-target'));
 document.getElementById('mob-help').addEventListener('click', () => hintEl.classList.toggle('show'));
-sheetBackdrop.addEventListener('click', closeSheets);
+sheetBackdrop.addEventListener('click', () => applySheet('backdrop'));
 for (const el of [ammoEl, targetEl]) {
-  el.addEventListener('click', (e) => { if (e.target.closest('button:not(.swatch)')) closeSheets(); });
+  el.addEventListener('click', (e) => { if (e.target.closest('button:not(.swatch)')) applySheet('pick'); });
   new MutationObserver(syncSheetLabels).observe(el, { subtree: true, attributeFilter: ['class'] });
 }
-mobileQuery.addEventListener('change', closeSheets);
+mobileQuery.addEventListener('change', () => applySheet('layout-change'));
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetOpen) applySheet('escape'); });
 syncSheetLabels();
 
 // Hold-to-act buttons, with pointer capture like #cam-pad: Quake = holding Shift, Pull = holding Space.

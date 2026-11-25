@@ -26,6 +26,7 @@ All notable changes to this project are documented here, following
 - Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
 
 ### Changed
+- Desktop: the weapon and target lists collapse into the 🎯 and 💥 buttons like on mobile, so the weapon panel no longer covers the chimney foot (#61)
 - Brick chimney is 1.25× wider and 1.5× higher, has no crown and no stone base any more, and stands directly on the ground; it now takes dynamite at the foot to topple it (#58)
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
 - Physics now runs on crashcat instead of cannon-es: buildings stand still until hit and break apart piece by piece instead of bursting from a light touch (#9, #20)
