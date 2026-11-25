@@ -1296,6 +1296,14 @@ const chargeMatl = new THREE.MeshStandardMaterial({ color: '#5e6338', roughness:
 const chargeBoxMatl = new THREE.MeshStandardMaterial({ color: '#1c1c20', roughness: 0.5, metalness: 0.3 });
 const netMatl = new THREE.MeshStandardMaterial({ color: '#3c4a2e', roughness: 0.9, wireframe: true });
 const netWeightMatl = new THREE.MeshStandardMaterial({ color: '#55585e', roughness: 0.4, metalness: 0.8 });
+// shared so each charge/net shot reuses them instead of leaking new GPU buffers
+const chargeBrickGeo = new THREE.BoxGeometry(CHARGE.halfExtents[0] * 2, CHARGE.halfExtents[1] * 2, CHARGE.halfExtents[2] * 2);
+const chargeBoxGeo = new THREE.BoxGeometry(0.12, 0.05, 0.09);
+const chargeLedGeo = new THREE.SphereGeometry(0.018, 8, 6);
+const chargeLedMatls = { '#3fd16a': new THREE.MeshBasicMaterial({ color: '#3fd16a' }), '#ff3b30': new THREE.MeshBasicMaterial({ color: '#ff3b30' }) };
+const antennaGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6);
+const netBundleGeo = new THREE.IcosahedronGeometry(NET.radius, 1);
+const netWeightGeo = new THREE.SphereGeometry(0.06, 8, 6);
 const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
@@ -1490,14 +1498,14 @@ function shootTire(dir, power) {
 // olive-drab brick with a black detonator box and a small LED on top
 function makeChargeMesh(ledColor) {
   const g = new THREE.Group();
-  const [hx, hy, hz] = CHARGE.halfExtents;
-  const brick = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2), chargeMatl);
+  const hy = CHARGE.halfExtents[1];
+  const brick = new THREE.Mesh(chargeBrickGeo, chargeMatl);
   brick.castShadow = true;
   g.add(brick);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.09), chargeBoxMatl);
+  const box = new THREE.Mesh(chargeBoxGeo, chargeBoxMatl);
   box.position.y = hy + 0.025;
   g.add(box);
-  const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: ledColor }));
+  const led = new THREE.Mesh(chargeLedGeo, chargeLedMatls[ledColor]);
   led.position.set(0.035, hy + 0.055, 0);
   g.add(led);
   g.userData.led = led;
@@ -1505,7 +1513,7 @@ function makeChargeMesh(ledColor) {
 }
 function makeRemoteChargeMesh() {
   const g = makeChargeMesh('#3fd16a');
-  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6), chargeBoxMatl);
+  const antenna = new THREE.Mesh(antennaGeo, chargeBoxMatl);
   antenna.position.set(-0.04, CHARGE.halfExtents[1] + 0.16, 0);
   g.add(antenna);
   return g;
@@ -1516,9 +1524,9 @@ function makeTimedChargeMesh() {
 // a bundled net with four lead weights, as thrown
 function makeNetBundleMesh() {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(NET.radius, 1), netMatl));
+  g.add(new THREE.Mesh(netBundleGeo, netMatl));
   for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-    const w = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), netWeightMatl);
+    const w = new THREE.Mesh(netWeightGeo, netWeightMatl);
     w.position.set(x * 0.24, -0.1, z * 0.24);
     g.add(w);
   }
