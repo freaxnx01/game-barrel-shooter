@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARGE, chargeLaunch, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeMomentum, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
 
 test('chargeLaunch_PowerRange_Speed12To26', () => {
   assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 12);
@@ -57,10 +57,19 @@ test('armedRemotes_MixedRecords_OnlyUnexplodedRemotes', () => {
 });
 
 test('CHARGE_Tuning_MatchesSpec', () => {
-  assert.equal(CHARGE.mass, 2);
+  assert.equal(CHARGE.mass, 0.1);
   assert.deepEqual(CHARGE.halfExtents, [0.16, 0.08, 0.11]);
   assert.equal(CHARGE.blastRadius, 4);
   assert.equal(CHARGE.blastStrength, 500);
   assert.equal(CHARGE.fuseMs, 4000);
   assert.equal(CHARGE.maxRemote, 6);
+});
+
+test('chargeMomentum_FullPower_StaysBelowThreeNewtonSeconds', () => {
+  assert.ok(chargeMomentum(1) <= 3);
+  assert.ok(Math.abs(chargeMomentum(1) - 2.6) < 1e-9);
+});
+
+test('chargeMomentum_NoPower_IsBaseSpeedTimesMass', () => {
+  assert.ok(Math.abs(chargeMomentum(0) - 1.2) < 1e-9);
 });
