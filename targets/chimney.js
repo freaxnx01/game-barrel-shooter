@@ -12,8 +12,8 @@ export const CHIMNEY = {
   courseHeight: 0.35,
   radiusBottom: 1.625,
   radiusTop: 0.9375,
-  wallBottom: 0.30,
-  wallTop: 0.18,
+  wallBottom: 0.375,
+  wallTop: 0.225,
   sootCourses: 5,           // top shaft courses tinted by soot
   clearance: 0.002,         // tangential clearance per ring brick (#9)
 };
