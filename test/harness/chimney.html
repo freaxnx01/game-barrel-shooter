@@ -19,14 +19,20 @@
      with the same body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE).
      Unlike addBlock it adds the centre offset ZC after scaling, so the chimney stands at
      z = -6 here vs -12 in the game; all checks are measured in this harness's own frame
-     and checks: it stands still, two cannonballs at the foot bring it down, a light ball
+     and checks: it stands still, one dynamite charge at the foot brings it down, a light ball
      does not. Title becomes CHIMNEY PASS/FAIL.
      Measured 2026-11-25 (#58: segments 12, shaftCourses 43, wallBottom 0.375, wallTop 0.225, ROW_GAP 0;
      walls thickened from the planned 0.30 / 0.18 as tuning step 1):
        stable: max displacement 0.0149 after 5 s (all woken, < 0.02); 0.0857 with the 0.30 / 0.18 walls
-       base-hit: FAILS. Two cannonballs (mass 9, r 0.29, 40 m/s) at shaft course 1 knock out only
-                 5 bricks (courses 0-1); the running-bond ring above bridges the gap and the top
-                 mean y stays at 28.33 of home 28.35 (needs < 50 %); no tip-over
+       base-hit (attack decided 2026-11-25, geometry kept): the bigger shaft is harder to topple.
+                 Two cannonballs (mass 9, r 0.29, 40 m/s) at shaft course 1 knock out only 5 bricks
+                 and the running bond bridges the gap (top mean y 28.33 of home 28.35). Attempts,
+                 shots 1 s apart, then 12 s, pass = top mean y < 50 % of home:
+                   3 cannonballs: FAIL, min 28.33, 8 bricks moved
+                   4 cannonballs: FAIL, min 28.34, 8 bricks moved
+                   1 dynamite (explode() values 4.5 / 600 at the foot face, course 1): PASS,
+                     min 0.69, 514 bricks moved, tip-over radial 7.94   <- BASE_ATTACK
+                   (dynamite + 2 cannonballs, for reference: PASS, min 0.49, 512 moved, radial 8.36)
        light-hit: mass 0.6 ball at 25 m/s mid-shaft leaves the top at 99.9 % and 0 bricks moved (< 52)
        Tuning tried, all base-hit FAIL (top never drops): walls 0.30/0.18 and 0.375/0.225;
        segments 13 and 10 (10 also fails stable 0.0917); shaftCourses 45 (stable 0.0213) and 41.
@@ -111,20 +117,45 @@ async function checkStable() {
   ctx.phys.destroy();
 }
 
-async function checkBaseHit() {
+// explode() in index.html with the dynamite values (radius 4.5, strength 600): radial impulse
+// with linear falloff on every dynamic body within the radius, plus 30 % extra lift.
+function explodeAt(ctx, p, RADIUS = 4.5, STRENGTH = 600) {
+  for (const body of ctx.phys.bodies()) {
+    if (body.mass <= 0) continue;
+    let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
+    const dist = Math.max(Math.hypot(dx, dy, dz), 0.5);
+    if (dist > RADIUS) continue;
+    dx /= dist; dy /= dist; dz /= dist;
+    const imp = STRENGTH * (1 - dist / RADIUS);
+    ctx.phys.wake(body);
+    ctx.phys.applyImpulse(body, dx * imp, dy * imp + imp * 0.3, dz * imp);
+  }
+}
+
+// Base-hit attack (#58): the bigger shaft no longer falls to two cannonballs (they remove ~5
+// bricks and the running bond bridges the gap), so the attack is the smallest one that passes.
+// Shots go 1 s apart in this order; 'dynamite' explodes at the outer face of course 1 on the aim line.
+const BASE_ATTACK = ['dynamite'];
+
+async function checkBaseHit(attack = BASE_ATTACK, label = 'base-hit') {
   const ctx = await fresh();
   const homeY = topHomeY(ctx), y = shaftCourseY(1);
-  const cannon = { mass: 9, radius: 0.29, speed: 40, y };
-  fire(ctx, cannon);
-  stepSeconds(ctx, 1);
-  fire(ctx, cannon);
+  const cannon = { mass: 9, radius: 0.29, speed: 40, y };   // cannonball: mass 9, r BALL_R*0.9, max speed 40
+  const footFace = (CHIMNEY.radiusBottom + CHIMNEY.wallBottom) * S + ZC;
+  attack.forEach((shot, i) => {
+    if (i > 0) stepSeconds(ctx, 1);
+    if (shot === 'cannon') fire(ctx, cannon);
+    else explodeAt(ctx, { x: 0.4, y, z: footFace });
+  });
   let tipRadial = null, lowest = Infinity;
   stepSeconds(ctx, 12, () => {
     const my = topMeanY(ctx);
     lowest = Math.min(lowest, my);
     if (tipRadial === null && my < 0.9 * homeY) tipRadial = topMeanRadial(ctx);
   });
-  row(lowest < 0.5 * homeY, 'base-hit', `top mean y min ${lowest.toFixed(2)} of home ${homeY.toFixed(2)} (< 50 %)`);
+  const end = topMeanY(ctx);
+  const down = ctx.bricks.filter(b => moved(b) > 0.45).length;
+  row(lowest < 0.5 * homeY, label, `[${attack.join(' + ')}] top mean y min ${lowest.toFixed(2)} of home ${homeY.toFixed(2)} (< 50 %), at end ${end.toFixed(2)}, bricks moved > 0.45: ${down}`);
   row(tipRadial !== null && tipRadial > 2.5, 'tip-over', `top mean radial offset when first below 90 %: ${tipRadial === null ? 'never' : tipRadial.toFixed(2)} (> 2.5 means it toppled sideways)`, false);
   ctx.phys.destroy();
 }
