@@ -907,7 +907,6 @@ const brickMatls = ['#9b4a35', '#a85a40', '#8c3f2d', '#b0654a'].map(c =>
 const sootMatls = ['#4a3a34', '#5a4640'].map(c =>
   new THREE.MeshStandardMaterial({ map: makeBrickTexture(c, '#6a625a'), roughness: 0.9 }));
 function chimneyMatl(b, i) {
-  if (b.part === 'plinth') return stoneMatls[i % stoneMatls.length];
   const set = isSoot(b) ? sootMatls : brickMatls;
   return set[(i * 7 + b.course) % set.length];
 }
@@ -1206,7 +1205,7 @@ const camCfg = {
   castlegate:      { r: 24, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGate(), -6) },
   castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
   jenga:     { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupJenga },
-  chimney:   { r: 30,   ty: 5,   tz: -6, plat: false, build: setupChimney },
+  chimney:   { r: 52,   ty: 8.5, tz: -6, plat: false, build: setupChimney },
 };
 function buildTargets() {
   stopPush();        // a held Jenga block is about to be removed
