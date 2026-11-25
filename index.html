@@ -235,6 +235,7 @@
     <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
     <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
     <button data-type="harpoon"><span class="dot" style="background:#cfd4da;border-radius:2px"></span>Harpoon <span style="opacity:0.5">J</span></button>
+    <button data-type="net"><span class="dot" style="background:#3c4a2e;border:2px dashed #b9a77a;box-sizing:border-box"></span>Heavy net <span style="opacity:0.5">N</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Powers</div>
@@ -246,7 +247,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K detonates remote charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Boom detonates remote charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon and heavy net — hold Space to reel the catch in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K detonates remote charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon and net: hold Pull to reel the catch in · Boom detonates remote charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
 <div id="ioshint" role="note" hidden><span>Play as an app: Share ⬆ → Add to Home Screen</span><button id="ioshintx" type="button" aria-label="Dismiss the home-screen tip">×</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
@@ -256,7 +257,7 @@
 </div>
 <div id="act-bar">
   <button id="act-quake" title="Hold for an earthquake">🌋<span>Quake</span></button>
-  <button id="act-pull" title="Hold to reel the harpooned barrel in" hidden>🪝<span>Pull</span></button>
+  <button id="act-pull" title="Hold to reel the harpoon or net in" hidden>🪝<span>Pull</span></button>
   <button id="act-boom" title="Detonate the remote charges" hidden>💥<span>Boom</span></button>
 </div>
 <div id="sheet-backdrop"></div>
@@ -343,6 +344,7 @@ import { chimneyLayout, isSoot } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
+import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn } from './weapons/net.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
@@ -1209,6 +1211,7 @@ const camCfg = {
 function buildTargets() {
   stopPush();        // a held Jenga block is about to be removed
   detachHarpoon();   // a tethered harpoon references a barrel body we're about to remove
+  detachNet();       // the net references target bodies we're about to remove
   barrelSupport.reset();
   clearTargets();
   for (const h of hurricanes) scene.remove(h.group);
@@ -1291,6 +1294,8 @@ let paintChoice = 0;         // index into PAINT_COLORS, or RANDOM_PAINT
 let lastPaintIndex = null;   // colour of the previous paintball, so random mode never repeats it
 const chargeMatl = new THREE.MeshStandardMaterial({ color: '#5e6338', roughness: 0.85 });
 const chargeBoxMatl = new THREE.MeshStandardMaterial({ color: '#1c1c20', roughness: 0.5, metalness: 0.3 });
+const netMatl = new THREE.MeshStandardMaterial({ color: '#3c4a2e', roughness: 0.9, wireframe: true });
+const netWeightMatl = new THREE.MeshStandardMaterial({ color: '#55585e', roughness: 0.4, metalness: 0.8 });
 const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
@@ -1508,6 +1513,17 @@ function makeRemoteChargeMesh() {
 function makeTimedChargeMesh() {
   return makeChargeMesh('#ff3b30');
 }
+// a bundled net with four lead weights, as thrown
+function makeNetBundleMesh() {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(NET.radius, 1), netMatl));
+  for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    const w = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), netWeightMatl);
+    w.position.set(x * 0.24, -0.1, z * 0.24);
+    g.add(w);
+  }
+  return g;
+}
 
 function shootBall(dir, power) {
   const type = ammoType;
@@ -1542,6 +1558,7 @@ function shootBall(dir, power) {
     football:    { mass: FOOTBALL.mass, r: FOOTBALL.radius },
     remotecharge: { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
     timedcharge:  { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
+    net:          { mass: NET.mass, r: NET.radius },
   }[type];
   let shapeSpec;
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
@@ -1594,6 +1611,10 @@ function shootBall(dir, power) {
     speed = footballSpeed(power);
   } else if (type === 'remotecharge' || type === 'timedcharge') {
     const launch = chargeLaunch(dir, power);   // slight arc, like the grenade
+    vdir = launch.direction;
+    speed = launch.speed;
+  } else if (type === 'net') {
+    const launch = netLaunch(dir, power);   // heavy: slow, with an arc
     vdir = launch.direction;
     speed = launch.speed;
   }
@@ -1789,6 +1810,8 @@ function shootBall(dir, power) {
     mesh = makeRemoteChargeMesh();
   } else if (type === 'timedcharge') {
     mesh = makeTimedChargeMesh();
+  } else if (type === 'net') {
+    mesh = makeNetBundleMesh();
   } else {
     mesh = new THREE.Mesh(ballGeo, bombMatl);
     const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
@@ -1806,6 +1829,7 @@ function shootBall(dir, power) {
     if (type === 'bomb' && !rec.exploded) { explode(rec); return; }
     if (type === 'dynamite' && !rec.exploded) { explode(rec, 4.5, 600); return; }
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
+    if (type === 'net' && !rec.hit) { netCatch(rec); return; }
     if (type === 'harpoon' && !rec.hit) harpoonStick(rec, other);
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
     if (type === 'football') rec.hit = true;   // the first touch ends the spiral; from then on it hops freely
@@ -2039,6 +2063,39 @@ function makeRopeTexture() {
   return ropeTexCache;
 }
 
+// braided rope: a unit-height cylinder that drawRope() repositions every frame.
+// Each rope clones the texture so harpoon and net ropes keep their own repeat.
+function makeRopeMesh() {
+  const map = makeRopeTexture().clone();
+  map.needsUpdate = true;
+  return new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 1, 8, 1, true),
+    new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide }));
+}
+function disposeRope(rope) {
+  scene.remove(rope);
+  rope.geometry.dispose();
+  rope.material.map.dispose();
+  rope.material.dispose();
+}
+function drawRope(rope, from, to) {
+  const seg = to.clone().sub(from);
+  const len = seg.length();
+  rope.position.copy(from).add(to).multiplyScalar(0.5);
+  if (len > 1e-6) rope.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), seg.clone().normalize());
+  rope.scale.set(1, len, 1);
+  rope.material.map.repeat.set(1, Math.max(1, Math.round(len * 2)));  // braid stays fine-grained, doesn't stretch
+}
+// ropes start at a launcher point low-right in view — from the camera itself they're edge-on and invisible
+function launcherPoint() {
+  return new THREE.Vector3(0.6, -0.55, -1.4).applyMatrix4(camera.matrixWorld);
+}
+function syncPullButton() {
+  const tethered = Boolean(harpoonLink || netLink);
+  pullBtn.hidden = !tethered;
+  if (!tethered) pulling = false;
+}
+
 // ---------- Harpoon: embed in the struck barrel; the player then reels it in ----------
 function harpoonStick(rec, other) {
   rec.hit = true;
@@ -2049,26 +2106,75 @@ function harpoonStick(rec, other) {
   phys.setVelocity(rec.body, v.x * 0.15, v.y * 0.15, v.z * 0.15);
   phys.setAngularVelocity(rec.body, 0, 0, 0);
   const constraint = phys.addFixedJoint(rec.body, other);
-  // thin braided rope: a unit-height cylinder we reposition/orient/scale every frame
-  const rope = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, 1, 8, 1, true),
-    new THREE.MeshStandardMaterial({ map: makeRopeTexture(), roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide }));
+  const rope = makeRopeMesh();
   scene.add(rope);
   harpoonLink = { rec, barrel: other, constraint, rope };
-  pullBtn.hidden = false;
+  syncPullButton();
   playBounce(6);
 }
 
 function detachHarpoon() {
   if (!harpoonLink) return;
   phys.removeJoint(harpoonLink.constraint);
-  scene.remove(harpoonLink.rope);
-  harpoonLink.rope.geometry.dispose();
-  harpoonLink.rope.material.dispose();
+  disposeRope(harpoonLink.rope);
   if (harpoonLink.rec) harpoonLink.rec.stuck = false;   // let it be culled normally now
   harpoonLink = null;
-  pulling = false;
-  pullBtn.hidden = true;
+  syncPullButton();
+}
+
+// ---------- Heavy net: catch the pieces around the first contact; the player then drags them in ----------
+function netCatch(rec) {
+  rec.hit = true;
+  const caught = selectCaught(barrels.map((b) => b.body), rec.body.position);
+  if (!caught.length) return;                 // missed: the net lies where it fell and is culled later
+  detachNet();                                // one net at a time: a new catch replaces the old one
+  for (const body of caught) phys.wake(body);
+  const drape = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), netMatl);
+  const rope = makeRopeMesh();
+  scene.add(drape);
+  scene.add(rope);
+  netLink = { bodies: caught, drape, rope };
+  // the bundled net is replaced by the drape — removed out of the collide callback, like paintSplat()
+  setTimeout(() => {
+    phys.removeBody(rec.body);
+    scene.remove(rec.mesh);
+    const i = balls.indexOf(rec);
+    if (i >= 0) balls.splice(i, 1);
+  }, 0);
+  syncPullButton();
+  playBounce(4);
+}
+
+function detachNet() {
+  if (!netLink) return;
+  scene.remove(netLink.drape);
+  netLink.drape.geometry.dispose();
+  disposeRope(netLink.rope);
+  netLink = null;
+  syncPullButton();
+}
+
+function updateNet() {
+  netLink.bodies = netLink.bodies.filter((body) => body.position.y >= -5);   // pieces off the world drop out
+  if (!netLink.bodies.length) { detachNet(); return; }
+  const from = launcherPoint();
+  const points = netLink.bodies.map((body) => body.position);
+  const centre = centroid(points);
+  const c = new THREE.Vector3(centre.x, centre.y, centre.z);
+  drawRope(netLink.rope, from, c);
+  netLink.drape.position.copy(c);
+  netLink.drape.scale.setScalar(spread(points, centre) + 0.6);
+  if (!pulling) return;
+  if (isReeledIn(from, centre)) { detachNet(); return; }
+  for (const body of netLink.bodies) pullNetPiece(body, from);
+}
+
+function pullNetPiece(body, from) {
+  const f = pullForce(from, body.position, body.mass || 1);
+  phys.wake(body);
+  phys.applyForce(body, f.x, f.y, f.z);
+  const v = phys.getVelocity(body);
+  phys.setVelocity(body, v.x * 0.92, v.y * 0.92, v.z * 0.92);
 }
 
 // ---------- Hurricane: a wandering tornado at the aim point ----------
@@ -2429,7 +2535,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2(0, 0);
 let charging = false, chargeStart = 0;
-let harpoonLink = null, pulling = false;   // a harpoon stuck in a barrel; hold Space to reel it in
+let harpoonLink = null, netLink = null, pulling = false;   // harpoon / heavy net tethers; hold Space to reel in
 const pullBtn = document.getElementById('act-pull');   // mobile Pull button, shown only while a harpoon is attached
 const powerEl = document.getElementById('power');
 const powerFill = document.getElementById('powerFill');
@@ -2655,6 +2761,7 @@ function removeProjectile(b) {
 
 function reset() {
   detachHarpoon();   // drop any tethered harpoon before rebuilding bodies
+  detachNet();       // drop any held net before rebuilding bodies
   for (const b of balls) removeProjectile(b);
   balls.length = 0;
   for (const h of hurricanes) scene.remove(h.group);
@@ -2701,7 +2808,8 @@ addEventListener('keydown', (e) => {
   if (k === 'b') setAmmo('remotecharge');
   if (k === 'z') setAmmo('timedcharge');
   if (k === 'k') detonateRemoteCharges();
-  if (e.key === ' ' && harpoonLink) { pulling = true; e.preventDefault(); }  // hold Space = elephant pull
+  if (k === 'n') setAmmo('net');
+  if (e.key === ' ' && (harpoonLink || netLink)) { pulling = true; e.preventDefault(); }  // hold Space = reel in
   if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
 });
 addEventListener('keyup', (e) => {
@@ -2751,7 +2859,7 @@ holdButton(document.getElementById('act-quake'), () => {
   quakeActive = true;
   quakeStart = performance.now();
 }, () => { quakeActive = false; });
-holdButton(pullBtn, () => { if (!autoPlay && harpoonLink) pulling = true; }, () => { pulling = false; });
+holdButton(pullBtn, () => { if (!autoPlay && (harpoonLink || netLink)) pulling = true; }, () => { pulling = false; });
 const boomBtn = document.getElementById('act-boom');   // mobile Boom button, shown while remote charges are armed
 boomBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!autoPlay) detonateRemoteCharges(); });
 
@@ -2850,17 +2958,8 @@ function animate() {
   // Harpoon tether: keep the rope drawn, and reel the barrel in while the player pulls.
   if (harpoonLink) {
     const rec = harpoonLink.rec, b = harpoonLink.barrel;
-    // rope starts at a launcher point low-right in view — from the camera itself it's edge-on and invisible
-    const from = new THREE.Vector3(0.6, -0.55, -1.4).applyMatrix4(camera.matrixWorld);
-    const to = new THREE.Vector3(rec.body.position.x, rec.body.position.y, rec.body.position.z);
-    const seg = to.clone().sub(from);
-    const dist3 = seg.length();
-    harpoonLink.rope.position.copy(from).add(to).multiplyScalar(0.5);
-    if (dist3 > 1e-6) {
-      harpoonLink.rope.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), seg.clone().normalize());
-    }
-    harpoonLink.rope.scale.set(1, dist3, 1);
-    harpoonLink.rope.material.map.repeat.set(1, Math.max(1, Math.round(dist3 * 2)));  // braid stays fine-grained, doesn't stretch
+    const from = launcherPoint();
+    drawRope(harpoonLink.rope, from, new THREE.Vector3(rec.body.position.x, rec.body.position.y, rec.body.position.z));
     if (b.position.y < -5) { detachHarpoon(); }        // barrel fell off the world
     else if (pulling) {
       let dx = from.x - b.position.x, dy = from.y - b.position.y, dz = from.z - b.position.z;
@@ -2875,6 +2974,7 @@ function animate() {
       if (dist < 4) detachHarpoon();                    // reeled in close → let go
     }
   }
+  if (netLink) updateNet();
 
   // charge bar
   if (charging) {
