@@ -7,7 +7,6 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
-- Remote and timed charges stick to the first piece or the ground they hit and ride along with it, and no longer knock things over on impact (#62)
 - Action buttons on desktop: Pull, Boom and a new Cut button (key O) that lets go of a harpoon or heavy net, each shown only while it applies; Cut is on mobile too (#63)
 - Camera pad bottom-right (turn, tilt, zoom; hold to keep moving) and arrow keys for the camera, so it can be moved without a right mouse button, e.g. on a Chromebook touchpad or touchscreen
 - Tractor tire weapon (key T): rolls into the target, then tips over and lies flat (#8)
@@ -23,12 +22,11 @@ All notable changes to this project are documented here, following
 - On an iPhone or iPad in the browser, a tip shows how to play Barrel Blast as an app: "Share ⬆ → Add to Home Screen"; × hides it for good, the "?" panel keeps the line, and it never shows in the installed app or on other devices (#50)
 - Maskable app icon, so Android launchers show the barrel pyramid in a full round or squircle icon instead of a small one on a white plate; the browser bar colour now matches the app colour
 - Brick industrial chimney target: a tapering factory chimney of red brick with a soot-blackened top; hit it at the foot and it tips over and breaks apart (#55)
-- Remote charge (key B) that lies where it lands until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw (#54)
-- Heavy net (key N): catches up to six pieces where it lands; hold Space or Pull to drag them in (#54)
+- Remote charge (key B) that waits until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw; both stick to the first piece or the ground they hit and do no impact damage (#54, #62)
+- Heavy net (key N): a 4 m × 4 m throw net of thick rope with wide meshes that opens in flight, drapes over the catch and holds up to 14 pieces within 2.4 m; hold Space or Pull to drag them in (#54, #60)
 - Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
 
 ### Changed
-- Heavy net is now a 4 m × 4 m throw net of thick rope with wide meshes and corner weights: it opens in flight, lies flat where it lands, drapes over the catch as a rope dome and catches up to 14 pieces within 2.4 m instead of 6 within 1.6 m (#60)
 - Desktop: the weapon and target lists collapse into the 🎯 and 💥 buttons like on mobile, so the weapon panel no longer covers the chimney foot (#61)
 - Brick chimney is 1.25× wider and 1.5× higher, has no crown and no stone base any more, and stands directly on the ground; it now takes dynamite at the foot to topple it (#58)
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
