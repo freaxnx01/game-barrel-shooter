@@ -3,6 +3,7 @@
 // no crown. No THREE, no DOM.
 // Boxes: { hx, hy, hz, x, y, z, ry, part, course }  // half extents + centre in base units,
 // ry = yaw; part is always 'shaft'; course 0-based from the ground.
+// brickFaceRects/visibleBrickAspect describe the texture: two brick courses per body (#64).
 // Centred on x = 0, z = 0 with the ground at y = 0; index.html scales by TSCALE 2.
 // Spec: docs/superpowers/specs/2026-11-25-issue-58-bigger-chimney-design.md
 
@@ -16,6 +17,7 @@ export const CHIMNEY = {
   wallTop: 0.225,
   sootCourses: 5,           // top shaft courses tinted by soot
   clearance: 0.002,         // tangential clearance per ring brick (#9)
+  faceRows: 2,              // brick courses drawn on one body's texture, so bricks look elongated (#64)
 };
 
 const ROW_GAP = 0;      // courses touch exactly so waking the stack doesn't settle (#55)
@@ -66,4 +68,21 @@ function addRing(boxes, course, staggered, radius, wall, bottomY) {
       ry: a, part: 'shaft', course,
     });
   }
+}
+
+// Brick rectangles of one chimney texture (#64): a mortar frame of joint/2 on every edge,
+// so two bodies side by side show one full joint, and `rows` equal bricks separated by a
+// full joint. Head joints stay at the body edges, so the running bond is unchanged.
+export function brickFaceRects(width, height, rows, joint) {
+  const h = (height - rows * joint) / rows;
+  const rects = [];
+  for (let i = 0; i < rows; i++) {
+    rects.push({ x: joint / 2, y: joint / 2 + i * (h + joint), w: width - joint, h });
+  }
+  return rects;
+}
+
+// Visible length : height of one drawn brick of a body (#64).
+export function visibleBrickAspect(box) {
+  return (2 * box.hx) / ((2 * box.hy) / CHIMNEY.faceRows);
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot } from '../targets/chimney.js';
+import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot, brickFaceRects, visibleBrickAspect } from '../targets/chimney.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const shaft = () => chimneyLayout().filter(b => b.part === 'shaft');
@@ -63,4 +63,44 @@ test('chimneyLayout_BrickLengthStaysCloseToBefore', () => {
   const bottom = shaft().find(b => b.course === 0);
   assert.ok(bottom.hx * 2 < 0.646 * 1.15, `bottom brick length ${bottom.hx * 2}`);
   for (const b of chimneyLayout()) assert.ok(b.hx > 0.15, `course ${b.course}`);
+});
+test('chimneyFaceRows_IsTwo', () => {
+  assert.equal(CHIMNEY.faceRows, 2);
+});
+test('brickFaceRects_TwoRows_EqualHeightsAndJoints', () => {
+  const rects = brickFaceRects(256, 128, 2, 8);
+  assert.equal(rects.length, 2);
+  assert.deepEqual(rects[0], { x: 4, y: 4, w: 248, h: 56 });
+  assert.deepEqual(rects[1], { x: 4, y: 68, w: 248, h: 56 });
+});
+test('brickFaceRects_AnyRows_FrameHalfJointGapFullJoint', () => {
+  for (const rows of [1, 2, 3]) {
+    const rects = brickFaceRects(256, 128, rows, 8);
+    assert.equal(rects.length, rows);
+    assert.equal(rects[0].y, 4);
+    const last = rects[rows - 1];
+    assert.ok(Math.abs(128 - (last.y + last.h) - 4) < 1e-9, `bottom frame rows=${rows}`);
+    for (let i = 1; i < rows; i++) {
+      assert.ok(Math.abs(rects[i].y - (rects[i - 1].y + rects[i - 1].h) - 8) < 1e-9, `gap ${i}`);
+      assert.ok(Math.abs(rects[i].h - rects[0].h) < 1e-9);
+    }
+    for (const r of rects) {
+      assert.equal(r.x, 4);
+      assert.equal(r.w, 248);
+    }
+  }
+});
+test('visibleBrickAspect_EveryBody_Elongated', () => {
+  for (const b of chimneyLayout()) {
+    const a = visibleBrickAspect(b);
+    assert.ok(a >= 2.0 && a <= 4.0, `course ${b.course}: aspect ${a}`);
+  }
+});
+test('visibleBrickAspect_FootLongerThanTop', () => {
+  const boxes = chimneyLayout();
+  const foot = visibleBrickAspect(boxes.find(b => b.course === 0));
+  const top = visibleBrickAspect(boxes.find(b => b.course === CHIMNEY.shaftCourses - 1));
+  assert.ok(foot > top);
+  assert.ok(Math.abs(foot - 3.805) < 0.01, `foot ${foot}`);
+  assert.ok(Math.abs(top - 2.159) < 0.01, `top ${top}`);
 });
