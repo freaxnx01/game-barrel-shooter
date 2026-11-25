@@ -15,22 +15,26 @@
 </style>
 </head>
 <body>
-<!-- Brick chimney collapse harness (#55). Builds the chimney on the real crashcat backend
+<!-- Brick chimney collapse harness (#55, reshaped in #58: shaft only, no plinth or crown). Builds the chimney on the real crashcat backend
      with the same body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE).
      Unlike addBlock it adds the centre offset ZC after scaling, so the chimney stands at
      z = -6 here vs -12 in the game; all checks are measured in this harness's own frame
      and checks: it stands still, two cannonballs at the foot bring it down, a light ball
      does not. Title becomes CHIMNEY PASS/FAIL.
-     Measured 2026-11-24 (segments 10, shaftCourses 24, wallBottom 0.30, wallTop 0.18, ROW_GAP 0):
-       stable: max displacement 0.0079 after 5 s (all woken, < 0.02)
-       base-hit: two cannonballs (mass 9, r 0.29, 40 m/s) at shaft course 1 bring crown
-                 mean y to 0.39 of home 19.30 (< 50 %) within 12 s; tip-over radial 2.95
-       light-hit: mass 0.6 ball at 25 m/s mid-shaft leaves crown at 99.9 % and 0 bricks moved
+     Measured 2026-11-25 (#58: segments 12, shaftCourses 43, wallBottom 0.375, wallTop 0.225, ROW_GAP 0;
+     walls thickened from the planned 0.30 / 0.18 as tuning step 1):
+       stable: max displacement 0.0149 after 5 s (all woken, < 0.02); 0.0857 with the 0.30 / 0.18 walls
+       base-hit: FAILS. Two cannonballs (mass 9, r 0.29, 40 m/s) at shaft course 1 knock out only
+                 5 bricks (courses 0-1); the running-bond ring above bridges the gap and the top
+                 mean y stays at 28.33 of home 28.35 (needs < 50 %); no tip-over
+       light-hit: mass 0.6 ball at 25 m/s mid-shaft leaves the top at 99.9 % and 0 bricks moved (< 52)
+       Tuning tried, all base-hit FAIL (top never drops): walls 0.30/0.18 and 0.375/0.225;
+       segments 13 and 10 (10 also fails stable 0.0917); shaftCourses 45 (stable 0.0213) and 41.
        Ball x offset 0.4 hits a ring brick (odd courses have a gap at x=0 through the hollow centre) -->
 <pre id="out">running…</pre>
 <script type="module">
 import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
-import { CHIMNEY, chimneyLayout, coursePitch, plinthPitch } from '../../targets/chimney.js';
+import { CHIMNEY, chimneyLayout, coursePitch } from '../../targets/chimney.js';
 import { massFor } from '../../targets/apk-layouts.js';
 
 const out = document.getElementById('out');
@@ -73,15 +77,16 @@ function moved(b) {
   const p = b.body.position;
   return Math.hypot(p.x - b.home.x, p.y - b.home.y, p.z - b.home.z);
 }
-function crownOf(ctx) { return ctx.bricks.filter(b => b.part === 'crown'); }
-function crownMeanY(ctx) { const c = crownOf(ctx); return c.reduce((s, b) => s + b.body.position.y, 0) / c.length; }
-function crownHomeY(ctx) { const c = crownOf(ctx); return c.reduce((s, b) => s + b.home.y, 0) / c.length; }
-function crownMeanRadial(ctx) {
-  const c = crownOf(ctx);
+const isTop = (b) => b.course >= CHIMNEY.shaftCourses - CHIMNEY.sootCourses;
+function topOf(ctx) { return ctx.bricks.filter(isTop); }
+function topMeanY(ctx) { const c = topOf(ctx); return c.reduce((s, b) => s + b.body.position.y, 0) / c.length; }
+function topHomeY(ctx) { const c = topOf(ctx); return c.reduce((s, b) => s + b.home.y, 0) / c.length; }
+function topMeanRadial(ctx) {
+  const c = topOf(ctx);
   return c.reduce((s, b) => s + Math.hypot(b.body.position.x, b.body.position.z - ZC), 0) / c.length;
 }
 function shaftCourseY(course) {
-  return (CHIMNEY.plinthCourses * plinthPitch() + course * coursePitch() + CHIMNEY.courseHeight / 2) * S;
+  return (course * coursePitch() + CHIMNEY.courseHeight / 2) * S;
 }
 function stepSeconds(ctx, seconds, onFrame) {
   for (let f = 0; f < seconds / DT; f++) { onFrame?.(f * DT); ctx.phys.step(DT); }
@@ -108,30 +113,31 @@ async function checkStable() {
 
 async function checkBaseHit() {
   const ctx = await fresh();
-  const homeY = crownHomeY(ctx), y = shaftCourseY(1);
+  const homeY = topHomeY(ctx), y = shaftCourseY(1);
   const cannon = { mass: 9, radius: 0.29, speed: 40, y };
   fire(ctx, cannon);
   stepSeconds(ctx, 1);
   fire(ctx, cannon);
   let tipRadial = null, lowest = Infinity;
   stepSeconds(ctx, 12, () => {
-    const my = crownMeanY(ctx);
+    const my = topMeanY(ctx);
     lowest = Math.min(lowest, my);
-    if (tipRadial === null && my < 0.9 * homeY) tipRadial = crownMeanRadial(ctx);
+    if (tipRadial === null && my < 0.9 * homeY) tipRadial = topMeanRadial(ctx);
   });
-  row(lowest < 0.5 * homeY, 'base-hit', `crown mean y min ${lowest.toFixed(2)} of home ${homeY.toFixed(2)} (< 50 %)`);
-  row(tipRadial !== null && tipRadial > 2.0, 'tip-over', `crown mean radial offset when first below 90 %: ${tipRadial === null ? 'never' : tipRadial.toFixed(2)} (> 2.0 means it toppled sideways)`, false);
+  row(lowest < 0.5 * homeY, 'base-hit', `top mean y min ${lowest.toFixed(2)} of home ${homeY.toFixed(2)} (< 50 %)`);
+  row(tipRadial !== null && tipRadial > 2.5, 'tip-over', `top mean radial offset when first below 90 %: ${tipRadial === null ? 'never' : tipRadial.toFixed(2)} (> 2.5 means it toppled sideways)`, false);
   ctx.phys.destroy();
 }
 
 async function checkLightHit() {
   const ctx = await fresh();
-  const homeY = crownHomeY(ctx);
+  const homeY = topHomeY(ctx);
   fire(ctx, { mass: 0.6, radius: 0.33, speed: 25, y: shaftCourseY(Math.floor(CHIMNEY.shaftCourses / 2)) });
   stepSeconds(ctx, 6);
-  const my = crownMeanY(ctx);
+  const my = topMeanY(ctx);
   const down = ctx.bricks.filter(b => moved(b) > 0.45).length;
-  row(my > 0.8 * homeY && down < 28, 'light-hit', `crown mean y ${my.toFixed(2)} of ${homeY.toFixed(2)} (> 80 %), bricks moved > 0.45: ${down} (< 28)`);
+  const limit = Math.round(0.1 * ctx.bricks.length);
+  row(my > 0.8 * homeY && down < limit, 'light-hit', `top mean y ${my.toFixed(2)} of ${homeY.toFixed(2)} (> 80 %), bricks moved > 0.45: ${down} (< ${limit})`);
   ctx.phys.destroy();
 }
 
