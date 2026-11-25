@@ -360,7 +360,7 @@ import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { nudgeOrbit, heldNudge, fitOrbitRadius } from './camera/orbit.js';
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
-import { chimneyLayout, isSoot } from './targets/chimney.js';
+import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
@@ -906,20 +906,25 @@ function placeLayout(boxes, zC) {
   for (const b of boxes) addBlock(b.hx, b.hy, b.hz, m(), massFor(b), b.x, b.y, b.z + zC, b.ry, 0);
 }
 
-// Brick chimney (#55): one brick per body; the mortar joint is a frame drawn on every face
-// of the brick texture, so courses read as brickwork. Tints vary per brick, soot on top.
+// Brick chimney (#55, #64): one body per brick of the physics, but each body's texture shows
+// CHIMNEY.faceRows courses of bricks, so they look elongated; the mortar frame is half a joint
+// on every edge, so joints between bodies match joints inside one. Tints vary per body, soot on top.
 function makeBrickTexture(brick, mortar) {
+  const W = 256, H = 128, JOINT = 8;
   const c = document.createElement('canvas');
-  c.width = 128; c.height = 64;
+  c.width = W; c.height = H;
   const g = c.getContext('2d');
-  g.fillStyle = mortar; g.fillRect(0, 0, 128, 64);
-  g.fillStyle = brick; g.fillRect(5, 5, 118, 54);
+  g.fillStyle = mortar; g.fillRect(0, 0, W, H);
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 60; i++) {
-    g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.10)';
-    g.fillRect(6 + rnd() * 116, 6 + rnd() * 52, 1 + rnd() * 3, 1 + rnd() * 2);
-  }
+  brickFaceRects(W, H, CHIMNEY.faceRows, JOINT).forEach((r, i) => {
+    g.fillStyle = brick; g.fillRect(r.x, r.y, r.w, r.h);
+    if (i % 2 === 1) { g.fillStyle = 'rgba(0,0,0,0.07)'; g.fillRect(r.x, r.y, r.w, r.h); }
+    for (let k = 0; k < 60; k++) {
+      g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.10)';
+      g.fillRect(r.x + 1 + rnd() * (r.w - 6), r.y + 1 + rnd() * (r.h - 4), 2 + rnd() * 4, 1 + rnd() * 3);
+    }
+  });
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
