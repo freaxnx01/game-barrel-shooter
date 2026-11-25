@@ -363,7 +363,7 @@ import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { chimneyLayout, isSoot } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
-import { CHARGE, chargeLaunch, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn } from './weapons/net.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
@@ -1860,6 +1860,7 @@ function shootBall(dir, power) {
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
     if (type === 'net' && !rec.hit) { netCatch(rec); return; }
     if (type === 'harpoon' && !rec.hit) harpoonStick(rec, other);
+    if ((type === 'remotecharge' || type === 'timedcharge') && !rec.exploded) chargeStick(rec, other);
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
     if (type === 'football') rec.hit = true;   // the first touch ends the spiral; from then on it hops freely
     if (Math.abs(impactSpeed) < 1.5) return;
@@ -1896,6 +1897,7 @@ function explode(rec, RADIUS = 3, STRENGTH = 320) {
   // remove the projectile — deferred out of the collide/step callback so we
   // never remove a body while the world is stepping
   setTimeout(() => {
+    if (rec.stickJoint) { phys.removeJoint(rec.stickJoint); rec.stickJoint = null; }
     phys.removeBody(rec.body);
     scene.remove(rec.mesh);
     const i = balls.indexOf(rec);
@@ -2158,6 +2160,18 @@ function detachHarpoon() {
   if (harpoonLink.rec) harpoonLink.rec.stuck = false;   // let it be culled normally now
   harpoonLink = null;
   syncPullButton();
+}
+
+// ---------- Remote and timed charges: stick to the first thing they hit, no impact damage (#62) ----------
+function chargeStick(rec, other) {
+  const plan = chargeStickPlan(rec.stuck, other);
+  if (plan === 'ignore') return;
+  rec.stuck = true;                              // exempts it from the 12 s and y < -5 culls
+  phys.setVelocity(rec.body, 0, 0, 0);
+  phys.setAngularVelocity(rec.body, 0, 0, 0);
+  if (plan === 'joint') rec.stickJoint = phys.addFixedJoint(rec.body, other);
+  else phys.setGravityFactor(rec.body, 0);       // no body to join: hang where it is
+  playBounce(4);
 }
 
 // ---------- Heavy net: catch the pieces around the first contact; the player then drags them in ----------
@@ -2791,6 +2805,7 @@ function updateJengaHud() {
 updateHud();
 
 function removeProjectile(b) {
+  if (b.stickJoint) { phys.removeJoint(b.stickJoint); b.stickJoint = null; }
   b.rumble?.stop();
   if (b.constraint) {
     phys.removeJoint(b.constraint);
