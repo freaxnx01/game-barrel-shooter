@@ -23,7 +23,7 @@ All notable changes to this project are documented here, following
 - Maskable app icon, so Android launchers show the barrel pyramid in a full round or squircle icon instead of a small one on a white plate; the browser bar colour now matches the app colour
 - Brick industrial chimney target: a tapering factory chimney of red brick with a soot-blackened top; hit it at the foot and it tips over and breaks apart (#55)
 - Remote charge (key B) that waits until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw; both stick to the first piece or the ground they hit and do no impact damage (#54, #62)
-- Heavy net (key N): a 4 m × 4 m throw net of thick rope with wide meshes that opens in flight, drapes over the catch and holds up to 14 pieces within 2.4 m; hold Space or Pull to drag them in (#54, #60)
+- Heavy net (key N): a 4 m × 4 m throw net of thick rope with wide meshes that opens in flight, falls over the catch like cloth, hanging down the sides of the pieces and following them as they are dragged, and holds up to 14 pieces within 2.4 m; hold Space or Pull to drag them in (#54, #60, #70)
 - Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
 
 ### Changed
