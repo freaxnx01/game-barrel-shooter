@@ -54,3 +54,10 @@ export function canPlaceRemote(armedCount) {
 export function armedRemotes(records) {
   return records.filter((r) => r.type === 'remotecharge' && !r.exploded);
 }
+
+// What a charge does on a contact: 'ignore' once stuck, 'freeze' in place when there is no
+// body handle to join, otherwise 'joint' (static bodies such as the ground count too).
+export function chargeStickPlan(stuck, other) {
+  if (stuck) return 'ignore';
+  return other ? 'joint' : 'freeze';
+}
