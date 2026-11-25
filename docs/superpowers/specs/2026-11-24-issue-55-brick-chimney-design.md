@@ -50,13 +50,19 @@ exported `CHIMNEY` object; the layout function reads them, the tests read them f
 |---|---|---|
 | `segments` | 10 | bricks per ring, constant from bottom to top |
 | `shaftCourses` | 24 | ring courses of the shaft |
-| `courseHeight` | 0.35 | brick height; course pitch is `courseHeight + 0.001` (same idea as `brickRowPitch`) |
+| `courseHeight` | 0.35 | brick height; course pitch is `courseHeight` exactly (no row gap; see the note below the table) |
 | `radiusBottom` / `radiusTop` | 1.3 / 0.75 | centre-line radius of the first and last shaft course; linear in between |
 | `wallBottom` / `wallTop` | 0.30 / 0.18 | half wall depth (`hz`) of the first and last shaft course; linear in between |
 | `plinthCourses` / `plinthBlock` / `plinthHeight` | 2 / 1.1 / 0.45 | a solid 3×3 grid of stone blocks per course, block pitch `plinthBlock + 0.001` |
 | `crownCourses` | 2 | corbelled rim: ring radii `radiusTop + 0.12` and `+ 0.24`, half depths 0.30 and 0.34 |
 | `sootCourses` | 3 | the top 3 shaft courses are soot-tinted; the crown always is |
 | `clearance` | 0.002 | tangential clearance subtracted from each ring brick's half length |
+
+**Row gap changed in implementation (PR #56).** This spec first set the course pitch to
+`courseHeight + 0.001`, like `brickRowPitch`. With 26 stacked courses that gap let the woken
+stack settle about 24 mm, which failed the harness's stable check (< 0.02). Courses
+now touch exactly (`ROW_GAP = 0` in `targets/chimney.js`), which makes the chimney the only
+stacked target without a vertical gap.
 
 Ring brick geometry, copied from `setupCylinder` in `index.html`: course `c` has
 `step = 2π / segments`, bricks at angles `a = j·step + (c % 2)·step/2` (running bond), centre
@@ -134,7 +140,7 @@ harness header comment and in the PR.
   278, part counts 18/240/20, no overlapping pairs, every block supported, shaft radius
   strictly decreasing course by course, crown wider than the last shaft course, running bond
   (odd courses rotated by half a step), and the top face of the crown at
-  `2 × 0.451 + 26 × 0.351 = 10.028` (base units, ±0.01).
+  `2 × 0.45 + 26 × 0.35 = 10.0` (base units, ±0.01).
 - `test/harness/chimney.html` shows `CHIMNEY PASS`; the existing harnesses still pass.
 - Screenshots at 1280×720 and 390×844 of the standing chimney, and one mid-collapse after
   two cannonballs at the foot, looked at with the Read tool.
