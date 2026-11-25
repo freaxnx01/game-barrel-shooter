@@ -107,7 +107,31 @@
   }
 
   /* ---------- Mobile mode (#37): small or touch screens only ---------- */
-  #mob-bar, #act-bar, #sheet-backdrop, .hint .hint-touch, .hint .hint-reload, .hint .hint-ios { display: none; }
+  #act-bar, .hint .hint-touch, .hint .hint-reload, .hint .hint-ios { display: none; }
+
+  /* ---------- Collapsed menus (#61): weapon and target lists open as a sheet, on every screen size ---------- */
+  #sheet-backdrop { display: none; }
+  #sheet-backdrop.open { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,0.45); }
+  .ammo, .target { display: none; }
+  .ammo.open, .target.open {
+    position: fixed; z-index: 20; top: calc(8px + var(--sa-t)); left: 50%; transform: translateX(-50%); right: auto; bottom: auto;
+    width: min(900px, calc(100% - 16px)); max-width: none; max-height: calc(100% - 56px - var(--sa-t) - var(--sa-b));
+    overflow-y: auto; box-sizing: border-box; padding: 12px;
+    background: rgba(26,22,17,0.96); border: 1px solid rgba(245,239,228,0.25); border-radius: 10px; color: #f5efe4;
+  }
+  .ammo.open { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: start; }
+  .ammo.open button { width: 100%; }
+  .ammo.open .paint-colors .swatch { width: 28px; height: 28px; }
+  .target.open { display: flex; }
+  #mob-bar { display: flex; gap: 6px; position: fixed; top: calc(116px + var(--sa-t)); left: calc(22px + var(--sa-l)); }
+  #mob-bar button {
+    font-family: inherit; color: #f5efe4; background: rgba(26,22,17,0.55);
+    border: 1px solid rgba(245,239,228,0.3); border-radius: 6px; cursor: pointer;
+    padding: 7px 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; touch-action: manipulation;
+  }
+  #mob-bar button:hover { background: rgba(245,239,228,0.18); }
+  #mob-help, #mob-jenga-shoot { display: none; }   /* desktop: the hint is always visible, #jenga-shoot is its own button */
+  .hint { top: calc(164px + var(--sa-t)); }
   @media (max-width: 900px), (pointer: coarse) {
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #c { touch-action: none; }
@@ -120,13 +144,14 @@
     #autoplay { top: calc(46px + var(--sa-t)); right: calc(12px + var(--sa-r)); }
     #jenga-shoot { display: none; }   /* mobile: the toggle lives in #mob-bar */
 
-    #mob-bar { display: flex; gap: 6px; position: fixed; top: calc(86px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: calc(12px + var(--sa-r)); }
-    #mob-bar button, #act-bar button {
+    #mob-bar { top: calc(86px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: calc(12px + var(--sa-r)); }
+    #act-bar button {
       font-family: inherit; color: #f5efe4; background: rgba(26,22,17,0.55);
       border: 1px solid rgba(245,239,228,0.3); border-radius: 6px; cursor: pointer;
     }
-    #mob-bar button { padding: 7px 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; touch-action: manipulation; }
-    #mob-help { flex: none; width: 34px; padding: 7px 0 !important; font-weight: 700; }
+    #mob-bar button { max-width: 150px; }
+    #mob-help { display: block; flex: none; width: 34px; padding: 7px 0 !important; font-weight: 700; }
+    #mob-jenga-shoot:not([hidden]) { display: block; }
 
     .hint { display: none; top: calc(128px + var(--sa-t)); left: calc(12px + var(--sa-l)); max-width: 280px; padding: 8px 10px; border-radius: 6px; background: rgba(26,22,17,0.8); opacity: 0.9; font-size: 12px; line-height: 1.5; }
     .hint.show { display: block; }
@@ -160,19 +185,10 @@
 
     #game-nav { font-size: 11px !important; gap: 6px !important; padding: 4px 8px !important; bottom: calc(6px + var(--sa-b)) !important; right: calc(6px + var(--sa-r)) !important; white-space: nowrap; }
 
-    /* the two lists become sheets, opened from #mob-bar */
-    .ammo, .target { display: none; }
-    #sheet-backdrop.open { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,0.45); }
-    .ammo.open, .target.open {
-      position: fixed; z-index: 20; top: calc(8px + var(--sa-t)); left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); bottom: auto; max-width: none;
-      max-height: calc(100% - 56px - var(--sa-t) - var(--sa-b)); overflow-y: auto; box-sizing: border-box; padding: 12px;
-      background: rgba(26,22,17,0.96); border: 1px solid rgba(245,239,228,0.25); border-radius: 10px; color: #f5efe4;
-    }
-    .ammo.open { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: start; }
-    .ammo.open button { width: 100%; }
-    .ammo.open .paint-colors .swatch { width: 28px; height: 28px; }
+    /* the two lists are full-width sheets here (the desktop sheet is a centered panel) */
+    .ammo.open, .target.open { left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); transform: none; width: auto; }
+    .ammo.open { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
     .ammo button span:not(.dot) { display: none; }
-    .target.open { display: flex; }
     .target .glabel { width: 48px; }
   }
   @media (max-width: 480px) {
