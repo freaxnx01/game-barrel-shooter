@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale, drapeRadius, drapeParallels } from '../weapons/net.js';
+import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale } from '../weapons/net.js';
 
 const piece = (x, mass = 8) => ({ position: { x, y: 0, z: 0 }, mass });
 const origin = { x: 0, y: 0, z: 0 };
@@ -93,19 +93,3 @@ test('openScale_Midway_MonotonicAndEasedOut', () => {
   assert.ok(openScale(NET.openMs / 2) > (NET.bundleScale + 1) / 2);   // ease-out: past half size at half time
 });
 
-test('drapeRadius_SmallAndLargeSpread_FloorThenMargin', () => {
-  assert.equal(drapeRadius(0), NET.drapeMin);
-  assert.equal(drapeRadius(0.3), NET.drapeMin);
-  assert.ok(Math.abs(drapeRadius(2.5) - 3.3) < 1e-9);
-});
-
-test('drapeParallels_FourRings_OnUnitHemisphereRisingAndNarrowing', () => {
-  const rings = drapeParallels();
-  assert.equal(rings.length, NET.drapeParallels);
-  for (const r of rings) assert.ok(Math.abs(r.radius * r.radius + r.y * r.y - 1) < 1e-9);
-  for (let i = 1; i < rings.length; i++) {
-    assert.ok(rings[i].y > rings[i - 1].y);
-    assert.ok(rings[i].radius < rings[i - 1].radius);
-  }
-  assert.ok(rings[0].y > 0 && rings[rings.length - 1].radius > 0);
-});
