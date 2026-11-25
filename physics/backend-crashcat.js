@@ -79,6 +79,7 @@ export function createCrashcatBackend(cc) {
       material: spec.material,
       mass: isStatic ? 0 : spec.mass,
       userData: spec.userData,
+      shape: spec.shape,             // the shape spec, read by the heavy net cloth for collision proxies (#70)
       frictionOverride: null,
       _pos: { x: spec.position.x, y: spec.position.y, z: spec.position.z },
       _quat: { x: 0, y: 0, z: 0, w: 1 },

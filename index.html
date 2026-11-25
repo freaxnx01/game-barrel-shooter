@@ -365,6 +365,7 @@ import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, 
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale, drapeRadius, drapeParallels } from './weapons/net.js';
+import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
@@ -1330,6 +1331,7 @@ const chargeLedMatls = { '#3fd16a': new THREE.MeshBasicMaterial({ color: '#3fd16
 const antennaGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6);
 const netStrandGeo = new THREE.CylinderGeometry(NET.ropeRadius, NET.ropeRadius, NET.openSize, 6);   // one rope strand of the open net
 const netWeightGeo = new THREE.SphereGeometry(NET.weightRadius, 10, 8);
+const netSegGeo = new THREE.CylinderGeometry(NET.ropeRadius, NET.ropeRadius, 1, 6);   // one cloth rope segment, unit length along +Y (#70)
 const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
@@ -1591,6 +1593,43 @@ function makeNetDrapeMesh() {
   return g;
 }
 const netDrape = makeNetDrapeMesh();
+
+// cloth drape after a catch (#70): one instanced rope cylinder per cloth segment plus the four corner weights.
+// Built once; netCatch() resets the cloth and adds the group, detachNet() removes it. No per-frame GPU allocation.
+const netCloth = createCloth();
+function makeNetClothMesh() {
+  const g = new THREE.Group();
+  const ropes = new THREE.InstancedMesh(netSegGeo, netMatl, netCloth.segA.length);
+  ropes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  ropes.frustumCulled = false;   // the instances move every frame; the unit geometry's bounds would cull them wrongly
+  g.add(ropes);
+  const weights = cornerNodes(netCloth.n).map((node) => {
+    const mesh = new THREE.Mesh(netWeightGeo, netWeightMatl);
+    g.add(mesh);
+    return { node, mesh };
+  });
+  g.userData = { ropes, weights };
+  return g;
+}
+const netClothMesh = makeNetClothMesh();
+const netClothUp = new THREE.Vector3(0, 1, 0);
+const netClothA = new THREE.Vector3(), netClothDir = new THREE.Vector3(), netClothScale = new THREE.Vector3();
+const netClothQ = new THREE.Quaternion(), netClothM = new THREE.Matrix4();
+function syncNetClothMesh() {
+  const { pos, segA, segB } = netCloth;
+  const { ropes, weights } = netClothMesh.userData;
+  for (let s = 0; s < segA.length; s++) {
+    netClothA.fromArray(pos, segA[s] * 3);
+    netClothDir.fromArray(pos, segB[s] * 3).sub(netClothA);
+    const len = netClothDir.length();
+    if (len > 1e-6) netClothQ.setFromUnitVectors(netClothUp, netClothDir.multiplyScalar(1 / len));
+    netClothA.addScaledVector(netClothDir, len / 2);   // segment midpoint
+    netClothScale.set(1, len, 1);
+    ropes.setMatrixAt(s, netClothM.compose(netClothA, netClothQ, netClothScale));
+  }
+  ropes.instanceMatrix.needsUpdate = true;
+  for (const { node, mesh } of weights) mesh.position.fromArray(pos, node * 3);
+}
 
 function shootBall(dir, power) {
   const type = ammoType;
