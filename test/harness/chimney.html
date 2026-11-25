@@ -16,7 +16,9 @@
 </head>
 <body>
 <!-- Brick chimney collapse harness (#55). Builds the chimney on the real crashcat backend
-     with the same body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE)
+     with the same body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE).
+     Unlike addBlock it adds the centre offset ZC after scaling, so the chimney stands at
+     z = -6 here vs -12 in the game; all checks are measured in this harness's own frame
      and checks: it stands still, two cannonballs at the foot bring it down, a light ball
      does not. Title becomes CHIMNEY PASS/FAIL.
      Measured 2026-11-24 (segments 10, shaftCourses 24, wallBottom 0.30, wallTop 0.18, ROW_GAP 0):
