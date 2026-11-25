@@ -73,6 +73,13 @@
   .ammo button:hover { background: rgba(245,239,228,0.18); }
   .ammo button.sel { background: rgba(245,239,228,0.22); border-color: rgba(245,239,228,0.7); }
   .ammo .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  .paint-colors { display: flex; flex-wrap: wrap; gap: 5px; padding: 1px 0 3px 3px; max-width: 150px; }
+  .paint-colors[hidden] { display: none; }
+  .ammo .paint-colors .swatch {
+    width: 20px; height: 20px; padding: 0; border-radius: 50%; justify-content: center;
+    font-size: 11px; border: 2px solid rgba(245,239,228,0.25);
+  }
+  .ammo .paint-colors .swatch.on { border-color: #f5efe4; box-shadow: 0 0 0 1px #f5efe4; }
   #cam-pad {
     position: fixed; right: calc(20px + var(--sa-r)); bottom: calc(52px + var(--sa-b)); display: flex; gap: 8px; align-items: center;
     user-select: none; -webkit-user-select: none; touch-action: none;
@@ -163,6 +170,7 @@
     }
     .ammo.open { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: start; }
     .ammo.open button { width: 100%; }
+    .ammo.open .paint-colors .swatch { width: 28px; height: 28px; }
     .ammo button span:not(.dot) { display: none; }
     .target.open { display: flex; }
     .target .glabel { width: 48px; }
@@ -207,6 +215,7 @@
     <button data-type="bomb"><span class="dot" style="background:#1c1c20;border:2px solid #e0483a;box-sizing:border-box"></span>Bomb <span style="opacity:0.5">3</span></button>
     <button data-type="grenade"><span class="dot" style="background:#4a5a34;border-radius:3px"></span>Grenade <span style="opacity:0.5">G</span></button>
     <button data-type="paintball"><span class="dot" style="background:#e23b3b"></span>Paintball <span style="opacity:0.5">P</span></button>
+    <div class="paint-colors" id="paint-colors" hidden></div>
     <button data-type="dynamite"><span class="dot" style="background:#d23f2a;border-radius:2px"></span>Dynamite <span style="opacity:0.5">D</span></button>
   </div>
   <div class="ammo-group">
@@ -235,7 +244,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
 <div id="ioshint" role="note" hidden><span>Play as an app: Share ⬆ → Add to Home Screen</span><button id="ioshintx" type="button" aria-label="Dismiss the home-screen tip">×</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
@@ -329,6 +338,7 @@ import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { chimneyLayout, isSoot } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
+import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
@@ -1271,8 +1281,10 @@ const tipGeo = new THREE.ConeGeometry(0.09, 0.28, 10);
 const fuseGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.14, 8);
 const fuseMatl = new THREE.MeshStandardMaterial({ color: '#8a7040', roughness: 0.9 });
 // new ammo materials + geometries
-const paintMatl = new THREE.MeshStandardMaterial({ color: '#e23b3b', roughness: 0.55 });
-const paintSplatMatl = new THREE.MeshStandardMaterial({ color: '#d62828', roughness: 0.7 });
+const paintBallMatls = PAINT_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c.ball, roughness: 0.55 }));
+const paintSplatMatls = PAINT_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c.splat, roughness: 0.7 }));
+let paintChoice = 0;         // index into PAINT_COLORS, or RANDOM_PAINT
+let lastPaintIndex = null;   // colour of the previous paintball, so random mode never repeats it
 const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
@@ -1285,16 +1297,41 @@ const balls = []; // {body, mesh, born, type, exploded}
 
 let ammoType = 'basketball';
 const ammoEl = document.getElementById('ammo');
+const paintColorsEl = document.getElementById('paint-colors');
+function buildPaintSwatches() {
+  const choices = [...PAINT_COLORS.keys(), RANDOM_PAINT];
+  for (const choice of choices) {
+    const s = document.createElement('button');
+    s.type = 'button';
+    s.className = 'swatch';
+    s.dataset.paint = String(choice);
+    if (choice === RANDOM_PAINT) { s.textContent = '🎲'; s.title = 'Random: every shot a different colour'; }
+    else { s.style.background = PAINT_COLORS[choice].ball; s.title = PAINT_COLORS[choice].name; }
+    paintColorsEl.append(s);
+  }
+}
+function setPaintChoice(choice) {
+  paintChoice = choice;
+  for (const s of paintColorsEl.children) s.classList.toggle('on', s.dataset.paint === String(choice));
+}
+buildPaintSwatches();
+setPaintChoice(0);
+paintColorsEl.addEventListener('click', (e) => {
+  const s = e.target.closest('.swatch');
+  if (!s || autoPlay) return;
+  setPaintChoice(s.dataset.paint === RANDOM_PAINT ? RANDOM_PAINT : Number(s.dataset.paint));
+});
 function setAmmo(type) {
   ammoType = type;
-  for (const b of ammoEl.querySelectorAll('button')) b.classList.toggle('sel', b.dataset.type === type);
+  for (const b of ammoEl.querySelectorAll('button[data-type]')) b.classList.toggle('sel', b.dataset.type === type);
+  paintColorsEl.hidden = type !== 'paintball';
   // Sniper lens zooms the view for precision; other ammo restores the default FOV.
   const fov = type === 'sniper' ? 26 : DEFAULT_FOV;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 ammoEl.addEventListener('click', (e) => {
   if (autoPlay) return;
-  const btn = e.target.closest('button');
+  const btn = e.target.closest('button[data-type]');
   if (btn) setAmmo(btn.dataset.type);
 });
 
@@ -1554,6 +1591,7 @@ function shootBall(dir, power) {
     scene.add(chainMesh);
   }
 
+  let paintIndex = null;
   let mesh;
   if (type === 'basketball') {
     mesh = new THREE.Mesh(ballGeo, basketMatl);
@@ -1610,7 +1648,9 @@ function shootBall(dir, power) {
     fin.position.set(0, -0.42, 0.15); fin.castShadow = true;
     mesh.add(fin);
   } else if (type === 'paintball') {
-    mesh = new THREE.Mesh(ballGeo, paintMatl);
+    paintIndex = paintIndexForShot(paintChoice, lastPaintIndex, Math.random);
+    lastPaintIndex = paintIndex;
+    mesh = new THREE.Mesh(ballGeo, paintBallMatls[paintIndex]);
     mesh.scale.setScalar(0.15 / BALL_R);
   } else if (type === 'grenade') {
     mesh = new THREE.Group();
@@ -1712,7 +1752,7 @@ function shootBall(dir, power) {
   mesh.castShadow = type !== 'sniper';
   scene.add(mesh);
   const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos,
-    muzzle: { x: start.x, y: start.y, z: start.z } };
+    muzzle: { x: start.x, y: start.y, z: start.z }, paintIndex };
   // sounds: launch now, clank/bounce on collision
   playShoot(power);
   phys.onCollide(body, (other, impactSpeed) => {
@@ -1789,9 +1829,9 @@ function explode(rec, RADIUS = 3, STRENGTH = 320) {
 function paintSplat(rec, other) {
   rec.hit = true;
   const tgt = barrels.find(b => b.body === other);
-  if (tgt) tgt.mesh.traverse(o => { if (o.isMesh) o.material = paintMatl; });
+  if (tgt) tgt.mesh.traverse(o => { if (o.isMesh) o.material = paintBallMatls[rec.paintIndex]; });
   // splat blob at the impact spot
-  const splat = new THREE.Mesh(splatGeo, paintSplatMatl);
+  const splat = new THREE.Mesh(splatGeo, paintSplatMatls[rec.paintIndex]);
   const p = rec.body.position;
   splat.position.set(p.x, p.y, p.z);
   splat.scale.set(1 + Math.random() * 0.5, 0.35, 1 + Math.random() * 0.5);
@@ -2592,7 +2632,7 @@ addEventListener('keydown', (e) => {
   if (k === '8') setAmmo('catapult');
   if (k === '9') setAmmo('slingshot');
   if (k === '0') setAmmo('f16');
-  if (k === 'p') setAmmo('paintball');
+  if (k === 'p') { if (ammoType === 'paintball') setPaintChoice(nextPaintChoice(paintChoice)); else setAmmo('paintball'); }
   if (k === 'l') setAmmo('lightning');
   if (k === 'u') setAmmo('hurricane');
   if (k === 'm') setAmmo('magneto');
@@ -2641,7 +2681,7 @@ document.getElementById('mob-target').addEventListener('click', () => openSheet(
 document.getElementById('mob-help').addEventListener('click', () => hintEl.classList.toggle('show'));
 sheetBackdrop.addEventListener('click', closeSheets);
 for (const el of [ammoEl, targetEl]) {
-  el.addEventListener('click', (e) => { if (e.target.closest('button')) closeSheets(); });
+  el.addEventListener('click', (e) => { if (e.target.closest('button:not(.swatch)')) closeSheets(); });
   new MutationObserver(syncSheetLabels).observe(el, { subtree: true, attributeFilter: ['class'] });
 }
 mobileQuery.addEventListener('change', closeSheets);
