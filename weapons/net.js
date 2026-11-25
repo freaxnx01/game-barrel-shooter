@@ -19,11 +19,6 @@ export const NET = {
   weightRadius: 0.1,
   bundleScale: 0.12,   // leaves the launcher as a bundle …
   openMs: 350,         // … and is fully open this long after the throw
-  // drape after a catch: a rope dome over the caught pieces
-  drapeMargin: 0.8,
-  drapeMin: 1.2,
-  drapeMeridians: 8,
-  drapeParallels: 4,
 };
 
 function distance(a, b) {
@@ -79,17 +74,4 @@ export function openScale(elapsedMs) {
   const t = Math.min(Math.max(elapsedMs / NET.openMs, 0), 1);
   const eased = 1 - (1 - t) * (1 - t);
   return NET.bundleScale + (1 - NET.bundleScale) * eased;
-}
-
-// Radius of the drape dome for a given spread of the caught pieces around their centroid.
-export function drapeRadius(spreadValue) {
-  return Math.max(NET.drapeMin, spreadValue + NET.drapeMargin);
-}
-
-// Parallels of the unit drape dome, from the rim upward: { radius, y } on the unit hemisphere.
-export function drapeParallels() {
-  return Array.from({ length: NET.drapeParallels }, (_, i) => {
-    const lat = ((i + 1) / (NET.drapeParallels + 1)) * (Math.PI / 2);
-    return { radius: Math.cos(lat), y: Math.sin(lat) };
-  });
 }

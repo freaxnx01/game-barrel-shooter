@@ -364,7 +364,7 @@ import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects } from './targets/chimne
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
-import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale, drapeRadius, drapeParallels } from './weapons/net.js';
+import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
@@ -1573,27 +1573,6 @@ function makeNetMesh() {
   return g;
 }
 
-// rope dome draped over the caught pieces (#60): arcs and rings of thick rope on a unit hemisphere,
-// scaled to the catch every frame. Built once; netCatch() adds it to the scene, detachNet() removes it.
-const NET_DRAPE_TUBE_R = 0.02;   // at unit scale; the dome is 1.2–4 m, so the rope reads as 2.4–8 cm
-function makeNetDrapeMesh() {
-  const g = new THREE.Group();
-  const arcGeo = new THREE.TorusGeometry(1, NET_DRAPE_TUBE_R, 6, 24, Math.PI);   // half-torus: rim to rim over the top
-  for (let i = 0; i < NET.drapeMeridians; i++) {
-    const arc = new THREE.Mesh(arcGeo, netMatl);
-    arc.rotation.y = (i / NET.drapeMeridians) * Math.PI;
-    g.add(arc);
-  }
-  for (const ring of drapeParallels()) {
-    const p = new THREE.Mesh(new THREE.TorusGeometry(ring.radius, NET_DRAPE_TUBE_R, 6, 32), netMatl);
-    p.rotation.x = Math.PI / 2;
-    p.position.y = ring.y;
-    g.add(p);
-  }
-  return g;
-}
-const netDrape = makeNetDrapeMesh();
-
 // cloth drape after a catch (#70): one instanced rope cylinder per cloth segment plus the four corner weights.
 // Built once; netCatch() resets the cloth and adds the group, detachNet() removes it. No per-frame GPU allocation.
 const netCloth = createCloth();
@@ -2259,11 +2238,14 @@ function netCatch(rec) {
   if (!caught.length) return;                 // missed: the net lies where it fell and is culled later
   detachNet();                                // one net at a time: a new catch replaces the old one
   for (const body of caught) phys.wake(body);
+  // the cloth continues from the flying net: same place, same open scale, half its speed (#70)
+  resetCloth(netCloth, rec.body.position, rec.mesh.scale.x, phys.getVelocity(rec.body));
+  syncNetClothMesh();
   const rope = makeRopeMesh();
-  scene.add(netDrape);
+  scene.add(netClothMesh);
   scene.add(rope);
-  netLink = { bodies: caught, drape: netDrape, rope };
-  // the bundled net is replaced by the drape — removed out of the collide callback, like paintSplat()
+  netLink = { bodies: caught, rope, ropeNode: nearestCorner(netCloth, launcherPoint()) };
+  // the bundled net is replaced by the cloth — removed out of the collide callback, like paintSplat()
   setTimeout(() => {
     phys.removeBody(rec.body);
     scene.remove(rec.mesh);
@@ -2276,22 +2258,32 @@ function netCatch(rec) {
 
 function detachNet() {
   if (!netLink) return;
-  scene.remove(netLink.drape);
+  scene.remove(netClothMesh);
   disposeRope(netLink.rope);
   netLink = null;
   syncPullButton();
 }
 
-function updateNet() {
+const NET_STILL = { x: 0, y: 0, z: 0 };
+// collision proxies for the cloth: every caught piece (live pose and velocity) plus the target platform
+function netProxies(bodies) {
+  const proxies = [];
+  for (const body of bodies) {
+    const p = proxyFor(body.shape, body.position, body.quaternion, phys.getVelocity(body));
+    if (p) proxies.push(p);
+  }
+  if (platBody) proxies.push(proxyFor(platBody.shape, platBody.position, platBody.quaternion, NET_STILL));
+  return proxies;
+}
+
+function updateNet(dt) {
   netLink.bodies = netLink.bodies.filter((body) => body.position.y >= -5);   // pieces off the world drop out
   if (!netLink.bodies.length) { detachNet(); return; }
   const from = launcherPoint();
-  const points = netLink.bodies.map((body) => body.position);
-  const centre = centroid(points);
-  const c = new THREE.Vector3(centre.x, centre.y, centre.z);
-  drawRope(netLink.rope, from, c);
-  netLink.drape.position.copy(c);
-  netLink.drape.scale.setScalar(drapeRadius(spread(points, centre)));
+  const centre = centroid(netLink.bodies.map((body) => body.position));
+  stepCloth(netCloth, dt, { proxies: netProxies(netLink.bodies), leashCentre: centre });
+  syncNetClothMesh();
+  drawRope(netLink.rope, from, new THREE.Vector3().fromArray(netCloth.pos, netLink.ropeNode * 3));
   if (!pulling) return;
   if (isReeledIn(from, centre)) { detachNet(); return; }
   for (const body of netLink.bodies) pullNetPiece(body, from);
@@ -3117,7 +3109,7 @@ function animate() {
       if (dist < 4) detachHarpoon();                    // reeled in close → let go
     }
   }
-  if (netLink) updateNet();
+  if (netLink) updateNet(dt);
 
   // charge bar
   if (charging) {
