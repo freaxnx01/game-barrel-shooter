@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn } from '../weapons/net.js';
+import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale, drapeRadius, drapeParallels } from '../weapons/net.js';
 
 const piece = (x, mass = 8) => ({ position: { x, y: 0, z: 0 }, mass });
 const origin = { x: 0, y: 0, z: 0 };
@@ -18,7 +18,7 @@ test('netLaunch_FlatAim_LiftedUnitDirection', () => {
 });
 
 test('selectCaught_InAndOutOfRadius_OnlyNearOnes', () => {
-  const near = piece(1), far = piece(2);
+  const near = piece(1), far = piece(3);
   assert.deepEqual(selectCaught([far, near], origin), [near]);
 });
 
@@ -30,11 +30,18 @@ test('selectCaught_NoPieces_Empty', () => {
   assert.deepEqual(selectCaught([], origin), []);
 });
 
-test('selectCaught_MoreThanMax_NearestSixInOrder', () => {
-  const pieces = [0.8, 0.3, 0.1, 0.7, 0.5, 0.2, 0.6, 0.4].map((x) => piece(x));
+test('NET_Catch_RadiusAndCapGrowWithTheOpenNet', () => {
+  assert.equal(NET.captureRadius, 2.4);
+  assert.equal(NET.maxCatch, 14);
+  assert.ok(NET.captureRadius > NET.openSize / 2);          // covers at least the inscribed circle
+  assert.ok(NET.captureRadius < NET.openSize / Math.SQRT2); // but not the full diagonal
+});
+
+test('selectCaught_MoreThanMax_NearestFourteenInOrder', () => {
+  const pieces = Array.from({ length: 20 }, (_, i) => piece((20 - i) * 0.1));   // 2.0 m … 0.1 m, farthest first
   const caught = selectCaught(pieces, origin);
   assert.equal(caught.length, NET.maxCatch);
-  assert.deepEqual(caught.map((p) => p.position.x), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]);
+  assert.deepEqual(caught.map((p) => Math.round(p.position.x * 10)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 });
 
 test('centroid_TwoPoints_Midpoint', () => {
@@ -67,4 +74,38 @@ test('pullForce_SamePoint_NoNaN', () => {
 test('isReeledIn_InsideAndAtReleaseDistance_TrueThenFalse', () => {
   assert.equal(isReeledIn(origin, { x: 0, y: 0, z: 3.9 }), true);
   assert.equal(isReeledIn(origin, { x: 0, y: 0, z: 4 }), false);
+});
+
+test('strandOffsets_FourMetreNet_NineStrandsHalfAMetreApart', () => {
+  assert.deepEqual(strandOffsets(), [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]);
+});
+
+test('openScale_StartAndEnd_BundleThenFull', () => {
+  assert.equal(openScale(0), NET.bundleScale);
+  assert.equal(openScale(-10), NET.bundleScale);
+  assert.equal(openScale(NET.openMs), 1);
+  assert.equal(openScale(5000), 1);
+});
+
+test('openScale_Midway_MonotonicAndEasedOut', () => {
+  const a = openScale(100), b = openScale(200), c = openScale(300);
+  assert.ok(NET.bundleScale < a && a < b && b < c && c < 1);
+  assert.ok(openScale(NET.openMs / 2) > (NET.bundleScale + 1) / 2);   // ease-out: past half size at half time
+});
+
+test('drapeRadius_SmallAndLargeSpread_FloorThenMargin', () => {
+  assert.equal(drapeRadius(0), NET.drapeMin);
+  assert.equal(drapeRadius(0.3), NET.drapeMin);
+  assert.ok(Math.abs(drapeRadius(2.5) - 3.3) < 1e-9);
+});
+
+test('drapeParallels_FourRings_OnUnitHemisphereRisingAndNarrowing', () => {
+  const rings = drapeParallels();
+  assert.equal(rings.length, NET.drapeParallels);
+  for (const r of rings) assert.ok(Math.abs(r.radius * r.radius + r.y * r.y - 1) < 1e-9);
+  for (let i = 1; i < rings.length; i++) {
+    assert.ok(rings[i].y > rings[i - 1].y);
+    assert.ok(rings[i].radius < rings[i - 1].radius);
+  }
+  assert.ok(rings[0].y > 0 && rings[rings.length - 1].radius > 0);
 });
