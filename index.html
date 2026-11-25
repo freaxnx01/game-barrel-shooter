@@ -107,7 +107,7 @@
   }
 
   /* ---------- Mobile mode (#37): small or touch screens only ---------- */
-  #act-bar, .hint .hint-touch, .hint .hint-reload, .hint .hint-ios { display: none; }
+  .hint .hint-touch, .hint .hint-reload, .hint .hint-ios { display: none; }
 
   /* ---------- Collapsed menus (#61): weapon and target lists open as a sheet, on every screen size ---------- */
   #sheet-backdrop { display: none; }
@@ -132,6 +132,20 @@
   #mob-bar button:hover { background: rgba(245,239,228,0.18); }
   #mob-help, #mob-jenga-shoot { display: none; }   /* desktop: the hint is always visible, #jenga-shoot is its own button */
   .hint { top: calc(164px + var(--sa-t)); }
+
+  /* ---------- Action bar (#63): Pull, Cut, Boom (and Quake on mobile), each shown only while it applies ---------- */
+  #act-bar { display: flex; gap: 8px; position: fixed; right: calc(20px + var(--sa-r)); bottom: calc(190px + var(--sa-b)); user-select: none; -webkit-user-select: none; touch-action: none; }
+  #act-bar button {
+    font-family: inherit; color: #f5efe4; background: rgba(26,22,17,0.55);
+    border: 1px solid rgba(245,239,228,0.3); border-radius: 6px; cursor: pointer;
+    width: 60px; height: 60px; padding: 0; font-size: 22px; touch-action: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  }
+  #act-bar button:hover { background: rgba(245,239,228,0.18); }
+  #act-bar button span { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  #act-bar button[hidden] { display: none; }
+  #act-bar button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
+
   @media (max-width: 900px), (pointer: coarse) {
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #c { touch-action: none; }
@@ -145,10 +159,6 @@
     #jenga-shoot { display: none; }   /* mobile: the toggle lives in #mob-bar */
 
     #mob-bar { top: calc(86px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: calc(12px + var(--sa-r)); }
-    #act-bar button {
-      font-family: inherit; color: #f5efe4; background: rgba(26,22,17,0.55);
-      border: 1px solid rgba(245,239,228,0.3); border-radius: 6px; cursor: pointer;
-    }
     #mob-bar button { max-width: 150px; }
     #mob-help { display: block; flex: none; width: 34px; padding: 7px 0 !important; font-weight: 700; }
     #mob-jenga-shoot:not([hidden]) { display: block; }
@@ -167,14 +177,7 @@
     /* #50: the free strip below #mob-bar, where the "?" panel opens; hidden while that panel shows (it carries the same line) */
     #ioshint { top: calc(128px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: auto; max-width: calc(100% - 24px - var(--sa-l) - var(--sa-r)); border-radius: 22px; font-size: 12px; }
 
-    #act-bar { display: flex; gap: 8px; position: fixed; left: calc(12px + var(--sa-l)); bottom: calc(46px + var(--sa-b)); user-select: none; -webkit-user-select: none; touch-action: none; }
-    #act-bar button {
-      width: 60px; height: 60px; padding: 0; font-size: 22px; touch-action: none;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-    }
-    #act-bar button span { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
-    #act-bar button[hidden] { display: none; }
-    #act-bar button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
+    #act-bar { left: calc(12px + var(--sa-l)); right: auto; bottom: calc(46px + var(--sa-b)); }
 
     #cam-pad { right: calc(12px + var(--sa-r)); bottom: calc(46px + var(--sa-b)); gap: 6px; }
     #cam-pad .dpad { grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px); }
@@ -272,9 +275,10 @@
   <button id="mob-help" aria-controls="hint" title="Controls">?</button>
 </div>
 <div id="act-bar">
-  <button id="act-quake" title="Hold for an earthquake">🌋<span>Quake</span></button>
-  <button id="act-pull" title="Hold to reel the harpoon or net in" hidden>🪝<span>Pull</span></button>
-  <button id="act-boom" title="Detonate the remote charges" hidden>💥<span>Boom</span></button>
+  <button id="act-quake" title="Hold for an earthquake" hidden>🌋<span>Quake</span></button>
+  <button id="act-pull" title="Hold to reel the harpoon or net in (Space)" hidden>🪝<span>Pull</span></button>
+  <button id="act-cut" title="Cut the rope (O)" hidden>✂️<span>Cut</span></button>
+  <button id="act-boom" title="Detonate the remote charges (K)" hidden>💥<span>Boom</span></button>
 </div>
 <div id="sheet-backdrop"></div>
 <button id="reset">Reset</button>
