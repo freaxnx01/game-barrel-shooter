@@ -18,12 +18,14 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Aim** | Move the mouse — the projectile fires toward the cursor |
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag, arrow keys, or the pad bottom-right (hold to keep turning); scroll wheel or the pad's `+`/`−` to zoom. On a Chromebook touchpad, Alt + press and drag works as right-drag |
-| **Switch ammo** | Grouped buttons bottom-left, or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball; `P` again cycles the colour), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football), `B` (remote charge), `Z` (timed charge), `N` (heavy net) |
+| **Switch ammo** | The 💥 button top-left opens the weapon list (🎯 for targets), or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball; `P` again cycles the colour), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football), `B` (remote charge), `Z` (timed charge), `N` (heavy net) |
 | **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga / Chimney · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
 | **Detonate** | `K` blows up all placed remote charges |
 | **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
 | **Reset** | `R` key or the Reset button |
+
+The 🎯 and 💥 buttons top-left open the target and weapon lists as a sheet on every screen size; pick an entry, click outside, or press `Escape` to close it.
 
 ### On a phone or tablet
 
