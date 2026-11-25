@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARGE, chargeLaunch, chargeMomentum, chargeStickPlan, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
 
 test('chargeLaunch_PowerRange_Speed12To26', () => {
   assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 12);
@@ -65,15 +65,6 @@ test('CHARGE_Tuning_MatchesSpec', () => {
   assert.equal(CHARGE.maxRemote, 6);
 });
 
-test('chargeMomentum_FullPower_StaysBelowThreeNewtonSeconds', () => {
-  assert.ok(chargeMomentum(1) <= 3);
-  assert.ok(Math.abs(chargeMomentum(1) - 2.6) < 1e-9);
-});
-
-test('chargeMomentum_NoPower_IsBaseSpeedTimesMass', () => {
-  assert.ok(Math.abs(chargeMomentum(0) - 1.2) < 1e-9);
-});
-
 test('chargeStickPlan_AlreadyStuck_Ignore', () => {
   assert.equal(chargeStickPlan(true, { mass: 5 }), 'ignore');
 });
@@ -89,4 +80,9 @@ test('chargeStickPlan_FirstContactWithStaticBody_Joint', () => {
 test('chargeStickPlan_NoOtherBody_Freeze', () => {
   assert.equal(chargeStickPlan(false, null), 'freeze');
   assert.equal(chargeStickPlan(false, undefined), 'freeze');
+});
+
+test('chargeStickPlan_OtherIsProjectile_Ignore', () => {
+  // projectiles are removed on their own schedule; a joint to one would outlive its body
+  assert.equal(chargeStickPlan(false, { mass: 2 }, true), 'ignore');
 });

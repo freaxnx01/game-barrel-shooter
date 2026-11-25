@@ -1883,8 +1883,9 @@ function explode(rec, RADIUS = 3, STRENGTH = 320) {
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
   // radial impulse on all dynamic bodies
+  const chargeBodies = new Set(balls.filter((b) => b.type === 'remotecharge' || b.type === 'timedcharge').map((b) => b.body));
   for (const body of phys.bodies()) {
-    if (body.mass <= 0 || body === rec.body) continue;
+    if (body.mass <= 0 || body === rec.body || chargeBodies.has(body)) continue;   // a 0.1 kg charge would fly off at 20x speed (#62)
     let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
     const dist = Math.max(Math.hypot(dx, dy, dz), 0.5);
     if (dist > RADIUS) continue;
@@ -2164,9 +2165,9 @@ function detachHarpoon() {
 
 // ---------- Remote and timed charges: stick to the first thing they hit, no impact damage (#62) ----------
 function chargeStick(rec, other) {
-  const plan = chargeStickPlan(rec.stuck, other);
+  const plan = chargeStickPlan(rec.stuck, other, balls.some((b) => b.body === other));
   if (plan === 'ignore') return;
-  rec.stuck = true;                              // exempts it from the 12 s and y < -5 culls
+  rec.stuck = true;                              // exempts it from the 12 s cull
   phys.setVelocity(rec.body, 0, 0, 0);
   phys.setAngularVelocity(rec.body, 0, 0, 0);
   if (plan === 'joint') rec.stickJoint = phys.addFixedJoint(rec.body, other);
@@ -3238,7 +3239,7 @@ function animate() {
     if (b.type === 'sniper' && !b.hit && isOutOfRange(b.muzzle, b.body.position)) { removeProjectile(b); balls.splice(i, 1); continue; }
     const cullTime = b.type === 'wrecking' ? 25000 : 12000;
     const timeless = b.stuck || (b.type === 'remotecharge' && !b.exploded);   // armed charges wait for K / Boom
-    if ((!timeless && now - b.born > cullTime) || (!b.stuck && b.body.position.y < -5)) {
+    if ((!timeless && now - b.born > cullTime) || ((!b.stuck || b.stickJoint) && b.body.position.y < -5)) {
       removeProjectile(b);
       balls.splice(i, 1);
     }

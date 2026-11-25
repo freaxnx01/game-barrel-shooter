@@ -138,7 +138,7 @@ No physics-facade change: `addBody`, `applyForce`, `applyImpulse`, `setVelocity`
 
 | | Value |
 |---|---|
-| Charge body | box, half extents `[0.16, 0.08, 0.11]`, mass 2, material `'heavy'` |
+| Charge body | box, half extents `[0.16, 0.08, 0.11]`, mass 2 (0.1 since #62, see `2026-11-25-issue-62-sticky-charges-design.md`), material `'heavy'` |
 | Charge launch | direction `normalize(dir + (0, 0.28, 0))`, speed `12 + 14 * power` |
 | Charge blast | `explode(rec, 4, 500)` |
 | Timed fuse | 4000 ms from launch; blink period `max(100, 600 - 500 * elapsed / 4000)` ms, LED on during the first half of each period |

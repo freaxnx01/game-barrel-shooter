@@ -28,11 +28,6 @@ export function chargeLaunch(dir, power) {
   };
 }
 
-// Momentum (N*s) a charge carries into its first contact; kept tiny so it does no impact damage.
-export function chargeMomentum(power) {
-  return CHARGE.mass * (CHARGE.speedBase + clamp01(power) * CHARGE.speedPower);
-}
-
 export function isFuseDone(bornMs, nowMs) {
   return nowMs - bornMs >= CHARGE.fuseMs;
 }
@@ -55,9 +50,10 @@ export function armedRemotes(records) {
   return records.filter((r) => r.type === 'remotecharge' && !r.exploded);
 }
 
-// What a charge does on a contact: 'ignore' once stuck, 'freeze' in place when there is no
-// body handle to join, otherwise 'joint' (static bodies such as the ground count too).
-export function chargeStickPlan(stuck, other) {
-  if (stuck) return 'ignore';
+// What a charge does on a contact: 'ignore' once stuck or when it hits another projectile
+// (removed on its own schedule, so a joint to it would outlive its body), 'freeze' in place
+// when there is no body handle to join, otherwise 'joint' (static bodies such as the ground count too).
+export function chargeStickPlan(stuck, other, otherIsProjectile = false) {
+  if (stuck || otherIsProjectile) return 'ignore';
   return other ? 'joint' : 'freeze';
 }
