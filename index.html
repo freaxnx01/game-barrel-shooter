@@ -372,6 +372,7 @@ import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
 import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
 import { sheetAfter } from './ui/sheet.js';
+import { visibleActions, CUT_KEY } from './ui/actions.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -2118,11 +2119,20 @@ function drawRope(rope, from, to) {
 function launcherPoint() {
   return new THREE.Vector3(0.6, -0.55, -1.4).applyMatrix4(camera.matrixWorld);
 }
-function syncPullButton() {
-  const tethered = Boolean(harpoonLink || netLink);
-  pullBtn.hidden = !tethered;
-  if (!tethered) pulling = false;
+function setHidden(el, hidden) { if (el.hidden !== hidden) el.hidden = hidden; }
+function syncActionBar() {
+  const v = visibleActions({
+    tethered: Boolean(harpoonLink || netLink),
+    armed: armedRemotes(balls).length,
+    mobile: mobileQuery.matches,
+  });
+  setHidden(quakeBtn, !v.quake);
+  setHidden(pullBtn, !v.pull);
+  setHidden(cutBtn, !v.cut);
+  setHidden(boomBtn, !v.boom);
+  if (!v.pull) pulling = false;
 }
+function syncPullButton() { syncActionBar(); }   // kept: the harpoon and net code calls this name
 
 // ---------- Harpoon: embed in the struck barrel; the player then reels it in ----------
 function harpoonStick(rec, other) {
@@ -2564,7 +2574,10 @@ const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2(0, 0);
 let charging = false, chargeStart = 0;
 let harpoonLink = null, netLink = null, pulling = false;   // harpoon / heavy net tethers; hold Space to reel in
-const pullBtn = document.getElementById('act-pull');   // mobile Pull button, shown only while a harpoon is attached
+const pullBtn = document.getElementById('act-pull');   // Pull button, shown only while a harpoon or net holds something
+const quakeBtn = document.getElementById('act-quake');
+const cutBtn = document.getElementById('act-cut');
+const boomBtn = document.getElementById('act-boom');   // shown while remote charges are armed
 const powerEl = document.getElementById('power');
 const powerFill = document.getElementById('powerFill');
 
@@ -2836,6 +2849,7 @@ addEventListener('keydown', (e) => {
   if (k === 'b') setAmmo('remotecharge');
   if (k === 'z') setAmmo('timedcharge');
   if (k === 'k') detonateRemoteCharges();
+  if (k === CUT_KEY) cutTether();
   if (k === 'n') setAmmo('net');
   if (e.key === ' ' && (harpoonLink || netLink)) { pulling = true; e.preventDefault(); }  // hold Space = reel in
   if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
@@ -2888,8 +2902,18 @@ holdButton(document.getElementById('act-quake'), () => {
   quakeStart = performance.now();
 }, () => { quakeActive = false; });
 holdButton(pullBtn, () => { if (!autoPlay && (harpoonLink || netLink)) pulling = true; }, () => { pulling = false; });
-const boomBtn = document.getElementById('act-boom');   // mobile Boom button, shown while remote charges are armed
 boomBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!autoPlay) detonateRemoteCharges(); });
+
+function cutTether() {
+  if (!harpoonLink && !netLink) return;
+  detachHarpoon();
+  detachNet();
+  pulling = false;
+  syncActionBar();
+}
+cutBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!autoPlay) cutTether(); });
+mobileQuery.addEventListener('change', syncActionBar);
+syncActionBar();
 
 // ---------- Auto-play ----------
 let autoPlay = false;
@@ -3204,8 +3228,7 @@ function animate() {
       balls.splice(i, 1);
     }
   }
-  const armed = armedRemotes(balls).length > 0;
-  if (boomBtn.hidden === armed) boomBtn.hidden = !armed;
+  syncActionBar();
 
   // explosion visuals
   for (let i = explosions.length - 1; i >= 0; i--) {
