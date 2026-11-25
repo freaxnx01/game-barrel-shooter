@@ -69,7 +69,7 @@ bottom layer sticks and pushing out a whole layer ends the round (title `JENGA P
 audible, does not clip, rises with held pieces and fades out within 0.2 s (title `HUM PASS`/`FAIL`).
 `test/harness/football-flight.html` checks the American football: nose along the flight path, spin,
 irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
-`test/harness/chimney.html` checks the brick chimney: it stands still, two cannonballs at the foot bring it down and a light ball does not (title `CHIMNEY PASS`/`FAIL`).
+`test/harness/chimney.html` checks the brick chimney: it stands still, one dynamite charge at the foot brings it down and a light ball does not (title `CHIMNEY PASS`/`FAIL`).
 
 ## Game Content
 
@@ -86,8 +86,8 @@ stacked crosses; Eiffel-style matchstick truss; bowling pins; cylindrical brick 
 and castle gates; hollow brick box and brick tower; four post-and-beam frame buildings; spiral
 tower; Jenga tower of 18 crosswise layers of 3 wooden blocks, where you push blocks out
 instead of shooting (the HUD counts blocks pulled; the round ends when the tower falls);
-tall brick industrial chimney on a stone plinth, tapering to a soot-blackened crown, that tips
-over and breaks apart when hit at the foot.
+tall brick industrial chimney, tapering to a soot-blackened top, that tips over and breaks apart
+when hit at the foot.
 
 **Feedback:** score HUD (targets knocked down / total), shot counter, and synthesized
 Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thunder, wind).

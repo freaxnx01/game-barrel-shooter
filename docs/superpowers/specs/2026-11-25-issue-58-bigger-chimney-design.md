@@ -28,7 +28,8 @@ and it breaks apart; a light ball only knocks a few bricks; an untouched chimney
 ## Anti-goals (a failure even if it technically works)
 
 - The untouched chimney creeps or sheds bricks (43 stacked courses at `ROW_GAP` 0 is the risk).
-- A light ball flattens it, or two cannonballs at the foot cannot topple it.
+- A light ball flattens it, or two cannonballs at the foot cannot topple it. (Superseded in
+  implementation: toppling takes dynamite at the foot, see Outcome below.)
 - A brick at course 0 floats above the ground, or the crown/plinth leaves dead code or stale docs.
 
 ## Shape (decided, builder must follow)
@@ -83,6 +84,21 @@ Exports after the change: `CHIMNEY`, `chimneyLayout`, `coursePitch`, `shaftRadiu
 
 `physics/materials.js`, damping, sleep values and the `ROW_GAP` of 0 stay as they are. Record the
 final values and measured numbers in the harness header comment and in the PR.
+
+### Outcome (implementation, 2026-11-25)
+
+- **Walls 0.375 / 0.225** (tuning step 1). With 0.30 / 0.18 the woken stack crept 0.0857
+  (stable check failed); with the thicker walls it moves 0.0149. Bricks keep length and height,
+  only the wall depth grows. 12 bricks per ring and 43 courses stay.
+- **Base hit is now one dynamite charge at the foot**, not two cannonballs (maintainer
+  decision: the bigger chimney being harder to topple is fine). Two cannonballs remove only
+  ~5 bricks at courses 0–1 and the running bond bridges the gap; the top stays at 28.33 of
+  28.35. No geometry variant in the tuning list changed that (segments 10 / 13, courses 41 / 45).
+  Attempts in order, smallest first: 3 cannonballs FAIL (min 28.33, 8 bricks moved),
+  4 cannonballs FAIL (28.34, 8), **1 dynamite PASS** (the game's `explode()` with 4.5 / 600 at
+  the outer face of course 1: top min 0.69, 514 bricks moved, tip-over radial 7.94).
+- **Camera `r: 52, ty: 8.5`**: the planned `r: 45, ty: 7.5` put the top under the target menu
+  at 1280×720.
 
 ## Verification
 
