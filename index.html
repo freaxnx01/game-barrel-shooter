@@ -1566,6 +1566,27 @@ function makeNetMesh() {
   return g;
 }
 
+// rope dome draped over the caught pieces (#60): arcs and rings of thick rope on a unit hemisphere,
+// scaled to the catch every frame. Built once; netCatch() adds it to the scene, detachNet() removes it.
+const NET_DRAPE_TUBE_R = 0.02;   // at unit scale; the dome is 1.2–4 m, so the rope reads as 2.4–8 cm
+function makeNetDrapeMesh() {
+  const g = new THREE.Group();
+  const arcGeo = new THREE.TorusGeometry(1, NET_DRAPE_TUBE_R, 6, 24, Math.PI);   // half-torus: rim to rim over the top
+  for (let i = 0; i < NET.drapeMeridians; i++) {
+    const arc = new THREE.Mesh(arcGeo, netMatl);
+    arc.rotation.y = (i / NET.drapeMeridians) * Math.PI;
+    g.add(arc);
+  }
+  for (const ring of drapeParallels()) {
+    const p = new THREE.Mesh(new THREE.TorusGeometry(ring.radius, NET_DRAPE_TUBE_R, 6, 32), netMatl);
+    p.rotation.x = Math.PI / 2;
+    p.position.y = ring.y;
+    g.add(p);
+  }
+  return g;
+}
+const netDrape = makeNetDrapeMesh();
+
 function shootBall(dir, power) {
   const type = ammoType;
   if (type === 'lightning') { strikeLightning(); shots++; updateHud(); return; }
@@ -2194,11 +2215,10 @@ function netCatch(rec) {
   if (!caught.length) return;                 // missed: the net lies where it fell and is culled later
   detachNet();                                // one net at a time: a new catch replaces the old one
   for (const body of caught) phys.wake(body);
-  const drape = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), netMatl);
   const rope = makeRopeMesh();
-  scene.add(drape);
+  scene.add(netDrape);
   scene.add(rope);
-  netLink = { bodies: caught, drape, rope };
+  netLink = { bodies: caught, drape: netDrape, rope };
   // the bundled net is replaced by the drape — removed out of the collide callback, like paintSplat()
   setTimeout(() => {
     phys.removeBody(rec.body);
@@ -2213,7 +2233,6 @@ function netCatch(rec) {
 function detachNet() {
   if (!netLink) return;
   scene.remove(netLink.drape);
-  netLink.drape.geometry.dispose();
   disposeRope(netLink.rope);
   netLink = null;
   syncPullButton();
@@ -2228,7 +2247,7 @@ function updateNet() {
   const c = new THREE.Vector3(centre.x, centre.y, centre.z);
   drawRope(netLink.rope, from, c);
   netLink.drape.position.copy(c);
-  netLink.drape.scale.setScalar(spread(points, centre) + 0.6);
+  netLink.drape.scale.setScalar(drapeRadius(spread(points, centre)));
   if (!pulling) return;
   if (isReeledIn(from, centre)) { detachNet(); return; }
   for (const body of netLink.bodies) pullNetPiece(body, from);
