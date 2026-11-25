@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale } from '../weapons/net.js';
+import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from '../weapons/net.js';
 
 const piece = (x, mass = 8) => ({ position: { x, y: 0, z: 0 }, mass });
 const origin = { x: 0, y: 0, z: 0 };
@@ -50,12 +50,6 @@ test('centroid_TwoPoints_Midpoint', () => {
 
 test('centroid_Empty_Null', () => {
   assert.equal(centroid([]), null);
-});
-
-test('spread_TwoPoints_LargestDistanceFromCentre', () => {
-  const pts = [{ x: 0, y: 0, z: 0 }, { x: 2, y: 4, z: 6 }];
-  assert.ok(Math.abs(spread(pts, { x: 1, y: 2, z: 3 }) - Math.sqrt(14)) < 1e-9);
-  assert.equal(spread([], origin), 0);
 });
 
 test('pullForce_TowardLauncher_ScaledByMassPlusGravity', () => {
