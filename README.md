@@ -80,7 +80,7 @@ irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
 - *Balls* — basketball, soccerball, tennis ball, bowling ball, cannonball, American football (a light 0.4 kg spiral pass that flies nose-first and hops off unpredictably when it lands; it tips single barrels rather than clearing the pyramid)
 - *Explosives* — bomb (explodes on contact), grenade (timed fuse), paintball (splats; pick a colour or 🎲 random), remote charge (lies still until you press K / Boom; up to 6), timed charge (explodes 4 s after the throw, LED blinks faster)
 - *Heavy & melee* — wrecking ball (swings on a chain), hammer (tumbles end-over-end), spear (flies point-first), tractor tire (rolls into the target, slows, and tips over)
-- *Launchers* — catapult (high lobbed rock), slingshot (fast pellet), mini F-16 (flies nose-first), heavy net (catches up to 6 pieces, hold Space / Pull to drag them in, O / Cut to let go)
+- *Launchers* — catapult (high lobbed rock), slingshot (fast pellet), mini F-16 (flies nose-first), heavy net (a 4 m rope net that catches up to 14 pieces, hold Space / Pull to drag them in, O / Cut to let go)
 - *Powers* — lightning (strikes the aim point), hurricane (wandering tornado funnel that lifts debris), magneto (hold left mouse to gather pieces toward the cursor)
 
 **Targets:** barrel pyramid on a platform; 6-level house of cards; stone fortress and ruined

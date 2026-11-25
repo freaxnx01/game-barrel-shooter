@@ -28,6 +28,7 @@ All notable changes to this project are documented here, following
 - Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
 
 ### Changed
+- Heavy net is now a 4 m × 4 m throw net of thick rope with wide meshes and corner weights: it opens in flight, lies flat where it lands, drapes over the catch as a rope dome and catches up to 14 pieces within 2.4 m instead of 6 within 1.6 m (#60)
 - Desktop: the weapon and target lists collapse into the 🎯 and 💥 buttons like on mobile, so the weapon panel no longer covers the chimney foot (#61)
 - Brick chimney is 1.25× wider and 1.5× higher, has no crown and no stone base any more, and stands directly on the ground; it now takes dynamite at the foot to topple it (#58)
 - The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
