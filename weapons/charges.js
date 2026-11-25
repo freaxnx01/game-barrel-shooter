@@ -2,7 +2,7 @@
 // Numbers from docs/superpowers/specs/2026-11-24-issue-54-detonators-net-paintball-design.md.
 
 export const CHARGE = {
-  mass: 2,
+  mass: 0.1, // nearly massless: a stuck charge must not knock pieces over (#62)
   halfExtents: [0.16, 0.08, 0.11],
   speedBase: 12,
   speedPower: 14,
@@ -26,6 +26,11 @@ export function chargeLaunch(dir, power) {
     direction: { x: x / n, y: y / n, z: z / n },
     speed: CHARGE.speedBase + clamp01(power) * CHARGE.speedPower,
   };
+}
+
+// Momentum (N*s) a charge carries into its first contact; kept tiny so it does no impact damage.
+export function chargeMomentum(power) {
+  return CHARGE.mass * (CHARGE.speedBase + clamp01(power) * CHARGE.speedPower);
 }
 
 export function isFuseDone(bornMs, nowMs) {
