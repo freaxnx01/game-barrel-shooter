@@ -217,6 +217,8 @@
     <button data-type="paintball"><span class="dot" style="background:#e23b3b"></span>Paintball <span style="opacity:0.5">P</span></button>
     <div class="paint-colors" id="paint-colors" hidden></div>
     <button data-type="dynamite"><span class="dot" style="background:#d23f2a;border-radius:2px"></span>Dynamite <span style="opacity:0.5">D</span></button>
+    <button data-type="remotecharge"><span class="dot" style="background:#5e6338;border:2px solid #3fd16a;box-sizing:border-box;border-radius:2px"></span>Remote charge <span style="opacity:0.5">B</span></button>
+    <button data-type="timedcharge"><span class="dot" style="background:#5e6338;border:2px solid #e0483a;box-sizing:border-box;border-radius:2px"></span>Timed charge <span style="opacity:0.5">Z</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Heavy &amp; melee</div>
@@ -244,7 +246,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon sticks — hold Space to reel the barrel in · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K detonates remote charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon sticks: hold Pull to reel the barrel in · Boom detonates remote charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
 <div id="ioshint" role="note" hidden><span>Play as an app: Share ⬆ → Add to Home Screen</span><button id="ioshintx" type="button" aria-label="Dismiss the home-screen tip">×</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
@@ -255,6 +257,7 @@
 <div id="act-bar">
   <button id="act-quake" title="Hold for an earthquake">🌋<span>Quake</span></button>
   <button id="act-pull" title="Hold to reel the harpooned barrel in" hidden>🪝<span>Pull</span></button>
+  <button id="act-boom" title="Detonate the remote charges" hidden>💥<span>Boom</span></button>
 </div>
 <div id="sheet-backdrop"></div>
 <button id="reset">Reset</button>
@@ -339,6 +342,7 @@ import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { chimneyLayout, isSoot } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
+import { CHARGE, chargeLaunch, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
@@ -1285,6 +1289,8 @@ const paintBallMatls = PAINT_COLORS.map((c) => new THREE.MeshStandardMaterial({ 
 const paintSplatMatls = PAINT_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c.splat, roughness: 0.7 }));
 let paintChoice = 0;         // index into PAINT_COLORS, or RANDOM_PAINT
 let lastPaintIndex = null;   // colour of the previous paintball, so random mode never repeats it
+const chargeMatl = new THREE.MeshStandardMaterial({ color: '#5e6338', roughness: 0.85 });
+const chargeBoxMatl = new THREE.MeshStandardMaterial({ color: '#1c1c20', roughness: 0.5, metalness: 0.3 });
 const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
@@ -1476,6 +1482,33 @@ function shootTire(dir, power) {
   updateHud();
 }
 
+// olive-drab brick with a black detonator box and a small LED on top
+function makeChargeMesh(ledColor) {
+  const g = new THREE.Group();
+  const [hx, hy, hz] = CHARGE.halfExtents;
+  const brick = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2), chargeMatl);
+  brick.castShadow = true;
+  g.add(brick);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.09), chargeBoxMatl);
+  box.position.y = hy + 0.025;
+  g.add(box);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: ledColor }));
+  led.position.set(0.035, hy + 0.055, 0);
+  g.add(led);
+  g.userData.led = led;
+  return g;
+}
+function makeRemoteChargeMesh() {
+  const g = makeChargeMesh('#3fd16a');
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6), chargeBoxMatl);
+  antenna.position.set(-0.04, CHARGE.halfExtents[1] + 0.16, 0);
+  g.add(antenna);
+  return g;
+}
+function makeTimedChargeMesh() {
+  return makeChargeMesh('#ff3b30');
+}
+
 function shootBall(dir, power) {
   const type = ammoType;
   if (type === 'lightning') { strikeLightning(); shots++; updateHud(); return; }
@@ -1483,6 +1516,7 @@ function shootBall(dir, power) {
   if (type === 'laser') { fireLaser(); shots++; updateHud(); return; }
   if (type === 'disruptor') { disruptorBlast(); shots++; updateHud(); return; }
   if (type === 'tire') { shootTire(dir, power); return; }
+  if (type === 'remotecharge' && !canPlaceRemote(armedRemotes(balls).length)) return;   // cap: 6 armed
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
@@ -1506,6 +1540,8 @@ function shootBall(dir, power) {
     harpoon:     { mass: 3,   r: SPEAR_R },
     sniper:      { mass: SNIPER.mass, r: SNIPER.radius },
     football:    { mass: FOOTBALL.mass, r: FOOTBALL.radius },
+    remotecharge: { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
+    timedcharge:  { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
   }[type];
   let shapeSpec;
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
@@ -1518,6 +1554,8 @@ function shootBall(dir, power) {
     shapeSpec = { kind: 'box', halfExtents: [0.34, 0.28, 0.3] };
   } else if (type === 'football') {
     shapeSpec = { kind: 'spheroid', halfLength: FOOTBALL.halfLength, radius: FOOTBALL.radius };
+  } else if (type === 'remotecharge' || type === 'timedcharge') {
+    shapeSpec = { kind: 'box', halfExtents: CHARGE.halfExtents };
   } else {
     shapeSpec = { kind: 'sphere', radius: cfg.r };
   }
@@ -1554,6 +1592,10 @@ function shootBall(dir, power) {
     speed = 30 + power * 12;
   } else if (type === 'football') {
     speed = footballSpeed(power);
+  } else if (type === 'remotecharge' || type === 'timedcharge') {
+    const launch = chargeLaunch(dir, power);   // slight arc, like the grenade
+    vdir = launch.direction;
+    speed = launch.speed;
   }
   phys.setVelocity(body, vdir.x * speed, vdir.y * speed, vdir.z * speed);
   if (type === 'spear' || type === 'f16' || type === 'harpoon') {
@@ -1743,6 +1785,10 @@ function shootBall(dir, power) {
     const streak = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.07, 1, 8, 1, true), streakMat);
     mesh.add(streak);
     mesh.userData.streak = streak;
+  } else if (type === 'remotecharge') {
+    mesh = makeRemoteChargeMesh();
+  } else if (type === 'timedcharge') {
+    mesh = makeTimedChargeMesh();
   } else {
     mesh = new THREE.Mesh(ballGeo, bombMatl);
     const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
@@ -1776,6 +1822,9 @@ function shootBall(dir, power) {
 // ---------- Explosion ----------
 const explosions = []; // {mesh, born, particles}
 // strengths are 4x the cannon-es values: crashcat stacks are stiffer, so the old blasts barely moved stone (#22)
+function detonateRemoteCharges() {
+  for (const rec of armedRemotes(balls)) explode(rec, CHARGE.blastRadius, CHARGE.blastStrength);
+}
 function explode(rec, RADIUS = 3, STRENGTH = 320) {
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
@@ -2649,6 +2698,9 @@ addEventListener('keydown', (e) => {
   if (k === 'v') setAmmo('disruptor');
   if (k === 'q') setAmmo('sniper');
   if (k === 'f') setAmmo('football');
+  if (k === 'b') setAmmo('remotecharge');
+  if (k === 'z') setAmmo('timedcharge');
+  if (k === 'k') detonateRemoteCharges();
   if (e.key === ' ' && harpoonLink) { pulling = true; e.preventDefault(); }  // hold Space = elephant pull
   if (e.key === 'Shift' && !quakeActive) { quakeActive = true; quakeStart = performance.now(); }
 });
@@ -2700,6 +2752,8 @@ holdButton(document.getElementById('act-quake'), () => {
   quakeStart = performance.now();
 }, () => { quakeActive = false; });
 holdButton(pullBtn, () => { if (!autoPlay && harpoonLink) pulling = true; }, () => { pulling = false; });
+const boomBtn = document.getElementById('act-boom');   // mobile Boom button, shown while remote charges are armed
+boomBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!autoPlay) detonateRemoteCharges(); });
 
 // ---------- Auto-play ----------
 let autoPlay = false;
@@ -2748,7 +2802,15 @@ function updateAutoPlay(now) {
     if (!autoPlaySceneSettled() && !timedOut) return;
     autoPlayState = 'aiming';
   }
-  if (autoPlayState === 'aiming') autoPlayFireNext();
+  if (autoPlayState === 'aiming') {
+    if (armedRemotes(balls).length) {        // remote charges would never go off on their own
+      detonateRemoteCharges();
+      autoPlayState = 'settling';
+      autoPlayShotAt = now;
+      return;
+    }
+    autoPlayFireNext();
+  }
 }
 
 autoPlayEl.addEventListener('click', () => {
@@ -2931,6 +2993,10 @@ function animate() {
     const b = balls[i];
     // grenade cooks off after a short fuse
     if (b.type === 'grenade' && !b.exploded && now - b.born > 1500) { explode(b); continue; }
+    if (b.type === 'timedcharge' && !b.exploded) {
+      if (isFuseDone(b.born, now)) { explode(b, CHARGE.blastRadius, CHARGE.blastStrength); continue; }
+      b.mesh.userData.led.visible = ledOn(now - b.born);
+    }
     // spear flies point-first until it hits something
     if ((b.type === 'spear' || b.type === 'f16') && !b.hit) {
       const v = phys.getVelocity(b.body);
@@ -3004,11 +3070,14 @@ function animate() {
     }
     if (b.type === 'sniper' && !b.hit && isOutOfRange(b.muzzle, b.body.position)) { removeProjectile(b); balls.splice(i, 1); continue; }
     const cullTime = b.type === 'wrecking' ? 25000 : 12000;
-    if (!b.stuck && (now - b.born > cullTime || b.body.position.y < -5)) {
+    const timeless = b.stuck || (b.type === 'remotecharge' && !b.exploded);   // armed charges wait for K / Boom
+    if ((!timeless && now - b.born > cullTime) || (!b.stuck && b.body.position.y < -5)) {
       removeProjectile(b);
       balls.splice(i, 1);
     }
   }
+  const armed = armedRemotes(balls).length > 0;
+  if (boomBtn.hidden === armed) boomBtn.hidden = !armed;
 
   // explosion visuals
   for (let i = explosions.length - 1; i >= 0; i--) {
