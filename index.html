@@ -254,7 +254,7 @@
     <button data-type="slingshot"><span class="dot" style="background:#9a938a;width:9px;height:9px"></span>Slingshot <span style="opacity:0.5">9</span></button>
     <button data-type="f16"><span class="dot" style="background:#8b939c;border-radius:2px;transform:rotate(45deg)"></span>F-16 <span style="opacity:0.5">0</span></button>
     <button data-type="harpoon"><span class="dot" style="background:#cfd4da;border-radius:2px"></span>Harpoon <span style="opacity:0.5">J</span></button>
-    <button data-type="net"><span class="dot" style="background:#3c4a2e;border:2px dashed #b9a77a;box-sizing:border-box"></span>Heavy net <span style="opacity:0.5">N</span></button>
+    <button data-type="net"><span class="dot" style="background:#7a6646;border:2px dashed #b9a77a;box-sizing:border-box"></span>Heavy net <span style="opacity:0.5">N</span></button>
   </div>
   <div class="ammo-group">
     <div class="glabel">Powers</div>
@@ -364,7 +364,7 @@ import { chimneyLayout, isSoot } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
-import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn } from './weapons/net.js';
+import { NET, netLaunch, selectCaught, centroid, spread, pullForce, isReeledIn, strandOffsets, openScale, drapeRadius, drapeParallels } from './weapons/net.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
@@ -1315,7 +1315,7 @@ let paintChoice = 0;         // index into PAINT_COLORS, or RANDOM_PAINT
 let lastPaintIndex = null;   // colour of the previous paintball, so random mode never repeats it
 const chargeMatl = new THREE.MeshStandardMaterial({ color: '#5e6338', roughness: 0.85 });
 const chargeBoxMatl = new THREE.MeshStandardMaterial({ color: '#1c1c20', roughness: 0.5, metalness: 0.3 });
-const netMatl = new THREE.MeshStandardMaterial({ color: '#3c4a2e', roughness: 0.9, wireframe: true });
+const netMatl = new THREE.MeshStandardMaterial({ color: '#7a6646', roughness: 0.95 });   // thick hemp rope (#60)
 const netWeightMatl = new THREE.MeshStandardMaterial({ color: '#55585e', roughness: 0.4, metalness: 0.8 });
 // shared so each charge/net shot reuses them instead of leaking new GPU buffers
 const chargeBrickGeo = new THREE.BoxGeometry(CHARGE.halfExtents[0] * 2, CHARGE.halfExtents[1] * 2, CHARGE.halfExtents[2] * 2);
@@ -1323,8 +1323,8 @@ const chargeBoxGeo = new THREE.BoxGeometry(0.12, 0.05, 0.09);
 const chargeLedGeo = new THREE.SphereGeometry(0.018, 8, 6);
 const chargeLedMatls = { '#3fd16a': new THREE.MeshBasicMaterial({ color: '#3fd16a' }), '#ff3b30': new THREE.MeshBasicMaterial({ color: '#ff3b30' }) };
 const antennaGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6);
-const netBundleGeo = new THREE.IcosahedronGeometry(NET.radius, 1);
-const netWeightGeo = new THREE.SphereGeometry(0.06, 8, 6);
+const netStrandGeo = new THREE.CylinderGeometry(NET.ropeRadius, NET.ropeRadius, NET.openSize, 6);   // one rope strand of the open net
+const netWeightGeo = new THREE.SphereGeometry(NET.weightRadius, 10, 8);
 const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness: 0.6, metalness: 0.35 });
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
@@ -1542,15 +1542,27 @@ function makeRemoteChargeMesh() {
 function makeTimedChargeMesh() {
   return makeChargeMesh('#ff3b30');
 }
-// a bundled net with four lead weights, as thrown
-function makeNetBundleMesh() {
+// the open throw net (#60): a square of thick rope strands with wide meshes and lead weights on the corners.
+// Only shared geometries. The strand plane sits just below the sphere body, so a net lying on the ground touches it.
+function makeNetMesh() {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(netBundleGeo, netMatl));
+  const half = NET.openSize / 2;
+  const y = -(NET.radius - NET.ropeRadius);
+  for (const o of strandOffsets()) {
+    const alongX = new THREE.Mesh(netStrandGeo, netMatl);   // strand parallel to x, offset along z
+    alongX.rotation.z = Math.PI / 2;
+    alongX.position.set(0, y, o);
+    const alongZ = new THREE.Mesh(netStrandGeo, netMatl);   // strand parallel to z, offset along x
+    alongZ.rotation.x = Math.PI / 2;
+    alongZ.position.set(o, y, 0);
+    g.add(alongX, alongZ);
+  }
   for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
     const w = new THREE.Mesh(netWeightGeo, netWeightMatl);
-    w.position.set(x * 0.24, -0.1, z * 0.24);
+    w.position.set(x * half, y, z * half);
     g.add(w);
   }
+  g.scale.setScalar(NET.bundleScale);   // leaves the launcher bundled; the ball sync opens it
   return g;
 }
 
@@ -1840,7 +1852,7 @@ function shootBall(dir, power) {
   } else if (type === 'timedcharge') {
     mesh = makeTimedChargeMesh();
   } else if (type === 'net') {
-    mesh = makeNetBundleMesh();
+    mesh = makeNetMesh();
   } else {
     mesh = new THREE.Mesh(ballGeo, bombMatl);
     const fuse = new THREE.Mesh(fuseGeo, fuseMatl);
@@ -3208,6 +3220,10 @@ function animate() {
     }
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
+    if (b.type === 'net') {   // the net flies and lies flat, and opens over the first part of the throw (#60)
+      b.mesh.quaternion.identity();
+      b.mesh.scale.setScalar(openScale(now - b.born));
+    }
     if (b.type === 'sniper') {
       const sv = phys.getVelocity(b.body);
       const sl = Math.hypot(sv.x, sv.y, sv.z);
