@@ -1324,7 +1324,6 @@ function measureTargetExtent() {
   return { halfWidth: Math.max(box.max.x - t.x, t.x - box.min.x), nearDepth: Math.max(box.max.z - t.z, 0) };
 }
 function fitCamera() {
-  // the default FOV, not the sniper's zoomed one, so picking the sniper doesn't move the camera
   orbit.radius = orbit.fitRadius = fitOrbitRadius(targetBaseRadius, targetExtent, DEFAULT_FOV, camera.aspect);
   const pushBack = orbit.radius - targetBaseRadius;
   scene.fog.near = FOG_NEAR + pushBack;
@@ -1439,9 +1438,7 @@ function setAmmo(type) {
   for (const b of ammoEl.querySelectorAll('button[data-type]')) b.classList.toggle('sel', b.dataset.type === type);
   paintColorsEl.hidden = type !== 'paintball';
   syncPaintDot();
-  // Sniper lens zooms the view for precision; other ammo restores the default FOV.
-  const fov = type === 'sniper' ? 26 : DEFAULT_FOV;
-  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  scopeEl.hidden = type !== 'sniper';   // the sniper lens shows a magnified scope circle around the aim point (#91)
 }
 ammoEl.addEventListener('click', (e) => {
   if (autoPlay) return;
