@@ -66,3 +66,86 @@ export function slabLanded(state, vy) {
   }
   return false;
 }
+
+// ---- Debris (visual only) ----------------------------------------------------
+// A crushed column breaks into a few small chunks and a dust puff. They have no physics
+// bodies, so they can never jam the pancaking slabs: plain objects moved by stepChunk
+// (gravity, a damped bounce on the ground y = 0, then rest), shrunk away by chunkScale.
+// All values in world units and seconds.
+export const DEBRIS = {
+  chunks: 5,        // per crushed column (24 columns -> at most 120 chunks)
+  speed: 3,         // mean horizontal launch speed
+  lift: 2,          // max upward launch speed
+  spin: 6,          // max angular speed per axis, rad/s
+  gravity: 9.82,
+  bounce: 0.3,      // vertical speed kept on a ground bounce
+  grip: 0.6,        // horizontal and spin speed kept on a ground bounce
+  restSpeed: 1,     // a bounce slower than this settles the chunk
+  life: 4,          // a chunk is gone after this many seconds
+  shrink: 1,        // ... shrinking to nothing over the last second
+  dustLife: 1.2,
+  dustGrow: 3,      // the puff grows to this many times its start radius
+  dustOpacity: 0.5,
+};
+
+// Park-Miller generator, so the same seed gives the same chunks (testable, no Math.random).
+function rng(seed) {
+  let s = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+
+// Chunks for a column centred at c with half extents hx, hy, hz. Chunks are spread up the
+// column's height, sized from its cross-section and thrown outward in all directions.
+export function debrisChunks(c, hx, hy, hz, seed) {
+  const r = rng(seed);
+  const out = [];
+  for (let i = 0; i < DEBRIS.chunks; i++) {
+    const a = r() * 2 * Math.PI;
+    const sp = DEBRIS.speed * (0.5 + r());
+    out.push({
+      x: c.x + (r() * 2 - 1) * hx,
+      y: c.y - hy + ((i + 0.5) / DEBRIS.chunks) * 2 * hy,
+      z: c.z + (r() * 2 - 1) * hz,
+      vx: Math.cos(a) * sp, vy: r() * DEBRIS.lift, vz: Math.sin(a) * sp,
+      rx: 0, ry: 0, rz: 0,
+      wx: (r() * 2 - 1) * DEBRIS.spin, wy: (r() * 2 - 1) * DEBRIS.spin, wz: (r() * 2 - 1) * DEBRIS.spin,
+      size: Math.min(hx, hz) * (0.6 + 0.5 * r()),
+      age: 0, resting: false,
+    });
+  }
+  return out;
+}
+
+// Advances a chunk by dt in place and returns it.
+export function stepChunk(ch, dt) {
+  ch.age += dt;
+  if (ch.resting) return ch;
+  ch.vy -= DEBRIS.gravity * dt;
+  ch.x += ch.vx * dt; ch.y += ch.vy * dt; ch.z += ch.vz * dt;
+  ch.rx += ch.wx * dt; ch.ry += ch.wy * dt; ch.rz += ch.wz * dt;
+  const floor = ch.size / 2;
+  if (ch.y < floor) {
+    ch.y = floor;
+    if (-ch.vy * DEBRIS.bounce < DEBRIS.restSpeed) {
+      ch.vx = ch.vy = ch.vz = ch.wx = ch.wy = ch.wz = 0;
+      ch.resting = true;
+    } else {
+      ch.vy = -ch.vy * DEBRIS.bounce;
+      ch.vx *= DEBRIS.grip; ch.vz *= DEBRIS.grip;
+      ch.wx *= DEBRIS.grip; ch.wy *= DEBRIS.grip; ch.wz *= DEBRIS.grip;
+    }
+  }
+  return ch;
+}
+
+// Size factor of a chunk of this age: 1, then shrinking to 0 over the last DEBRIS.shrink s.
+export function chunkScale(age) {
+  return Math.max(0, Math.min(1, (DEBRIS.life - age) / DEBRIS.shrink));
+}
+
+// Dust puff of this age: radius factor and opacity, or null once it is gone.
+export function dustPuff(age) {
+  if (age >= DEBRIS.dustLife) return null;
+  const t = age / DEBRIS.dustLife;
+  return { scale: 1 + (DEBRIS.dustGrow - 1) * Math.sqrt(t), opacity: DEBRIS.dustOpacity * (1 - t) };
+}

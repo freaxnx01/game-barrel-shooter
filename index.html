@@ -399,7 +399,7 @@ import { nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from './came
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
-import { DEMO, demolitionLayout, distToColumnAxis, slabLanded } from './targets/demolition.js';
+import { DEMO, demolitionLayout, distToColumnAxis, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from './targets/demolition.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
@@ -1018,6 +1018,8 @@ function crushColumn(b) {
   if (b.crushed) return;
   b.crushed = b.down = true;
   b.mesh.visible = false;
+  const at = b.body.position;
+  spawnDebris({ x: at.x, y: at.y, z: at.z }, b.mesh.scale.x / 2, b.mesh.scale.y / 2, b.mesh.scale.z / 2);
   if (harpoonLink && harpoonLink.barrel === b.body) detachHarpoon();
   phys.stopColliding(b.body);
   phys.setGravityFactor(b.body, 0);
@@ -1025,6 +1027,49 @@ function crushColumn(b) {
   phys.setPosition(b.body, b.home.x, -50, b.home.z);
   for (const o of barrels) phys.wake(o.body);   // the slab it held must fall, not hover asleep
   updateHud();
+}
+// Debris of crushed columns (#86): visual only, no physics bodies, so it never jams the
+// pancaking slabs. Chunks share unitBoxGeo and demoColumnMatl; each dust puff gets its own
+// clone of dustMatl (it fades) that is disposed when the puff is gone.
+const dustGeo = new THREE.SphereGeometry(1, 10, 8);
+const dustMatl = new THREE.MeshBasicMaterial({ color: '#b8b0a2', transparent: true, depthWrite: false });
+const debris = [], dusts = [];
+let debrisSeed = 1;
+function spawnDebris(c, hx, hy, hz) {
+  for (const ch of debrisChunks(c, hx, hy, hz, debrisSeed++)) {
+    const mesh = new THREE.Mesh(unitBoxGeo, demoColumnMatl);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    debris.push({ mesh, ch });
+  }
+  const mesh = new THREE.Mesh(dustGeo, dustMatl.clone());
+  mesh.position.set(c.x, c.y, c.z);
+  scene.add(mesh);
+  dusts.push({ mesh, age: 0, r: 2 * Math.max(hx, hz) });
+}
+function updateDebris(dt) {
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const { mesh, ch } = debris[i];
+    stepChunk(ch, dt);
+    const k = chunkScale(ch.age);
+    if (k <= 0) { scene.remove(mesh); debris.splice(i, 1); continue; }
+    mesh.position.set(ch.x, ch.y, ch.z);
+    mesh.rotation.set(ch.rx, ch.ry, ch.rz);
+    mesh.scale.setScalar(ch.size * k);
+  }
+  for (let i = dusts.length - 1; i >= 0; i--) {
+    const d = dusts[i];
+    d.age += dt;
+    const f = dustPuff(d.age);
+    if (!f) { scene.remove(d.mesh); d.mesh.material.dispose(); dusts.splice(i, 1); continue; }
+    d.mesh.scale.setScalar(d.r * f.scale);
+    d.mesh.material.opacity = f.opacity;
+  }
+}
+function clearDebris() {
+  for (const d of debris) scene.remove(d.mesh);
+  for (const d of dusts) { scene.remove(d.mesh); d.mesh.material.dispose(); }
+  debris.length = dusts.length = 0;
 }
 function crushNear(p) {
   for (const b of barrels) {
@@ -1297,6 +1342,7 @@ function clearTargets() {
   for (const b of barrels) { phys.removeBody(b.body); scene.remove(b.mesh); }
   barrels.length = 0;
   impactThrottle.reset();
+  clearDebris();
 }
 const camCfg = {
   barrels:   { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupBarrels, support: true },
@@ -3418,6 +3464,7 @@ function animate() {
   }
 
   if (targetMode === 'demolition') updateDemolition();
+  if (debris.length || dusts.length) updateDebris(dt);
 
   // sync barrels + detect knocked-over
   let changed = false;
