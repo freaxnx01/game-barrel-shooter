@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
 
 test('chargeLaunch_PowerRange_Speed12To26', () => {
   assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 12);
@@ -85,4 +85,69 @@ test('chargeStickPlan_NoOtherBody_Freeze', () => {
 test('chargeStickPlan_OtherIsProjectile_Ignore', () => {
   // projectiles are removed on their own schedule; a joint to one would outlive its body
   assert.equal(chargeStickPlan(false, { mass: 2 }, true), 'ignore');
+});
+
+// ---- #78: stick flush on the drawn surface ----
+function near(actual, expected, eps = 1e-9) {
+  for (const k of Object.keys(expected)) {
+    assert.ok(Math.abs(actual[k] - expected[k]) < eps, `${k}: ${actual[k]} vs ${expected[k]}`);
+  }
+}
+
+// rotates v by the unit quaternion q (v' = q v q*)
+function rotate(q, v) {
+  const tx = 2 * (q.y * v.z - q.z * v.y), ty = 2 * (q.z * v.x - q.x * v.z), tz = 2 * (q.x * v.y - q.y * v.x);
+  return {
+    x: v.x + q.w * tx + (q.y * tz - q.z * ty),
+    y: v.y + q.w * ty + (q.z * tx - q.x * tz),
+    z: v.z + q.w * tz + (q.x * ty - q.y * tx),
+  };
+}
+
+test('chargeReach_Standing_HalfDiagonal', () => {
+  assert.ok(Math.abs(chargeReach(0, 0) - 0.21) < 1e-9);
+});
+
+test('chargeReach_FullSpeedOneFrame_FramePlusSubstepPlusHalfDiagonal', () => {
+  assert.ok(Math.abs(chargeReach(24, 1 / 30) - 1.11) < 1e-9);   // 24 * (1/30 + 1/240) + 0.21
+});
+
+test('quatFromUp_Up_Identity', () => {
+  near(quatFromUp({ x: 0, y: 1, z: 0 }), { x: 0, y: 0, z: 0, w: 1 });
+});
+
+test('quatFromUp_Down_HalfTurnAboutX', () => {
+  near(quatFromUp({ x: 0, y: -1, z: 0 }), { x: 1, y: 0, z: 0, w: 0 });
+});
+
+test('quatFromUp_AnyNormal_TurnsUpOntoIt', () => {
+  for (const n of [{ x: 0, y: 0, z: 1 }, { x: -1, y: 0, z: 0 }, { x: 0.6, y: 0, z: 0.8 }, { x: 0.48, y: -0.6, z: 0.64 }]) {
+    const q = quatFromUp(n);
+    assert.ok(Math.abs(Math.hypot(q.x, q.y, q.z, q.w) - 1) < 1e-9);
+    near(rotate(q, { x: 0, y: 1, z: 0 }), n);
+  }
+});
+
+test('flushPose_FaceTowardsPlusZ_CentreHalfThicknessOut', () => {
+  const pose = flushPose({ x: 1, y: 2, z: 3 }, { x: 0, y: 0, z: 1 });
+  near(pose.position, { x: 1, y: 2, z: 3.08 });
+  near(rotate(pose.quaternion, { x: 0, y: 1, z: 0 }), { x: 0, y: 0, z: 1 });
+});
+
+test('flushPose_Floor_LiesFlatOnTop', () => {
+  const pose = flushPose({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+  near(pose.position, { x: 0, y: 0.08, z: 0 });
+  near(pose.quaternion, { x: 0, y: 0, z: 0, w: 1 });
+});
+
+test('pieceOf_MeshOrChildOfAPiece_ThatPiece', () => {
+  const a = { parent: null }, b = { parent: null };
+  const pieces = [{ mesh: a }, { mesh: b }];
+  assert.equal(pieceOf(b, pieces), pieces[1]);
+  assert.equal(pieceOf({ parent: { parent: a } }, pieces), pieces[0]);
+});
+
+test('pieceOf_UnrelatedMesh_Null', () => {
+  assert.equal(pieceOf({ parent: { parent: null } }, [{ mesh: {} }]), null);
+  assert.equal(pieceOf(null, []), null);
 });
