@@ -47,3 +47,14 @@ test('scopeNdcTransform_CentreRect_UnitCircleScaledToPixels', () => {
   const t = scopeNdcTransform({ x: 144, y: 144, size: 288 }, 1280, 720);
   assert.ok(Math.abs(t.x - (-0.775)) < 1e-12 && Math.abs(t.y - 0.6) < 1e-12);
 });
+test('scopeFov_SmallCircle_PerceivedMagnificationIsFive', () => {
+  // the circle shows its FOV in `size` px where the main view spreads its FOV over the screen height,
+  // so the scope FOV must shrink by size/height too (#94 review): 5x on desktop and portrait phones
+  const tanHalf = (deg) => Math.tan((deg * Math.PI) / 360);
+  for (const [w, h] of [[1280, 720], [390, 844]]) {
+    const size = scopeDiameter(w, h);
+    const fov = scopeFov(55, SCOPE.magnification, size / h);
+    const perceived = (tanHalf(55) / tanHalf(fov)) * (size / h);
+    assert.ok(Math.abs(perceived - SCOPE.magnification) < 1e-9, `${w}x${h}: ${perceived}`);
+  }
+});

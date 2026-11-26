@@ -31,9 +31,11 @@ export function aimToScreen(ndcX, ndcY, width, height) {
   return { x: ((ndcX + 1) / 2) * width, y: ((1 - ndcY) / 2) * height };
 }
 
-// Vertical FOV (degrees) that magnifies the base FOV by `magnification`.
-export function scopeFov(baseFov, magnification = SCOPE.magnification) {
-  const half = Math.tan((baseFov * Math.PI) / 360) / magnification;
+// Vertical FOV (degrees) of the scope camera so objects in the circle look `magnification` times
+// bigger than in the view beneath. screenShare = circle diameter / screen height: the circle shows
+// its FOV in fewer pixels than the main view, so the FOV shrinks by that share as well (#94 review).
+export function scopeFov(baseFov, magnification = SCOPE.magnification, screenShare = 1) {
+  const half = (Math.tan((baseFov * Math.PI) / 360) * screenShare) / magnification;
   return (Math.atan(half) * 360) / Math.PI;
 }
 

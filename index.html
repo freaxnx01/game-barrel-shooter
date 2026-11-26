@@ -406,7 +406,7 @@ import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorne
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
-import { scopeRect, aimToScreen, scopeFov, scopeTextureSize, scopeNdcTransform } from './weapons/scope.js';
+import { SCOPE, scopeRect, aimToScreen, scopeFov, scopeTextureSize, scopeNdcTransform } from './weapons/scope.js';
 import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
 import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
@@ -3276,7 +3276,7 @@ let quakeActive = false, quakeStart = 0;
 let aimByTouch = false;
 const scopeEl = document.getElementById('scope');
 const scopeCamera = new THREE.PerspectiveCamera(scopeFov(DEFAULT_FOV), 1, 0.1, CAM_FAR);
-const scopeTarget = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
+const scopeTarget = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true, samples: 4 });   // antialiased like the main canvas
 const scopeScene = new THREE.Scene();
 const scopeOrtho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 const scopeDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 72), new THREE.MeshBasicMaterial({ map: scopeTarget.texture, depthTest: false, depthWrite: false }));
@@ -3289,6 +3289,8 @@ function scopeActive() {
 function placeScope(rect) {
   const px = scopeTextureSize(rect.size, renderer.getPixelRatio());
   if (scopeTarget.width !== px) scopeTarget.setSize(px, px);
+  const fov = scopeFov(DEFAULT_FOV, SCOPE.magnification, rect.size / innerHeight);
+  if (scopeCamera.fov !== fov) { scopeCamera.fov = fov; scopeCamera.updateProjectionMatrix(); }
   const t = scopeNdcTransform(rect, innerWidth, innerHeight);
   scopeDisc.position.set(t.x, t.y, 0);
   scopeDisc.scale.set(t.scaleX, t.scaleY, 1);
