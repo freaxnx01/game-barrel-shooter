@@ -367,6 +367,7 @@
       <button data-mode="bricktower">Brick Tower</button>
       <button data-mode="jenga">Jenga</button>
       <button data-mode="chimney">Chimney</button>
+      <button data-mode="demolition">Demolition Tower</button>
     </div>
   </div>
   <div class="target-group">
@@ -398,6 +399,7 @@ import { nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from './came
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
+import { DEMO, demolitionLayout, distToColumnAxis, slabLanded } from './targets/demolition.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
@@ -998,6 +1000,44 @@ function setupChimney() {
   chimneyLayout().forEach((b, i) => addBlock(b.hx, b.hy, b.hz, chimneyMatl(b, i), massFor(b), b.x, b.y, b.z + zC, b.ry, 0, wedgeGeo(wedgeProfile(b).taper)));
 }
 
+// Demolition tower (#86): heavy concrete slabs on slim columns. Rigid boxes never crush, so two
+// rules make it pancake: an explosion next to a column crushes that column (crushNear, from
+// explode), and a slab that falls and lands crushes the columns standing on it (updateDemolition).
+const demoColumnMatl = new THREE.MeshStandardMaterial({ color: '#8f8b84', roughness: 0.95, flatShading: true });
+const demoSlabMatl = new THREE.MeshStandardMaterial({ color: '#c4c0b8', roughness: 0.9, flatShading: true });
+function setupDemolition() {
+  const zC = -6;
+  for (const b of demolitionLayout()) {
+    addBlock(b.hx, b.hy, b.hz, b.part === 'slab' ? demoSlabMatl : demoColumnMatl, massFor(b), b.x, b.y, b.z + zC, b.ry, 0);
+    barrels[barrels.length - 1].demo = { part: b.part, storey: b.storey, hy: b.hy * TSCALE, state: {} };
+  }
+}
+// A crushed column leaves the simulation without leaving `barrels` (so the HUD total stays): it
+// stops colliding, hangs weightless below the ground and is hidden. It counts as down.
+function crushColumn(b) {
+  if (b.crushed) return;
+  b.crushed = b.down = true;
+  b.mesh.visible = false;
+  if (harpoonLink && harpoonLink.barrel === b.body) detachHarpoon();
+  phys.stopColliding(b.body);
+  phys.setGravityFactor(b.body, 0);
+  phys.setVelocity(b.body, 0, 0, 0);
+  phys.setPosition(b.body, b.home.x, -50, b.home.z);
+  for (const o of barrels) phys.wake(o.body);   // the slab it held must fall, not hover asleep
+  updateHud();
+}
+function crushNear(p) {
+  for (const b of barrels) {
+    if (b.demo?.part === 'column' && !b.crushed && distToColumnAxis(p, b.body.position, b.demo.hy) < DEMO.breakRadius) crushColumn(b);
+  }
+}
+function updateDemolition() {
+  for (const s of barrels) {
+    if (s.demo?.part !== 'slab' || !slabLanded(s.demo.state, phys.getVelocity(s.body).y)) continue;
+    for (const c of barrels) if (c.demo?.part === 'column' && c.demo.storey === s.demo.storey + 1) crushColumn(c);
+  }
+}
+
 // Jenga tower (#34): wooden blocks, own 'jenga' material, no MASONRY_MASS_SCALE
 const jengaMatls = ['#e2c69a', '#d8b986', '#e8cfa6', '#cfae7a'].map(c =>
   new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 }));
@@ -1287,6 +1327,7 @@ const camCfg = {
   castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
   jenga:     { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupJenga },
   chimney:   { r: 28,   ty: 6.5, tz: -6, plat: false, build: setupChimney },
+  demolition: { r: 24, ty: 4.5, tz: -6, plat: false, build: setupDemolition },
 };
 function buildTargets() {
   stopPush();        // a held Jenga block is about to be removed
@@ -2068,6 +2109,7 @@ function explode(rec, RADIUS = 3, STRENGTH = 320, opts = {}) {
   const flashScale = opts.flash ?? 1;
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
+  if (targetMode === 'demolition') crushNear(p);   // before the impulse: a crushed column is gone
   // cutting charge: shove the piece it sits on out of the line of support, even beyond the radius
   const partner = rec.stickBody;
   if (opts.shove && partner && partner.mass > 0) {
@@ -3374,6 +3416,8 @@ function animate() {
     const t = Math.min((performance.now() - chargeStart) / 400, 1);
     powerFill.style.width = (t * 100) + '%';
   }
+
+  if (targetMode === 'demolition') updateDemolition();
 
   // sync barrels + detect knocked-over
   let changed = false;
