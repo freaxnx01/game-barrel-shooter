@@ -360,7 +360,7 @@ import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { nudgeOrbit, heldNudge, fitOrbitRadius } from './camera/orbit.js';
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
-import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects } from './targets/chimney.js';
+import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, chimneyCore } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
@@ -938,9 +938,20 @@ function chimneyMatl(b, i) {
   const set = isSoot(b) ? sootMatls : brickMatls;
   return set[(i * 7 + b.course) % set.length];
 }
+// Mortar core (#71): visual-only tubes behind the ring gaps; no body, not in `barrels`.
+const coreMatls = { brick: new THREE.MeshStandardMaterial({ color: '#bfb5a3', roughness: 0.9, side: THREE.DoubleSide }),
+                    soot:  new THREE.MeshStandardMaterial({ color: '#6a625a', roughness: 0.9, side: THREE.DoubleSide }) };
+let chimneyCoreMeshes = [];
 function setupChimney() {
   const zC = -6;
   chimneyLayout().forEach((b, i) => addBlock(b.hx, b.hy, b.hz, chimneyMatl(b, i), massFor(b), b.x, b.y, b.z + zC, b.ry, 0));
+  chimneyCoreMeshes = chimneyCore().map(t => {
+    const geo = new THREE.CylinderGeometry(t.radiusTop * TSCALE, t.radiusBottom * TSCALE, t.height * TSCALE, 24, 1, true);
+    const mesh = new THREE.Mesh(geo, coreMatls[t.part]);
+    mesh.position.set(0, (t.y0 + t.height / 2) * TSCALE, zC * TSCALE);
+    scene.add(mesh);
+    return mesh;
+  });
 }
 
 // Jenga tower (#34): wooden blocks, own 'jenga' material, no MASONRY_MASS_SCALE
@@ -1199,6 +1210,8 @@ function setPlatform(on) {
 let targetMode = 'barrels';
 const targetEl = document.getElementById('target');
 function clearTargets() {
+  for (const m of chimneyCoreMeshes) { scene.remove(m); m.geometry.dispose(); }
+  chimneyCoreMeshes.length = 0;
   for (const b of barrels) { phys.removeBody(b.body); scene.remove(b.mesh); }
   barrels.length = 0;
   impactThrottle.reset();
@@ -3135,7 +3148,14 @@ function animate() {
       if (qd < 0.93 || moved) { b.down = true; changed = true; }
     }
   }
-  if (changed) updateHud();
+  if (changed) {
+    updateHud();
+    // the mortar core would stand alone once the chimney topples (#71)
+    if (chimneyCoreMeshes.length && chimneyCoreMeshes[0].visible &&
+        barrels.filter(b => b.down).length >= CHIMNEY.segments) {
+      for (const m of chimneyCoreMeshes) m.visible = false;
+    }
+  }
   updateJengaRules();
   if (camCfg[targetMode].support) barrelSupport.tick(now, barrels);
   updateAutoPlay(now);
