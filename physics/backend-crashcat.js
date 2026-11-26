@@ -185,7 +185,7 @@ export function createCrashcatBackend(cc) {
 
   // A body that collides with nothing (a stuck charge, #78): crashcat filters every pair by
   // (groupsA & maskB) && (groupsB & maskA) on each step, so a zero mask drops all its contacts.
-  function setCollides(h, on) { h.raw.collisionMask = on ? 0xffffffff : 0; }
+  function stopColliding(h) { h.raw.collisionMask = 0; }
 
   // ---- listener: material pairs + queued contact events ----
   // crashcat keeps using the bodies after the listener returns, so the game's
@@ -287,7 +287,7 @@ export function createCrashcatBackend(cc) {
     applyImpulse, applyForce,
     setFriction, restoreFriction,
     wake, isSleeping, setGravityFactor,
-    onCollide, setCollides,
+    onCollide, stopColliding,
     addDistanceJoint, addFixedJoint, removeJoint,
     destroy,
   };
