@@ -183,6 +183,10 @@ export function createCrashcatBackend(cc) {
 
   function onCollide(h, cb) { collideCbs.set(h, cb); }
 
+  // A body that collides with nothing (a stuck charge, #78): crashcat filters every pair by
+  // (groupsA & maskB) && (groupsB & maskA) on each step, so a zero mask drops all its contacts.
+  function setCollides(h, on) { h.raw.collisionMask = on ? 0xffffffff : 0; }
+
   // ---- listener: material pairs + queued contact events ----
   // crashcat keeps using the bodies after the listener returns, so the game's
   // collide callbacks (which remove bodies / add joints) must not run inside
@@ -246,11 +250,12 @@ export function createCrashcatBackend(cc) {
     return joint;
   }
   function addFixedJoint(a, b) {
+    // one shared world point: crashcat stores each point relative to its own body's centre, so
+    // a's and b's own positions would pull the two centres together (#78)
     const pa = [a.position.x, a.position.y, a.position.z];
-    const pb = [b.position.x, b.position.y, b.position.z];
     const j = cc.fixedConstraint.create(world, {
       bodyIdA: a.raw.id, bodyIdB: b.raw.id,
-      point1: pa, point2: pb,
+      point1: pa, point2: pa,
       axisX1: [1, 0, 0], axisY1: [0, 1, 0],
       axisX2: [1, 0, 0], axisY2: [0, 1, 0],
       space: cc.ConstraintSpace.WORLD,
@@ -282,7 +287,7 @@ export function createCrashcatBackend(cc) {
     applyImpulse, applyForce,
     setFriction, restoreFriction,
     wake, isSleeping, setGravityFactor,
-    onCollide,
+    onCollide, setCollides,
     addDistanceJoint, addFixedJoint, removeJoint,
     destroy,
   };
