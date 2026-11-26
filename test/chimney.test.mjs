@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot, brickFaceRects, visibleBrickAspect } from '../targets/chimney.js';
+import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot, brickFaceRects, visibleBrickAspect, chimneyCore } from '../targets/chimney.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const shaft = () => chimneyLayout().filter(b => b.part === 'shaft');
@@ -103,4 +103,37 @@ test('visibleBrickAspect_FootLongerThanTop', () => {
   assert.ok(foot > top);
   assert.ok(Math.abs(foot - 3.805) < 0.01, `foot ${foot}`);
   assert.ok(Math.abs(top - 2.159) < 0.01, `top ${top}`);
+});
+
+test('chimneyCore_TwoTubes_BrickThenSoot', () => {
+  const core = chimneyCore();
+  assert.deepEqual(core.map(t => t.part), ['brick', 'soot']);
+});
+test('chimneyCore_TubesCoverGroundToTopCourse', () => {
+  const [brick, soot] = chimneyCore();
+  const top = CHIMNEY.shaftCourses * coursePitch();
+  assert.equal(brick.y0, 0);
+  assert.ok(Math.abs(brick.y0 + brick.height - soot.y0) < 1e-9);
+  assert.ok(Math.abs(soot.y0 + soot.height - top) < 1e-9);
+});
+test('chimneyCore_SootTubeStartsAtSootCourses', () => {
+  const soot = chimneyCore()[1];
+  assert.ok(Math.abs(soot.y0 - (CHIMNEY.shaftCourses - CHIMNEY.sootCourses) * coursePitch()) < 1e-9);
+});
+test('chimneyCore_RadiusIsMidWallAndContinuous', () => {
+  const [brick, soot] = chimneyCore();
+  assert.ok(Math.abs(brick.radiusTop - soot.radiusBottom) < 1e-9);
+  assert.ok(brick.radiusBottom > brick.radiusTop && soot.radiusBottom > soot.radiusTop);
+  // at a course centre the tube radius equals the shaft radius of that course
+  const c = 10;
+  const y = c * coursePitch() + CHIMNEY.courseHeight / 2;
+  const r = brick.radiusBottom + (brick.radiusTop - brick.radiusBottom) * (y - brick.y0) / brick.height;
+  assert.ok(Math.abs(r - shaftRadius(c)) < 1e-9, `r ${r}`);
+});
+test('chimneyCore_StaysInsideBlocks_NeverOutsideOuterFace', () => {
+  const [brick, soot] = chimneyCore();
+  for (const t of [brick, soot]) {
+    assert.ok(t.radiusBottom < shaftRadius(0) + shaftWall(0));
+    assert.ok(t.radiusTop > 0.5);
+  }
 });

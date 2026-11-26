@@ -86,3 +86,19 @@ export function brickFaceRects(width, height, rows, joint) {
 export function visibleBrickAspect(box) {
   return (2 * box.hx) / ((2 * box.hy) / CHIMNEY.faceRows);
 }
+
+// Visual mortar core (#71): the ring blocks touch at their inner corners, so an open wedge
+// (about 4 * wall * tan 15 deg wide on the outer face) shows the dark hollow shaft. Two open
+// tapered tubes at the mid-wall radius fill it with mortar colour: brick-mortar up to the soot
+// courses, soot-mortar above. Visual only, no body. Radius is linear in y (shaftRadius is
+// linear in the course), taken at course centres and extended to the tube ends.
+// Returns [{ part, y0, height, radiusBottom, radiusTop }] in base units.
+export function chimneyCore() {
+  const pitch = coursePitch();
+  const slope = (CHIMNEY.radiusTop - CHIMNEY.radiusBottom) / ((CHIMNEY.shaftCourses - 1) * pitch);
+  const radiusAt = (y) => CHIMNEY.radiusBottom + slope * (y - CHIMNEY.courseHeight / 2);
+  const top = CHIMNEY.shaftCourses * pitch;
+  const split = (CHIMNEY.shaftCourses - CHIMNEY.sootCourses) * pitch;
+  const tube = (part, y0, y1) => ({ part, y0, height: y1 - y0, radiusBottom: radiusAt(y0), radiusTop: radiusAt(y1) });
+  return [tube('brick', 0, split), tube('soot', split, top)];
+}
