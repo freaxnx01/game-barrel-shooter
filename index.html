@@ -360,7 +360,7 @@ import { createCrashcatBackend } from './physics/backend-crashcat.js';
 import { nudgeOrbit, heldNudge, fitOrbitRadius } from './camera/orbit.js';
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
-import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects } from './targets/chimney.js';
+import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
@@ -708,7 +708,7 @@ const stoneMatls = ['#a39a88', '#968d7c', '#ada393'].map(c =>
 // could break a stone building; lighter blocks keep them destructible (#22)
 const MASONRY_MASS_SCALE = 0.25;
 
-function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
+function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz, geo = unitBoxGeo) {
   const S = TSCALE;
   hx *= S; hy *= S; hz *= S; x *= S; y *= S; z *= S;
   mass *= MASONRY_MASS_SCALE;
@@ -724,7 +724,7 @@ function addBlock(hx, hy, hz, matl3, mass, x, y, z, ry, rz) {
     userData: { specMass: mass },
   });
   addImpactSound(body, 'stone');
-  const mesh = new THREE.Mesh(unitBoxGeo, matl3);
+  const mesh = new THREE.Mesh(geo, matl3);
   mesh.scale.set(hx * 2, hy * 2, hz * 2);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
@@ -938,9 +938,25 @@ function chimneyMatl(b, i) {
   const set = isSoot(b) ? sootMatls : brickMatls;
   return set[(i * 7 + b.course) % set.length];
 }
+// Chimney wedge meshes (#71): one geometry per taper (one per course, at most 43), shared by
+// the 12 blocks of a ring. Module scope and never disposed, like unitBoxGeo.
+const wedgeGeos = new Map();
+function wedgeGeo(taper) {
+  const key = taper.toFixed(4);
+  let geo = wedgeGeos.get(key);
+  if (!geo) {
+    const f = wedgeFaces(taper);
+    geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(f.positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(f.normals, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(f.uvs, 2));
+    wedgeGeos.set(key, geo);
+  }
+  return geo;
+}
 function setupChimney() {
   const zC = -6;
-  chimneyLayout().forEach((b, i) => addBlock(b.hx, b.hy, b.hz, chimneyMatl(b, i), massFor(b), b.x, b.y, b.z + zC, b.ry, 0));
+  chimneyLayout().forEach((b, i) => addBlock(b.hx, b.hy, b.hz, chimneyMatl(b, i), massFor(b), b.x, b.y, b.z + zC, b.ry, 0, wedgeGeo(wedgeProfile(b).taper)));
 }
 
 // Jenga tower (#34): wooden blocks, own 'jenga' material, no MASONRY_MASS_SCALE
