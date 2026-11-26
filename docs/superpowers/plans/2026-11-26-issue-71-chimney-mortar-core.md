@@ -1,3 +1,5 @@
+> **Superseded** by `docs/superpowers/plans/2026-11-26-issue-71-chimney-wedge-blocks.md`. PR #73 showed the mortar core only fixes the gaps seen head-on; from other angles the dark side faces of the boxes remain. The chimney blocks are now drawn as wedges instead.
+
 # Chimney Mortar Core Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (this plan is dispatched through the issue pipeline). Steps use checkbox (`- [ ]`) syntax for tracking.

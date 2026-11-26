@@ -1,3 +1,5 @@
+> **Superseded** by `docs/superpowers/specs/2026-11-26-issue-71-chimney-wedge-blocks-design.md`. PR #73 showed the mortar core only fixes the gaps seen head-on; from other angles the dark side faces of the boxes remain. The chimney blocks are now drawn as wedges instead.
+
 # Chimney Mortar Core (#71) — Design
 
 **Issue:** #71 `feat(targets): chimney mortar core so the ring gaps read as joints`
