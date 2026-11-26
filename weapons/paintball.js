@@ -26,3 +26,15 @@ export function paintIndexForShot(choice, prevIndex, rng) {
   const k = Math.floor(rng() * (n - 1));
   return k >= prevIndex ? k + 1 : k;
 }
+
+// The dot on the weapon button while paintball is selected (#81).
+export function paintDotInfo(choice) {
+  const random = choice === RANDOM_PAINT;
+  const label = random ? 'Random' : PAINT_COLORS[choice].name;
+  return {
+    color: random ? null : PAINT_COLORS[choice].ball,
+    glyph: random ? '🎲' : '',
+    label,
+    title: `Paint colour: ${label}, click to change`,
+  };
+}
