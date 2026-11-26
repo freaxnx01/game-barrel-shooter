@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO, demolitionLayout, storeyPitch, slabHalf, distToColumnAxis, slabLanded } from '../targets/demolition.js';
+import { DEMO, DEBRIS, demolitionLayout, storeyPitch, slabHalf, distToColumnAxis, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
 import { massFor } from '../targets/apk-layouts.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
@@ -74,4 +74,67 @@ test('slabLanded_FallThenStop_TrueOnce', () => {
   assert.equal(slabLanded(st, -0.2), true);
   assert.equal(slabLanded(st, -4), false);
   assert.equal(slabLanded(st, 0), false);
+});
+
+const col = () => ({ c: { x: 3, y: 5, z: -12 }, hx: 0.3, hy: 1.25, hz: 0.3 });
+const chunks = (seed = 7) => { const { c, hx, hy, hz } = col(); return debrisChunks(c, hx, hy, hz, seed); };
+const settle = (ch) => { for (let i = 0; i < 600; i++) stepChunk(ch, 1 / 60); return ch; };
+
+test('debrisChunks_FivePerColumn_AtMost120ForTheTower', () => {
+  assert.equal(chunks().length, DEBRIS.chunks);
+  assert.ok(24 * DEBRIS.chunks <= 120);
+});
+test('debrisChunks_SameSeedSameChunks_OtherSeedDiffers', () => {
+  assert.deepEqual(chunks(7), chunks(7));
+  assert.notDeepEqual(chunks(7), chunks(8));
+});
+test('debrisChunks_StartInsideTheColumn_SmallerThanItsWidth', () => {
+  const { c, hx, hy, hz } = col();
+  for (const ch of chunks()) {
+    assert.ok(Math.abs(ch.x - c.x) <= hx && Math.abs(ch.z - c.z) <= hz);
+    assert.ok(ch.y >= c.y - hy && ch.y <= c.y + hy);
+    assert.ok(ch.size > 0 && ch.size <= Math.min(hx, hz) * 1.1 + 1e-9);
+  }
+});
+test('debrisChunks_ThrownOutwardAndUp_WithinLimits', () => {
+  for (const ch of chunks()) {
+    const h = Math.hypot(ch.vx, ch.vz);
+    assert.ok(h >= DEBRIS.speed * 0.5 - 1e-9 && h <= DEBRIS.speed * 1.5 + 1e-9);
+    assert.ok(ch.vy >= 0 && ch.vy <= DEBRIS.lift);
+  }
+});
+test('stepChunk_Falls_UnderGravity', () => {
+  const ch = chunks()[2], y0 = ch.y, vy0 = ch.vy;
+  stepChunk(ch, 0.1);
+  assert.ok(Math.abs(ch.vy - (vy0 - DEBRIS.gravity * 0.1)) < 1e-9);
+  assert.ok(ch.y < y0 + vy0 * 0.1);
+});
+test('stepChunk_SettlesOnTheGround_NearTheColumn', () => {
+  const { c } = col();
+  for (const ch of chunks()) {
+    settle(ch);
+    assert.equal(ch.resting, true);
+    assert.ok(Math.abs(ch.y - ch.size / 2) < 1e-9);
+    assert.ok(Math.hypot(ch.x - c.x, ch.z - c.z) < 6, 'lands within a few metres');
+  }
+});
+test('stepChunk_Resting_DoesNotMoveButAges', () => {
+  const ch = settle(chunks()[0]), x = ch.x, age = ch.age;
+  stepChunk(ch, 0.5);
+  assert.equal(ch.x, x);
+  assert.ok(Math.abs(ch.age - age - 0.5) < 1e-9);
+});
+test('chunkScale_FullThenShrinksToZeroAtLife', () => {
+  assert.equal(chunkScale(0), 1);
+  assert.equal(chunkScale(DEBRIS.life - DEBRIS.shrink), 1);
+  assert.ok(Math.abs(chunkScale(DEBRIS.life - DEBRIS.shrink / 2) - 0.5) < 1e-9);
+  assert.equal(chunkScale(DEBRIS.life), 0);
+  assert.equal(chunkScale(DEBRIS.life + 1), 0);
+});
+test('dustPuff_GrowsAndFades_ThenGone', () => {
+  const a = dustPuff(0), b = dustPuff(DEBRIS.dustLife / 2);
+  assert.equal(a.scale, 1);
+  assert.equal(a.opacity, DEBRIS.dustOpacity);
+  assert.ok(b.scale > a.scale && b.opacity < a.opacity);
+  assert.equal(dustPuff(DEBRIS.dustLife), null);
 });
