@@ -286,7 +286,7 @@
   <button id="act-cut" title="Cut the rope (O)" hidden>✂️<span>Cut</span></button>
   <button id="act-boom" title="Detonate all remote charges (K)" hidden>💥<span>Boom</span></button>
   <button id="act-boom-more" title="Detonate a single remote charge" aria-expanded="false" hidden>▸</button>
-  <div id="act-nums" hidden>
+  <div id="act-nums" hidden>   <!-- one button per CHARGE.maxRemote (weapons/charges.js) -->
     <button data-n="1" title="Detonate charge 1">1</button>
     <button data-n="2" title="Detonate charge 2">2</button>
     <button data-n="3" title="Detonate charge 3">3</button>
@@ -3218,6 +3218,7 @@ function placeChargeLabel(b) {
   labelWorld.set(p.x, p.y + 0.7, p.z);
   const s = chargeLabelScale(camera.position.distanceTo(labelWorld));
   label.scale.set(s, s, 1);
+  b.mesh.updateMatrixWorld();   // three.js refreshes matrixWorld only at render; worldToLocal needs it now
   label.position.copy(b.mesh.worldToLocal(labelWorld));
 }
 
@@ -3374,7 +3375,6 @@ function animate() {
       if (isFuseDone(b.born, now)) { explode(b, CHARGE.blastRadius, CHARGE.blastStrength); continue; }
       b.mesh.userData.led.visible = ledOn(now - b.born);
     }
-    if (b.type === 'remotecharge' && !b.exploded) placeChargeLabel(b);
     // spear flies point-first until it hits something
     if ((b.type === 'spear' || b.type === 'f16') && !b.hit) {
       const v = phys.getVelocity(b.body);
@@ -3418,6 +3418,7 @@ function animate() {
     }
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
+    if (b.type === 'remotecharge' && !b.exploded) placeChargeLabel(b);   // after the sync: worldToLocal needs this frame's pose
     if (b.type === 'net') {   // the net flies and lies flat, and opens over the first part of the throw (#60)
       b.mesh.quaternion.identity();
       b.mesh.scale.setScalar(openScale(now - b.born));
