@@ -145,6 +145,11 @@
   #act-bar button span { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
   #act-bar button[hidden] { display: none; }
   #act-bar button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
+  /* #79: toggle next to Boom and the row of per-charge buttons, floating above the bar */
+  #act-bar #act-boom-more { width: 28px; font-size: 16px; }
+  #act-nums { position: absolute; right: 0; bottom: 100%; margin-bottom: 8px; display: flex; gap: 6px; }
+  #act-nums[hidden] { display: none; }
+  #act-bar #act-nums button { width: 44px; height: 44px; font-size: 18px; font-weight: bold; }
 
   @media (max-width: 900px), (pointer: coarse) {
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -178,6 +183,7 @@
     #ioshint { top: calc(128px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: auto; max-width: calc(100% - 24px - var(--sa-l) - var(--sa-r)); border-radius: 22px; font-size: 12px; }
 
     #act-bar { left: calc(12px + var(--sa-l)); right: auto; bottom: calc(46px + var(--sa-b)); }
+    #act-nums { left: 0; right: auto; }
 
     #cam-pad { right: calc(12px + var(--sa-r)); bottom: calc(46px + var(--sa-b)); gap: 6px; }
     #cam-pad .dpad { grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px); }
@@ -278,7 +284,16 @@
   <button id="act-quake" title="Hold for an earthquake" hidden>🌋<span>Quake</span></button>
   <button id="act-pull" title="Hold to reel the harpoon or net in (Space)" hidden>🪝<span>Pull</span></button>
   <button id="act-cut" title="Cut the rope (O)" hidden>✂️<span>Cut</span></button>
-  <button id="act-boom" title="Detonate the remote charges (K)" hidden>💥<span>Boom</span></button>
+  <button id="act-boom" title="Detonate all remote charges (K)" hidden>💥<span>Boom</span></button>
+  <button id="act-boom-more" title="Detonate a single remote charge" aria-expanded="false" hidden>▸</button>
+  <div id="act-nums" hidden>
+    <button data-n="1" title="Detonate charge 1">1</button>
+    <button data-n="2" title="Detonate charge 2">2</button>
+    <button data-n="3" title="Detonate charge 3">3</button>
+    <button data-n="4" title="Detonate charge 4">4</button>
+    <button data-n="5" title="Detonate charge 5">5</button>
+    <button data-n="6" title="Detonate charge 6">6</button>
+  </div>
 </div>
 <div id="sheet-backdrop"></div>
 <button id="reset">Reset</button>
@@ -1984,6 +1999,11 @@ const explosions = []; // {mesh, born, particles}
 function detonateRemoteCharges() {
   for (const rec of armedRemotes(balls)) explode(rec, CHARGE.blastRadius, CHARGE.blastStrength);
 }
+// just the armed remote charge with this number (#79); nothing happens if there is none
+function detonateRemote(n) {
+  const rec = armedRemotes(balls).find((r) => r.number === n);
+  if (rec) explode(rec, CHARGE.blastRadius, CHARGE.blastStrength);
+}
 function explode(rec, RADIUS = 3, STRENGTH = 320) {
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
@@ -2238,6 +2258,18 @@ function syncActionBar() {
   setHidden(pullBtn, !v.pull);
   setHidden(cutBtn, !v.cut);
   setHidden(boomBtn, !v.boom);
+  setHidden(boomMoreBtn, !v.boom);
+  const nums = shownNumbers(armedRemotes(balls).map((r) => r.number));
+  if (!nums.length) numsOpen = false;
+  const key = nums.join(',') + (numsOpen ? 'o' : 'c');
+  if (key !== boomKey) {                      // touch the DOM only when something changed
+    boomKey = key;
+    boomLabel.textContent = nums.length ? 'Boom ' + nums.length : 'Boom';
+    boomMoreBtn.textContent = numsOpen ? '▾' : '▸';
+    boomMoreBtn.setAttribute('aria-expanded', String(numsOpen));
+    for (const b of numBtns) setHidden(b, !nums.includes(Number(b.dataset.n)));
+    setHidden(numsRow, !numberRowShown(numsOpen, nums.length));
+  }
   if (!v.pull) pulling = false;
 }
 function syncPullButton() { syncActionBar(); }   // kept: the harpoon and net code calls this name
@@ -2744,6 +2776,12 @@ const pullBtn = document.getElementById('act-pull');   // Pull button, shown onl
 const quakeBtn = document.getElementById('act-quake');
 const cutBtn = document.getElementById('act-cut');
 const boomBtn = document.getElementById('act-boom');   // shown while remote charges are armed
+const boomMoreBtn = document.getElementById('act-boom-more');
+const boomLabel = boomBtn.querySelector('span');
+const numsRow = document.getElementById('act-nums');
+const numBtns = [...numsRow.querySelectorAll('button')];
+let numsOpen = false;
+let boomKey = '';
 const powerEl = document.getElementById('power');
 const powerFill = document.getElementById('powerFill');
 
@@ -3070,6 +3108,13 @@ holdButton(document.getElementById('act-quake'), () => {
 }, () => { quakeActive = false; });
 holdButton(pullBtn, () => { if (!autoPlay && (harpoonLink || netLink)) pulling = true; }, () => { pulling = false; });
 boomBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!autoPlay) detonateRemoteCharges(); });
+boomMoreBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); numsOpen = !numsOpen; syncActionBar(); });
+numsRow.addEventListener('pointerdown', (e) => {
+  const b = e.target.closest('button[data-n]');
+  if (!b) return;
+  e.preventDefault();
+  if (!autoPlay) detonateRemote(Number(b.dataset.n));
+});
 
 function cutTether() {
   if (!harpoonLink && !netLink) return;
