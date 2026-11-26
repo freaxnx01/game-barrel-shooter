@@ -18,6 +18,8 @@ export function runContract(phys) {
     shapelessAnchorDoesNotCollide,
     distanceJointHoldsLength,
     fixedJointMovesTogether,
+    fixedJointKeepsRelativePose,
+    stopCollidingDropsContacts,
     bodyCountTracks,
     stack10Stands,
     unsupportedSleeperFalls,
@@ -273,6 +275,33 @@ function fixedJointMovesTogether(phys) {
   cleanup(phys, [a, c]);
   const pass = relVel < 0.2;
   return { name: 'fixedJointMovesTogether', pass, detail: `relVel=${relVel.toFixed(4)} expected < 0.2` };
+}
+
+// #78: the joint must hold the pose it was made at, not pull the two centres together
+function fixedJointKeepsRelativePose(phys) {
+  const add = (x) => phys.addBody({ shape: { kind: 'box', halfExtents: [0.2, 0.2, 0.2] }, mass: 1, material: 'stone', position: { x, y: 5, z: 0 } });
+  const a = add(0), c = add(0.7);
+  const j = phys.addFixedJoint(a, c);
+  step(phys, 0.5);
+  const d = Math.hypot(c.position.x - a.position.x, c.position.y - a.position.y, c.position.z - a.position.z);
+  phys.removeJoint(j);
+  cleanup(phys, [a, c]);
+  const pass = Math.abs(d - 0.7) < 0.05;
+  return { name: 'fixedJointKeepsRelativePose', pass, detail: `d=${d.toFixed(4)} expected ~0.7` };
+}
+
+// #78: a body that stopped colliding falls through the ground and reports no contact
+function stopCollidingDropsContacts(phys) {
+  const g = ground(phys);
+  const b = box(phys, [0.2, 0.2, 0.2], 1, 2);
+  let hits = 0;
+  phys.onCollide(b, () => { hits++; });
+  phys.stopColliding(b);
+  step(phys, 1.5);
+  const y = b.position.y;
+  cleanup(phys, [g, b]);
+  const pass = y < -1 && hits === 0;
+  return { name: 'stopCollidingDropsContacts', pass, detail: `y=${y.toFixed(3)} hits=${hits} expected y < -1, 0 hits` };
 }
 
 function bodyCountTracks(phys) {

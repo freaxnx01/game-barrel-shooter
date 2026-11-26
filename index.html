@@ -2244,7 +2244,7 @@ function chargeStick(rec, other) {
   phys.setAngularVelocity(rec.body, 0, 0, 0);
   if (plan === 'joint') rec.stickJoint = phys.addFixedJoint(rec.body, other);
   else phys.setGravityFactor(rec.body, 0);       // no body to join: hang where it is
-  phys.setCollides(rec.body, false);             // a stuck charge never pushes the pieces around it (#78)
+  phys.stopColliding(rec.body);             // a stuck charge never pushes the pieces around it (#78)
   playBounce(4);
 }
 
