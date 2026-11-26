@@ -2047,21 +2047,26 @@ function detonateRemote(n) {
   const rec = armedRemotes(balls).find((r) => r.number === n);
   if (rec) detonate(rec);
 }
-function explode(rec, RADIUS = 3, STRENGTH = 320) {
+function explode(rec, RADIUS = 3, STRENGTH = 320, opts = {}) {
+  const lift = opts.lift ?? BLAST_LIFT;
+  const flashScale = opts.flash ?? 1;
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
+  // cutting charge: shove the piece it sits on out of the line of support, even beyond the radius
+  const partner = rec.stickBody;
+  if (opts.shove && partner && partner.mass > 0) {
+    const s = cutShove({ x: partner.position.x - p.x, y: partner.position.y - p.y, z: partner.position.z - p.z }, opts.shove);
+    phys.wake(partner);
+    phys.applyImpulse(partner, s.x, s.y, s.z);
+  }
   // radial impulse on all dynamic bodies
   const chargeBodies = new Set(balls.filter((b) => isChargeType(b.type)).map((b) => b.body));
   for (const body of phys.bodies()) {
-    if (body.mass <= 0 || body === rec.body || chargeBodies.has(body)) continue;   // a 0.1 kg charge would fly off at 20x speed (#62)
-    let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
-    const dist = Math.max(Math.hypot(dx, dy, dz), 0.5);
-    if (dist > RADIUS) continue;
-    dx /= dist; dy /= dist; dz /= dist;
-    const falloff = 1 - dist / RADIUS;
-    const imp = STRENGTH * falloff;
+    if (body.mass <= 0 || body === rec.body || chargeBodies.has(body) || (opts.shove && body === partner)) continue;   // a 0.1 kg charge would fly off at 20x speed (#62)
+    const imp = blastImpulse({ x: body.position.x - p.x, y: body.position.y - p.y, z: body.position.z - p.z }, RADIUS, STRENGTH, lift);
+    if (!imp) continue;
     phys.wake(body);
-    phys.applyImpulse(body, dx * imp, dy * imp + imp * 0.3, dz * imp);
+    phys.applyImpulse(body, imp.x, imp.y, imp.z);
   }
   // remove the projectile — deferred out of the collide/step callback so we
   // never remove a body while the world is stepping
@@ -2075,13 +2080,13 @@ function explode(rec, RADIUS = 3, STRENGTH = 320) {
 
   // visual: flash sphere + debris particles
   const flash = new THREE.Mesh(
-    new THREE.SphereGeometry(0.4, 16, 12),
+    new THREE.SphereGeometry(0.4 * flashScale, 16, 12),
     new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.95 })
   );
   flash.position.set(p.x, p.y, p.z);
   scene.add(flash);
   const pGeo = new THREE.BufferGeometry();
-  const N = 60;
+  const N = Math.round(60 * flashScale);
   const pos = new Float32Array(N * 3), vel = [];
   for (let j = 0; j < N; j++) {
     pos[j * 3] = p.x; pos[j * 3 + 1] = p.y; pos[j * 3 + 2] = p.z;
@@ -2094,7 +2099,7 @@ function explode(rec, RADIUS = 3, STRENGTH = 320) {
   scene.add(pts);
   explosions.push({ flash, pts, vel, born: performance.now() });
   // camera shake
-  shake = 0.35;
+  shake = 0.35 * Math.max(flashScale, 0.6);
   playExplosion();
 }
 
