@@ -26,7 +26,7 @@ All notable changes to this project are documented here, following
 - Brick industrial chimney target: a tapering factory chimney of red brick with a soot-blackened top; hit it at the foot and it tips over and breaks apart (#55)
 - Remote charge (key B) that waits until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw; both stick flat on the visible surface of the first piece they hit (or where they land on the ground), ride along with it, do no impact damage and never push the pieces around them before they go off (#54, #62, #78)
 - Heavy net (key N): a 4 m × 4 m throw net of thick rope with wide meshes that opens in flight, falls over the catch like cloth, hanging down the sides of the pieces and following them as they are dragged, and holds up to 14 pieces within 2.4 m; hold Space or Pull to drag them in (#54, #60, #70)
-- Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
+- Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them. A paintball only colours the piece it hits: almost no force, so stone stays standing, and no splash blob (#54, #82)
 
 ### Changed
 - Chimney bricks look elongated and seamless: every brick block shows two courses of long bricks and is drawn as a wedge, so the blocks of a ring meet without dark gaps from every angle; the chimney's size and how it falls are unchanged (#64, #71)
