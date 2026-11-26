@@ -1,23 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
 
-test('chargeLaunch_PowerRange_Speed12To26', () => {
-  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 12);
-  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 1).speed, 26);
+test('chargeLaunch_PowerRange_Speed40To60', () => {
+  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 40);
+  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 1).speed, 60);
 });
 
 test('chargeLaunch_PowerOutOfRange_Clamped', () => {
-  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, -1).speed, 12);
-  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 5).speed, 26);
+  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, -1).speed, 40);
+  assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 5).speed, 60);
 });
 
-test('chargeLaunch_FlatAim_LiftedUnitDirection', () => {
-  const { direction: d } = chargeLaunch({ x: 0, y: 0, z: -1 }, 0.5);
-  assert.ok(Math.abs(Math.hypot(d.x, d.y, d.z) - 1) < 1e-9);
-  assert.ok(Math.abs(d.y - 0.28 / Math.hypot(0.28, 1)) < 1e-9);
-  assert.ok(d.z < 0);
-  assert.equal(d.x, 0);
+test('chargeLaunch_Aim_DirectionIsExactlyTheAim', () => {
+  for (const aim of [{ x: 0, y: 0, z: -1 }, { x: 0.6, y: 0.8, z: 0 }, { x: 0, y: -0.6, z: -0.8 }]) {
+    for (const power of [0, 0.5, 1]) {
+      const { direction: d } = chargeLaunch(aim, power);
+      assert.ok(Math.abs(d.x - aim.x) < 1e-9 && Math.abs(d.y - aim.y) < 1e-9 && Math.abs(d.z - aim.z) < 1e-9);
+    }
+  }
+});
+
+test('chargeLaunch_NoLiftTuning_Removed', () => {
+  assert.equal(CHARGE.lift, undefined);
+});
+
+test('chargeOutOfRange_BeforeAndAtFlightRange_FalseThenTrue', () => {
+  const start = { x: 1, y: 2, z: 3 };
+  assert.equal(chargeOutOfRange(start, { x: 1, y: 2, z: 3 - 99.9 }), false);
+  assert.equal(chargeOutOfRange(start, { x: 1, y: 2, z: 3 - CHARGE.flightRange }), true);
+});
+
+test('chargeReach_AtMaxSpeed_CoversOneFrameOfFlight', () => {
+  const dt = 1 / 60;
+  assert.ok(chargeReach(60, dt) > 60 * dt);
+  assert.ok(chargeReach(60, 0.1) > 60 * 0.1);
 });
 
 test('isFuseDone_BeforeAndAtFuse_FalseThenTrue', () => {

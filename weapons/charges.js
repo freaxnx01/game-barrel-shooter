@@ -1,12 +1,13 @@
 // Remote and timed demolition charges (#54): tuning and pure helpers. No engine, no DOM.
 // Numbers from docs/superpowers/specs/2026-11-24-issue-54-detonators-net-paintball-design.md.
+// Launch tuning changed in #90 (docs/superpowers/specs/2026-11-26-issue-90-charges-fly-straight-design.md).
 
 export const CHARGE = {
   mass: 0.1, // nearly massless: a stuck charge must not knock pieces over (#62)
   halfExtents: [0.16, 0.08, 0.11],
-  speedBase: 12,
-  speedPower: 14,
-  lift: 0.28,          // tossed with a slight arc, like the grenade
+  speedBase: 40,       // fast and straight to the crosshair (#90): 40-60 m/s, no gravity until first contact
+  speedPower: 20,
+  flightRange: 100,    // metres from the muzzle without a contact: gravity comes back (#90)
   blastRadius: 4,      // between bomb (3/320) and dynamite (4.5/600)
   blastStrength: 500,
   fuseMs: 4000,
@@ -20,12 +21,16 @@ function clamp01(v) {
 }
 
 export function chargeLaunch(dir, power) {
-  const x = dir.x, y = dir.y + CHARGE.lift, z = dir.z;
-  const n = Math.hypot(x, y, z);
+  const n = Math.hypot(dir.x, dir.y, dir.z);
   return {
-    direction: { x: x / n, y: y / n, z: z / n },
+    direction: { x: dir.x / n, y: dir.y / n, z: dir.z / n },   // exactly the crosshair ray (#90)
     speed: CHARGE.speedBase + clamp01(power) * CHARGE.speedPower,
   };
+}
+
+// True once a flying charge has gone CHARGE.flightRange from its muzzle (#90): it then falls like a miss.
+export function chargeOutOfRange(start, pos) {
+  return Math.hypot(pos.x - start.x, pos.y - start.y, pos.z - start.z) >= CHARGE.flightRange;
 }
 
 export function isFuseDone(bornMs, nowMs) {
