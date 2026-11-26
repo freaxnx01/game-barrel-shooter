@@ -1,10 +1,10 @@
-// Which #act-bar buttons apply right now (#63). Quake is mobile-only; on desktop Shift does it.
+// Which #act-bar buttons apply right now (#63). Quake always shows; on desktop Shift does it too.
 import { CHARGE } from '../weapons/charges.js';
 export const CUT_KEY = 'o';   // desktop key for "cut the rope"
 
-export function visibleActions({ tethered, armed, mobile }) {
+export function visibleActions({ tethered, armed }) {
   return {
-    quake: Boolean(mobile),
+    quake: true,
     pull: Boolean(tethered),
     cut: Boolean(tethered),
     boom: armed > 0,

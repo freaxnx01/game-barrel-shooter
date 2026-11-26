@@ -29,6 +29,7 @@ All notable changes to this project are documented here, following
 - Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them. A paintball only colours the piece it hits: almost no force, so stone stays standing, and no splash blob (#54, #82)
 
 ### Changed
+- The 🌋 Quake hold button shows on desktop too (bottom right), next to holding Shift
 - The chimney opens zoomed in: the camera starts at about half the old distance, so the chimney fills the screen with crown and foot in view
 - Chimney bricks look elongated and seamless: every brick block shows two courses of long bricks and is drawn as a wedge, so the blocks of a ring meet without dark gaps from every angle; the chimney's size and how it falls are unchanged (#64, #71)
 - Desktop: the weapon and target lists collapse into the 🎯 and 💥 buttons like on mobile, so the weapon panel no longer covers the chimney foot (#61)
