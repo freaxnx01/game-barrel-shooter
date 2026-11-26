@@ -246,6 +246,7 @@
     <div class="paint-colors" id="paint-colors" hidden></div>
     <button data-type="dynamite"><span class="dot" style="background:#d23f2a;border-radius:2px"></span>Dynamite <span style="opacity:0.5">D</span></button>
     <button data-type="remotecharge"><span class="dot" style="background:#5e6338;border:2px solid #3fd16a;box-sizing:border-box;border-radius:2px"></span>Remote charge <span style="opacity:0.5">B</span></button>
+    <button data-type="cutcharge"><span class="dot" style="background:#5e6338;border:2px solid #ff7a3c;box-sizing:border-box;border-radius:2px"></span>Cutting charge <span style="opacity:0.5">Y</span></button>
     <button data-type="timedcharge"><span class="dot" style="background:#5e6338;border:2px solid #e0483a;box-sizing:border-box;border-radius:2px"></span>Timed charge <span style="opacity:0.5">Z</span></button>
   </div>
   <div class="ammo-group">
@@ -382,7 +383,7 @@ import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale } from './weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
@@ -1626,6 +1627,22 @@ function makeRemoteChargeMesh(number) {
   g.userData.label = label;
   return g;
 }
+const cutBandMatl = new THREE.MeshStandardMaterial({ color: '#c2371f', roughness: 0.6 });
+const cutBandGeo = new THREE.BoxGeometry(0.05, CHARGE.halfExtents[1] * 2 + 0.01, CHARGE.halfExtents[2] * 2 + 0.01);
+// cutting charge (#87): the charge brick with two red bands, like a linear shaped charge; no antenna
+function makeCutChargeMesh(number) {
+  const g = makeChargeMesh('#ff3b30');
+  for (const x of [-0.08, 0.08]) {
+    const band = new THREE.Mesh(cutBandGeo, cutBandMatl);
+    band.position.x = x;
+    g.add(band);
+  }
+  const label = makeChargeLabel(number);
+  g.add(label);
+  g.userData.number = number;
+  g.userData.label = label;
+  return g;
+}
 function makeTimedChargeMesh() {
   return makeChargeMesh('#ff3b30');
 }
@@ -1697,7 +1714,7 @@ function shootBall(dir, power) {
   if (type === 'laser') { fireLaser(); shots++; updateHud(); return; }
   if (type === 'disruptor') { disruptorBlast(); shots++; updateHud(); return; }
   if (type === 'tire') { shootTire(dir, power); return; }
-  if (type === 'remotecharge' && !canPlaceRemote(armedRemotes(balls).length)) return;   // cap: 6 armed
+  if (isRemoteType(type) && !canPlaceRemote(armedRemotes(balls).length)) return;   // cap: 6 armed
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
@@ -1722,6 +1739,7 @@ function shootBall(dir, power) {
     sniper:      { mass: SNIPER.mass, r: SNIPER.radius },
     football:    { mass: FOOTBALL.mass, r: FOOTBALL.radius },
     remotecharge: { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
+    cutcharge:    { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
     timedcharge:  { mass: CHARGE.mass, r: CHARGE.halfExtents[0] },
     net:          { mass: NET.mass, r: NET.radius },
   }[type];
@@ -1736,12 +1754,12 @@ function shootBall(dir, power) {
     shapeSpec = { kind: 'box', halfExtents: [0.34, 0.28, 0.3] };
   } else if (type === 'football') {
     shapeSpec = { kind: 'spheroid', halfLength: FOOTBALL.halfLength, radius: FOOTBALL.radius };
-  } else if (type === 'remotecharge' || type === 'timedcharge') {
+  } else if (isChargeType(type)) {
     shapeSpec = { kind: 'box', halfExtents: CHARGE.halfExtents };
   } else {
     shapeSpec = { kind: 'sphere', radius: cfg.r };
   }
-  const fastProjectiles = new Set(['cannonball', 'spear', 'f16', 'sniper', 'slingshot', 'catapult', 'harpoon', 'remotecharge', 'timedcharge']);
+  const fastProjectiles = new Set(['cannonball', 'spear', 'f16', 'sniper', 'slingshot', 'catapult', 'harpoon', 'remotecharge', 'cutcharge', 'timedcharge']);
   const orientProjectiles = type === 'spear' || type === 'f16' || type === 'harpoon';
   const body = phys.addBody({
     mass: cfg.mass,
@@ -1749,7 +1767,7 @@ function shootBall(dir, power) {
     shape: shapeSpec,
     position: { x: start.x, y: start.y, z: start.z },
     fast: fastProjectiles.has(type),
-    gravityFactor: (type === 'sniper' || type === 'remotecharge' || type === 'timedcharge') ? 0 : undefined,   // straight flight until first contact (#30, #90)
+    gravityFactor: (type === 'sniper' || isChargeType(type)) ? 0 : undefined,   // straight flight until first contact (#30, #90)
     angularDamping: orientProjectiles ? 0.9 : (type === 'hammer' ? 0.05 : undefined),
   });
   let speed = 18 + power * 22; // fast & flat
@@ -1774,7 +1792,7 @@ function shootBall(dir, power) {
     speed = 30 + power * 12;
   } else if (type === 'football') {
     speed = footballSpeed(power);
-  } else if (type === 'remotecharge' || type === 'timedcharge') {
+  } else if (isChargeType(type)) {
     const launch = chargeLaunch(dir, power);   // straight along the crosshair, 40-60 m/s (#90)
     vdir = launch.direction;
     speed = launch.speed;
@@ -1973,6 +1991,8 @@ function shootBall(dir, power) {
     mesh.userData.streak = streak;
   } else if (type === 'remotecharge') {
     mesh = makeRemoteChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number)));   // the new rec is not in balls yet (#79)
+  } else if (type === 'cutcharge') {
+    mesh = makeCutChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number)));
   } else if (type === 'timedcharge') {
     mesh = makeTimedChargeMesh();
   } else if (type === 'net') {
@@ -1996,7 +2016,7 @@ function shootBall(dir, power) {
     if (type === 'paintball' && !rec.hit) { paintSplat(rec, other); return; }
     if (type === 'net' && !rec.hit) { netCatch(rec); return; }
     if (type === 'harpoon' && !rec.hit) harpoonStick(rec, other);
-    if ((type === 'remotecharge' || type === 'timedcharge') && !rec.exploded) chargeStick(rec, other);
+    if (isChargeType(type) && !rec.exploded) chargeStick(rec, other);
     if (type === 'spear' || type === 'f16' || type === 'harpoon') rec.hit = true;
     if (type === 'football') rec.hit = true;   // the first touch ends the spiral; from then on it hops freely
     if (Math.abs(impactSpeed) < 1.5) return;
@@ -2012,19 +2032,26 @@ function shootBall(dir, power) {
 // ---------- Explosion ----------
 const explosions = []; // {mesh, born, particles}
 // strengths are 4x the cannon-es values: crashcat stacks are stiffer, so the old blasts barely moved stone (#22)
+function detonate(rec) {
+  if (rec.type === 'cutcharge') {
+    explode(rec, CUT.radius, CUT.strength, { lift: CUT.lift, shove: CUT.shove, flash: CUT.flashScale });
+  } else {
+    explode(rec, CHARGE.blastRadius, CHARGE.blastStrength);
+  }
+}
 function detonateRemoteCharges() {
-  for (const rec of armedRemotes(balls)) explode(rec, CHARGE.blastRadius, CHARGE.blastStrength);
+  for (const rec of armedRemotes(balls)) detonate(rec);
 }
 // just the armed remote charge with this number (#79); nothing happens if there is none
 function detonateRemote(n) {
   const rec = armedRemotes(balls).find((r) => r.number === n);
-  if (rec) explode(rec, CHARGE.blastRadius, CHARGE.blastStrength);
+  if (rec) detonate(rec);
 }
 function explode(rec, RADIUS = 3, STRENGTH = 320) {
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
   // radial impulse on all dynamic bodies
-  const chargeBodies = new Set(balls.filter((b) => b.type === 'remotecharge' || b.type === 'timedcharge').map((b) => b.body));
+  const chargeBodies = new Set(balls.filter((b) => isChargeType(b.type)).map((b) => b.body));
   for (const body of phys.bodies()) {
     if (body.mass <= 0 || body === rec.body || chargeBodies.has(body)) continue;   // a 0.1 kg charge would fly off at 20x speed (#62)
     let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
@@ -2320,7 +2347,7 @@ function chargeStick(rec, other) {
   rec.stuck = true;                              // exempts it from the 12 s cull
   phys.setVelocity(rec.body, 0, 0, 0);
   phys.setAngularVelocity(rec.body, 0, 0, 0);
-  if (plan === 'joint') rec.stickJoint = phys.addFixedJoint(rec.body, other);
+  if (plan === 'joint') { rec.stickJoint = phys.addFixedJoint(rec.body, other); rec.stickBody = other; }
   else phys.setGravityFactor(rec.body, 0);       // no body to join: hang where it is
   phys.stopColliding(rec.body);             // a stuck charge never pushes the pieces around it (#78)
   playBounce(4);
@@ -2336,7 +2363,7 @@ const chargeNormal = new THREE.Vector3();
 const chargeNormalMatrix = new THREE.Matrix3();
 function stickChargesAhead(dt) {
   for (const rec of balls) {
-    if ((rec.type !== 'remotecharge' && rec.type !== 'timedcharge') || rec.stuck || rec.exploded) continue;
+    if (!isChargeType(rec.type) || rec.stuck || rec.exploded) continue;
     const v = phys.getVelocity(rec.body);
     const speed = Math.hypot(v.x, v.y, v.z);
     if (speed < 0.5) continue;
@@ -3065,6 +3092,7 @@ addEventListener('keydown', (e) => {
   if (k === 'q') setAmmo('sniper');
   if (k === 'f') setAmmo('football');
   if (k === 'b') setAmmo('remotecharge');
+  if (k === 'y') setAmmo('cutcharge');
   if (k === 'z') setAmmo('timedcharge');
   if (k === 'k') detonateRemoteCharges();
   if (k === CUT_KEY) cutTether();
@@ -3436,7 +3464,7 @@ function animate() {
     }
     b.mesh.position.copy(b.body.position);
     b.mesh.quaternion.copy(b.body.quaternion);
-    if (b.type === 'remotecharge' && !b.exploded) placeChargeLabel(b);   // after the sync: worldToLocal needs this frame's pose
+    if (isRemoteType(b.type) && !b.exploded) placeChargeLabel(b);   // after the sync: worldToLocal needs this frame's pose
     if (b.type === 'net') {   // the net flies and lies flat, and opens over the first part of the throw (#60)
       b.mesh.quaternion.identity();
       b.mesh.scale.setScalar(openScale(now - b.born));
@@ -3471,12 +3499,12 @@ function animate() {
     }
     if (b.type === 'sniper' && !b.hit && isOutOfRange(b.muzzle, b.body.position)) { removeProjectile(b); balls.splice(i, 1); continue; }
     // a charge that flew its whole range without a contact falls like a miss (#90)
-    if ((b.type === 'remotecharge' || b.type === 'timedcharge') && !b.hit && !b.stuck && chargeOutOfRange(b.muzzle, b.body.position)) {
+    if ((isChargeType(b.type)) && !b.hit && !b.stuck && chargeOutOfRange(b.muzzle, b.body.position)) {
       b.hit = true;
       phys.setGravityFactor(b.body, 1);
     }
     const cullTime = b.type === 'wrecking' ? 25000 : 12000;
-    const timeless = b.stuck || (b.type === 'remotecharge' && !b.exploded);   // armed charges wait for K / Boom
+    const timeless = b.stuck || (isRemoteType(b.type) && !b.exploded);   // armed charges wait for K / Boom
     if ((!timeless && now - b.born > cullTime) || ((!b.stuck || b.stickJoint) && b.body.position.y < -5)) {
       removeProjectile(b);
       balls.splice(i, 1);
