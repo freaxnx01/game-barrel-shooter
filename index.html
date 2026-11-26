@@ -382,7 +382,7 @@ import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale } from './weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
@@ -1741,7 +1741,7 @@ function shootBall(dir, power) {
   } else {
     shapeSpec = { kind: 'sphere', radius: cfg.r };
   }
-  const fastProjectiles = new Set(['cannonball', 'spear', 'f16', 'sniper', 'slingshot', 'catapult', 'harpoon']);
+  const fastProjectiles = new Set(['cannonball', 'spear', 'f16', 'sniper', 'slingshot', 'catapult', 'harpoon', 'remotecharge', 'timedcharge']);
   const orientProjectiles = type === 'spear' || type === 'f16' || type === 'harpoon';
   const body = phys.addBody({
     mass: cfg.mass,
@@ -1749,7 +1749,7 @@ function shootBall(dir, power) {
     shape: shapeSpec,
     position: { x: start.x, y: start.y, z: start.z },
     fast: fastProjectiles.has(type),
-    gravityFactor: type === 'sniper' ? 0 : undefined,
+    gravityFactor: (type === 'sniper' || type === 'remotecharge' || type === 'timedcharge') ? 0 : undefined,   // straight flight until first contact (#30, #90)
     angularDamping: orientProjectiles ? 0.9 : (type === 'hammer' ? 0.05 : undefined),
   });
   let speed = 18 + power * 22; // fast & flat
@@ -1775,7 +1775,7 @@ function shootBall(dir, power) {
   } else if (type === 'football') {
     speed = footballSpeed(power);
   } else if (type === 'remotecharge' || type === 'timedcharge') {
-    const launch = chargeLaunch(dir, power);   // slight arc, like the grenade
+    const launch = chargeLaunch(dir, power);   // straight along the crosshair, 40-60 m/s (#90)
     vdir = launch.direction;
     speed = launch.speed;
   } else if (type === 'net') {
@@ -2311,7 +2311,12 @@ function detachHarpoon() {
 // ---------- Remote and timed charges: stick to the first thing they hit, no impact damage (#62) ----------
 function chargeStick(rec, other) {
   const plan = chargeStickPlan(rec.stuck, other, balls.some((b) => b.body === other));
-  if (plan === 'ignore') return;
+  if (plan === 'ignore') {
+    if (!rec.stuck) { rec.hit = true; phys.setGravityFactor(rec.body, 1); }   // touched another projectile: it falls now (#90)
+    return;
+  }
+  rec.hit = true;
+  phys.setGravityFactor(rec.body, 1);            // the straight flight ends at the first contact (#90); freeze below sets it back to 0
   rec.stuck = true;                              // exempts it from the 12 s cull
   phys.setVelocity(rec.body, 0, 0, 0);
   phys.setAngularVelocity(rec.body, 0, 0, 0);
@@ -3465,6 +3470,11 @@ function animate() {
       b.chainMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir3.normalize());
     }
     if (b.type === 'sniper' && !b.hit && isOutOfRange(b.muzzle, b.body.position)) { removeProjectile(b); balls.splice(i, 1); continue; }
+    // a charge that flew its whole range without a contact falls like a miss (#90)
+    if ((b.type === 'remotecharge' || b.type === 'timedcharge') && !b.hit && !b.stuck && chargeOutOfRange(b.muzzle, b.body.position)) {
+      b.hit = true;
+      phys.setGravityFactor(b.body, 1);
+    }
     const cullTime = b.type === 'wrecking' ? 25000 : 12000;
     const timeless = b.stuck || (b.type === 'remotecharge' && !b.exploded);   // armed charges wait for K / Boom
     if ((!timeless && now - b.born > cullTime) || ((!b.stuck || b.stickJoint) && b.body.position.y < -5)) {
