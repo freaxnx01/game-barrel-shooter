@@ -363,7 +363,7 @@ import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
@@ -373,7 +373,7 @@ import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
 import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
 import { sheetAfter } from './ui/sheet.js';
-import { visibleActions, CUT_KEY } from './ui/actions.js';
+import { visibleActions, CUT_KEY, shownNumbers, numberRowShown } from './ui/actions.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
 let cc;
@@ -1555,11 +1555,44 @@ function makeChargeMesh(ledColor) {
   g.userData.led = led;
   return g;
 }
-function makeRemoteChargeMesh() {
+// One canvas texture per number, built on first use and shared by all labels (#79)
+const chargeLabelMaps = [];
+function chargeLabelMap(n) {
+  if (!chargeLabelMaps[n]) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(26,22,17,0.85)'; g.fill();
+    g.lineWidth = 4; g.strokeStyle = '#3fd16a'; g.stroke();
+    g.fillStyle = '#f5efe4'; g.font = 'bold 40px sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(n), 32, 34);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    chargeLabelMaps[n] = t;
+  }
+  return chargeLabelMaps[n];
+}
+const chargeLabelMatls = [];
+function makeChargeLabel(n) {
+  if (!chargeLabelMatls[n]) {
+    // depthTest off: the number is never hidden inside the chimney or the ground
+    chargeLabelMatls[n] = new THREE.SpriteMaterial({ map: chargeLabelMap(n), depthTest: false, depthWrite: false, transparent: true });
+  }
+  const s = new THREE.Sprite(chargeLabelMatls[n]);
+  s.renderOrder = 10;
+  return s;
+}
+function makeRemoteChargeMesh(number) {
   const g = makeChargeMesh('#3fd16a');
   const antenna = new THREE.Mesh(antennaGeo, chargeBoxMatl);
   antenna.position.set(-0.04, CHARGE.halfExtents[1] + 0.16, 0);
   g.add(antenna);
+  const label = makeChargeLabel(number);
+  g.add(label);
+  g.userData.number = number;
+  g.userData.label = label;
   return g;
 }
 function makeTimedChargeMesh() {
@@ -1908,7 +1941,7 @@ function shootBall(dir, power) {
     mesh.add(streak);
     mesh.userData.streak = streak;
   } else if (type === 'remotecharge') {
-    mesh = makeRemoteChargeMesh();
+    mesh = makeRemoteChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number)));   // the new rec is not in balls yet (#79)
   } else if (type === 'timedcharge') {
     mesh = makeTimedChargeMesh();
   } else if (type === 'net') {
@@ -1921,7 +1954,7 @@ function shootBall(dir, power) {
   }
   mesh.castShadow = type !== 'sniper';
   scene.add(mesh);
-  const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos,
+  const rec = { body, mesh, born: performance.now(), type, exploded: false, constraint, chainMesh, anchorPos, number: mesh.userData.number,
     muzzle: { x: start.x, y: start.y, z: start.z }, paintIndex };
   // sounds: launch now, clank/bounce on collision
   playShoot(power);
@@ -3131,6 +3164,18 @@ function resize() {
   }
 }
 
+// The number floats 0.7 above the charge in world space (the charge may lie tilted on a face) and
+// grows with the camera distance, so it stays readable from the chimney camera (#79).
+const labelWorld = new THREE.Vector3();
+function placeChargeLabel(b) {
+  const label = b.mesh.userData.label;
+  const p = b.body.position;
+  labelWorld.set(p.x, p.y + 0.7, p.z);
+  const s = chargeLabelScale(camera.position.distanceTo(labelWorld));
+  label.scale.set(s, s, 1);
+  label.position.copy(b.mesh.worldToLocal(labelWorld));
+}
+
 function animate() {
   requestAnimationFrame(animate);
   resize();
@@ -3284,6 +3329,7 @@ function animate() {
       if (isFuseDone(b.born, now)) { explode(b, CHARGE.blastRadius, CHARGE.blastStrength); continue; }
       b.mesh.userData.led.visible = ledOn(now - b.born);
     }
+    if (b.type === 'remotecharge' && !b.exploded) placeChargeLabel(b);
     // spear flies point-first until it hits something
     if ((b.type === 'spear' || b.type === 'f16') && !b.hit) {
       const v = phys.getVelocity(b.body);
