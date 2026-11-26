@@ -4,8 +4,9 @@ import { visibleActions, CUT_KEY } from '../ui/actions.js';
 
 const none = { tethered: false, armed: 0, mobile: false };
 
-test('visibleActions_Idle_Desktop_NothingShown', () => {
-  assert.deepEqual(visibleActions(none), { quake: false, pull: false, cut: false, boom: false });
+test('visibleActions_Idle_Desktop_OnlyQuake', () => {
+  // Quake shows on desktop too, next to holding Shift (playtest 2026-11-26)
+  assert.deepEqual(visibleActions(none), { quake: true, pull: false, cut: false, boom: false });
 });
 test('visibleActions_Idle_Mobile_OnlyQuake', () => {
   assert.deepEqual(visibleActions({ ...none, mobile: true }), { quake: true, pull: false, cut: false, boom: false });
