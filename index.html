@@ -363,7 +363,7 @@ import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
-import { CHARGE, chargeLaunch, chargeStickPlan, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
@@ -2244,7 +2244,39 @@ function chargeStick(rec, other) {
   phys.setAngularVelocity(rec.body, 0, 0, 0);
   if (plan === 'joint') rec.stickJoint = phys.addFixedJoint(rec.body, other);
   else phys.setGravityFactor(rec.body, 0);       // no body to join: hang where it is
+  phys.setCollides(rec.body, false);             // a stuck charge never pushes the pieces around it (#78)
   playBounce(4);
+}
+
+// Flying charges stick where their path first meets a drawn piece (#78): the chimney's wedge
+// meshes cover the gaps between its box colliders, so waiting for a physics contact let charges
+// slip into a gap and stick there, hidden. Runs before phys.step; the contact stays the fallback.
+const chargeRay = new THREE.Raycaster();
+const chargeRayFrom = new THREE.Vector3();
+const chargeRayDir = new THREE.Vector3();
+const chargeNormal = new THREE.Vector3();
+const chargeNormalMatrix = new THREE.Matrix3();
+function stickChargesAhead(dt) {
+  for (const rec of balls) {
+    if ((rec.type !== 'remotecharge' && rec.type !== 'timedcharge') || rec.stuck || rec.exploded) continue;
+    const v = phys.getVelocity(rec.body);
+    const speed = Math.hypot(v.x, v.y, v.z);
+    if (speed < 0.5) continue;
+    const p = rec.body.position;
+    chargeRay.set(chargeRayFrom.set(p.x, p.y, p.z), chargeRayDir.set(v.x / speed, v.y / speed, v.z / speed));
+    chargeRay.far = chargeReach(speed, dt);
+    const hit = chargeRay.intersectObjects(barrels.map((b) => b.mesh), true)[0];
+    const piece = hit && hit.face ? pieceOf(hit.object, barrels) : null;
+    if (piece) stickChargeOnFace(rec, piece, hit);
+  }
+}
+// meshes are scaled non-uniformly (addBlock), so the face normal goes to world space by the normal matrix
+function stickChargeOnFace(rec, piece, hit) {
+  chargeNormal.copy(hit.face.normal).applyMatrix3(chargeNormalMatrix.getNormalMatrix(hit.object.matrixWorld)).normalize();
+  const { position: at, quaternion: q } = flushPose(hit.point, chargeNormal);
+  phys.setPosition(rec.body, at.x, at.y, at.z);
+  phys.setQuaternion(rec.body, q.x, q.y, q.z, q.w);
+  chargeStick(rec, piece.body);
 }
 
 // ---------- Heavy net: catch the pieces around the first contact; the player then drags them in ----------
@@ -3105,6 +3137,7 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 1 / 30);
   const now = performance.now();
   applyJengaPush();
+  stickChargesAhead(dt);   // before the step: stick on the drawn face, not in a gap behind it (#78)
   phys.step(dt); // fixed 1/240 internal step (≤10 substeps) so fast projectiles don't tunnel through
   const camNudge = heldNudge(camHeld, dt);
   if (camNudge) { nudgeOrbit(orbit, camNudge.dTheta, camNudge.dPhi, camNudge.dRadius); updateCamera(); }
