@@ -2921,7 +2921,7 @@ function updateMagnetoHum(held) {
 // Backquote (§) or the ⏺ button records the #c canvas plus the game sound (recordTap) with a MediaRecorder.
 // HUD, buttons and #rec-msg are DOM, so they are never in the video. A hidden tab pauses the recorder
 // (no frames arrive); a recording stops by itself after MAX_SECONDS because the chunks live in RAM. Rules in ui/record.js.
-const REC = { state: 'idle', rec: null, chunks: [], fmt: null, clock: null, timer: 0, msgTimer: 0 };
+const REC = { state: 'idle', rec: null, chunks: [], fmt: null, clock: null, timer: 0, msgTimer: 0, capped: false };
 const recBtn = document.getElementById('mob-rec');
 const recMsg = document.getElementById('rec-msg');
 function recNotice(text) {
@@ -2934,28 +2934,36 @@ function recPaint() {
   recBtn.classList.toggle('rec', on);
   recBtn.textContent = on ? '● ' + formatClock(recordElapsed(REC.clock, performance.now())) : '⏺';
   recBtn.title = on ? 'Stop and save the video (key §)' : 'Record a video (key §)';
+  recBtn.setAttribute('aria-label', on ? 'Stop and save the video' : 'Record a video');
 }
 function startRecord() {
   if (REC.state !== 'idle') return;
   if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) { recNotice('Video recording is not supported in this browser'); return; }
   const fmt = pickRecordFormat((m) => MediaRecorder.isTypeSupported(m));
   if (!fmt) { recNotice('Video recording is not supported in this browser'); return; }
-  let rec;
+  let rec, videoTracks = [];
   try {
-    const stream = new MediaStream([...canvas.captureStream(60).getVideoTracks(), ...recordTap().getAudioTracks()]);
+    videoTracks = canvas.captureStream(60).getVideoTracks();
+    const stream = new MediaStream([...videoTracks, ...recordTap().getAudioTracks()]);
     rec = new MediaRecorder(stream, { mimeType: fmt.mime, videoBitsPerSecond: recordBitrate(canvas.width, canvas.height), audioBitsPerSecond: 192000 });
-  } catch (e) { recNotice('Recording failed'); return; }
-  REC.rec = rec; REC.chunks = []; REC.fmt = fmt;
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) REC.chunks.push(e.data); };
+    rec.onstop = finishRecord;
+    rec.onerror = () => failRecord();
+    REC.chunks = [];
+    rec.start(1000);   // a chunk every second
+  } catch (e) {
+    console.warn('video recording failed to start', e);
+    for (const t of videoTracks) t.stop();   // nothing is recording: release the canvas capture
+    recNotice('Recording failed');
+    return;
+  }
+  REC.rec = rec; REC.fmt = fmt;
   REC.clock = { startedAt: performance.now(), pausedAt: null, pausedTotal: 0 };
-  rec.ondataavailable = (e) => { if (e.data && e.data.size) REC.chunks.push(e.data); };
-  rec.onstop = finishRecord;
-  rec.onerror = () => failRecord();
-  rec.start(1000);   // a chunk every second
   REC.state = recordNext(REC.state, 'start');
   clearInterval(REC.timer);
   REC.timer = setInterval(() => {
     recPaint();
-    if (recordElapsed(REC.clock, performance.now()) >= MAX_SECONDS) { stopRecord(); recNotice('Recording stopped after 10 minutes'); }
+    if (recordElapsed(REC.clock, performance.now()) >= MAX_SECONDS) { REC.capped = true; stopRecord(); }
   }, 250);
   recPaint();
   recNotice('Recording started');
@@ -2963,10 +2971,11 @@ function startRecord() {
 function stopRecord() {
   if (REC.state !== 'recording' && REC.state !== 'paused') return;
   REC.state = recordNext(REC.state, 'stop');
+  clearInterval(REC.timer);   // the clock stops now, not when the recorder finishes flushing
   REC.rec.stop();
 }
 function finishRecord() {
-  const fmt = REC.fmt, chunks = REC.chunks;
+  const fmt = REC.fmt, chunks = REC.chunks, capped = REC.capped;
   cleanupRecord();
   if (!chunks.length) { recNotice('Recording failed'); return; }
   const url = URL.createObjectURL(new Blob(chunks, { type: fmt.mime.split(';')[0] }));
@@ -2974,14 +2983,14 @@ function finishRecord() {
   link.href = url; link.download = recordFileName(new Date(), fmt.ext);
   document.body.appendChild(link); link.click(); link.remove();   // the anchor in the document; the URL outlives the click
   setTimeout(() => URL.revokeObjectURL(url), 40000);
-  recNotice('Video saved');
+  recNotice(capped ? 'Video saved (stopped after 10 minutes)' : 'Video saved');
 }
 function failRecord() { cleanupRecord(); recNotice('Recording failed'); }
 function cleanupRecord() {
   clearInterval(REC.timer);
   // only the video track: the audio track belongs to the shared recordTap() destination and must stay live
   if (REC.rec && REC.rec.stream) for (const t of REC.rec.stream.getVideoTracks()) t.stop();
-  REC.rec = null; REC.chunks = []; REC.fmt = null; REC.clock = null;
+  REC.rec = null; REC.chunks = []; REC.fmt = null; REC.clock = null; REC.capped = false;
   REC.state = recordNext(REC.state, REC.state === 'stopping' ? 'stopped' : 'fail');
   recPaint();
 }
