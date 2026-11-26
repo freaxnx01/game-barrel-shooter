@@ -22,7 +22,7 @@ All notable changes to this project are documented here, following
 - On an iPhone or iPad in the browser, a tip shows how to play Barrel Blast as an app: "Share ⬆ → Add to Home Screen"; × hides it for good, the "?" panel keeps the line, and it never shows in the installed app or on other devices (#50)
 - Maskable app icon, so Android launchers show the barrel pyramid in a full round or squircle icon instead of a small one on a white plate; the browser bar colour now matches the app colour
 - Brick industrial chimney target: a tapering factory chimney of red brick with a soot-blackened top; hit it at the foot and it tips over and breaks apart (#55)
-- Remote charge (key B) that waits until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw; both stick to the first piece or the ground they hit and do no impact damage (#54, #62)
+- Remote charge (key B) that waits until you press K or the 💥 Boom button, and timed charge (key Z) that explodes 4 s after the throw; both stick flat on the visible surface of the first piece or the ground they hit, ride along with it, do no impact damage and never push the pieces around them before they go off (#54, #62, #78)
 - Heavy net (key N): a 4 m × 4 m throw net of thick rope with wide meshes that opens in flight, falls over the catch like cloth, hanging down the sides of the pieces and following them as they are dragged, and holds up to 14 pieces within 2.4 m; hold Space or Pull to drag them in (#54, #60, #70)
 - Paintball colours: pick one of seven colours or 🎲 random, where every shot has a different colour; P cycles them (#54)
 
