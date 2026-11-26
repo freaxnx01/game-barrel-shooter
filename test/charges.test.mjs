@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes } from '../weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from '../weapons/charges.js';
 
 test('chargeLaunch_PowerRange_Speed40To60', () => {
   assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 40);
@@ -167,4 +167,69 @@ test('pieceOf_MeshOrChildOfAPiece_ThatPiece', () => {
 test('pieceOf_UnrelatedMesh_Null', () => {
   assert.equal(pieceOf({ parent: { parent: null } }, [{ mesh: {} }]), null);
   assert.equal(pieceOf(null, []), null);
+});
+
+// ---- #87: cutting charge ----
+
+test('CUT_Tuning_SmallRadiusNoLift', () => {
+  assert.equal(CUT.radius, 1.2);
+  assert.equal(CUT.lift, 0);
+  assert.equal(BLAST_LIFT, 0.3);
+});
+
+test('blastImpulse_OutsideRadius_Null', () => {
+  assert.equal(blastImpulse({ x: 2, y: 0, z: 0 }, CUT.radius, CUT.strength, CUT.lift), null);
+});
+
+test('blastImpulse_Wide_KeepsUpwardKick', () => {
+  const i = blastImpulse({ x: 2, y: 0, z: 0 }, 4, 500);   // falloff 0.5 -> 250
+  assert.equal(i.x, 250);
+  assert.equal(i.y, 250 * BLAST_LIFT);
+  assert.equal(i.z, 0);
+});
+
+test('blastImpulse_Cut_NoUpwardComponentForSideOffset', () => {
+  const i = blastImpulse({ x: 0.8, y: 0, z: 0 }, CUT.radius, CUT.strength, CUT.lift);
+  assert.ok(i.x > 0);
+  assert.equal(i.y, 0);
+});
+
+test('blastImpulse_Cut_FallsOffWithDistance', () => {
+  const near = blastImpulse({ x: 0.6, y: 0, z: 0 }, CUT.radius, CUT.strength, CUT.lift);
+  const far = blastImpulse({ x: 1.1, y: 0, z: 0 }, CUT.radius, CUT.strength, CUT.lift);
+  assert.ok(near.x > far.x);
+});
+
+test('blastImpulse_AtCentre_FiniteAndInsideMinDistance', () => {
+  const i = blastImpulse({ x: 0, y: 0, z: 0 }, CUT.radius, CUT.strength, CUT.lift);
+  assert.ok(Number.isFinite(i.x) && Number.isFinite(i.y) && Number.isFinite(i.z));
+});
+
+test('cutShove_PieceToTheRight_HorizontalPushRight', () => {
+  const s = cutShove({ x: 3, y: 5, z: 0 });
+  assert.equal(s.x, CUT.shove);
+  assert.equal(s.y, 0);
+  assert.equal(s.z, 0);
+});
+
+test('cutShove_DiagonalOffset_UnitDirectionTimesStrength', () => {
+  const s = cutShove({ x: 1, y: 2, z: 1 }, 10);
+  assert.ok(Math.abs(Math.hypot(s.x, s.z) - 10) < 1e-9);
+  assert.equal(s.y, 0);
+});
+
+test('cutShove_VerticallyAligned_FallsBackToPlusX', () => {
+  assert.deepEqual(cutShove({ x: 0, y: 1, z: 0 }, 7), { x: 7, y: 0, z: 0 });
+});
+
+test('isRemoteType_And_isChargeType_Classify', () => {
+  assert.ok(isRemoteType('remotecharge') && isRemoteType('cutcharge'));
+  assert.ok(!isRemoteType('timedcharge') && !isRemoteType('bomb'));
+  assert.ok(isChargeType('timedcharge') && isChargeType('cutcharge') && !isChargeType('dynamite'));
+});
+
+test('armedRemotes_CutChargeCountsAsRemote', () => {
+  const a = { type: 'cutcharge', exploded: false };
+  const b = { type: 'cutcharge', exploded: true };
+  assert.deepEqual(armedRemotes([a, b]), [a]);
 });
