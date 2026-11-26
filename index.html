@@ -381,7 +381,7 @@ import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
-import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo } from './weapons/paintball.js';
+import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
@@ -1237,8 +1237,6 @@ function clearTargets() {
   for (const b of barrels) { phys.removeBody(b.body); scene.remove(b.mesh); }
   barrels.length = 0;
   impactThrottle.reset();
-  for (const s of paintSplats) scene.remove(s);
-  paintSplats.length = 0;
 }
 const camCfg = {
   barrels:   { r: 15.5, ty: 2.8, tz: -6, plat: true,  build: setupBarrels, support: true },
@@ -1351,7 +1349,6 @@ const fuseGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.14, 8);
 const fuseMatl = new THREE.MeshStandardMaterial({ color: '#8a7040', roughness: 0.9 });
 // new ammo materials + geometries
 const paintBallMatls = PAINT_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c.ball, roughness: 0.55 }));
-const paintSplatMatls = PAINT_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c.splat, roughness: 0.7 }));
 let paintChoice = 0;         // index into PAINT_COLORS, or RANDOM_PAINT
 let lastPaintIndex = null;   // colour of the previous paintball, so random mode never repeats it
 const chargeMatl = new THREE.MeshStandardMaterial({ color: '#5e6338', roughness: 0.85 });
@@ -1371,8 +1368,6 @@ const grenadeMatl = new THREE.MeshStandardMaterial({ color: '#48592f', roughness
 const grenadeGeo = new THREE.SphereGeometry(0.18, 18, 14);
 const hammerHeadMatl = new THREE.MeshStandardMaterial({ color: '#4a4e55', roughness: 0.35, metalness: 0.92 });
 const hammerHandleMatl = new THREE.MeshStandardMaterial({ color: '#8a5a34', roughness: 0.8 });
-const splatGeo = new THREE.SphereGeometry(0.28, 12, 10);
-const paintSplats = [];
 const bolts = [];
 const hurricanes = [];
 const balls = []; // {body, mesh, born, type, exploded}
@@ -1716,7 +1711,7 @@ function shootBall(dir, power) {
     catapult:    { mass: 10,  r: 0.4 },
     slingshot:   { mass: 0.4, r: 0.12 },
     f16:         { mass: 4,   r: 0.12 },
-    paintball:   { mass: 0.5, r: 0.15 },
+    paintball:   { mass: PAINTBALL.mass, r: PAINTBALL.radius },
     grenade:     { mass: 1.6, r: 0.18 },
     hammer:      { mass: 5,   r: 0.2 },
     medball:     { mass: 8,   r: BALL_R * 1.05 },
@@ -2076,19 +2071,11 @@ function explode(rec, RADIUS = 3, STRENGTH = 320) {
   playExplosion();
 }
 
-// ---------- Paintball: turn hit pieces red + leave a splat ----------
+// ---------- Paintball: turn hit pieces red ----------
 function paintSplat(rec, other) {
   rec.hit = true;
   const tgt = barrels.find(b => b.body === other);
   if (tgt) tgt.mesh.traverse(o => { if (o.isMesh) o.material = paintBallMatls[rec.paintIndex]; });
-  // splat blob at the impact spot
-  const splat = new THREE.Mesh(splatGeo, paintSplatMatls[rec.paintIndex]);
-  const p = rec.body.position;
-  splat.position.set(p.x, p.y, p.z);
-  splat.scale.set(1 + Math.random() * 0.5, 0.35, 1 + Math.random() * 0.5);
-  splat.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
-  scene.add(splat);
-  paintSplats.push(splat);
   // remove the paintball itself — deferred out of the collide callback like explode(),
   // never remove a body while the world is stepping (#15)
   setTimeout(() => {
