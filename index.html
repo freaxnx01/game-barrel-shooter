@@ -2615,7 +2615,7 @@ function playWind(dur) {
   g.gain.exponentialRampToValueAtTime(0.45, t + 0.6);
   g.gain.setValueAtTime(0.45, t + Math.max(dur - 1, 1));
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(ac.destination);
+  src.connect(f).connect(g).connect(ac.sfxOut);
   src.start(t);
 }
 
@@ -2632,7 +2632,7 @@ function playThunder() {
   const g = ac.createGain();
   g.gain.setValueAtTime(0.8, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(ac.destination);
+  src.connect(f).connect(g).connect(ac.sfxOut);
   src.start(t);
 }
 
@@ -2646,7 +2646,7 @@ function playExplosion() {
   const og = ac.createGain();
   og.gain.setValueAtTime(0.9, t);
   og.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-  o.connect(og).connect(ac.destination);
+  o.connect(og).connect(ac.sfxOut);
   o.start(t); o.stop(t + 0.9);
   // noise blast
   const dur = 0.7;
@@ -2660,16 +2660,28 @@ function playExplosion() {
   const g = ac.createGain();
   g.gain.setValueAtTime(0.7, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(ac.destination);
+  src.connect(f).connect(g).connect(ac.sfxOut);
   src.start(t);
 }
 
 // ---------- Sound (Web Audio, synthesized) ----------
 let audioCtx = null;
 function ctx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // one master bus (#95): every sound goes through sfxOut, so the recording can tap it
+    audioCtx.sfxOut = audioCtx.createGain();
+    audioCtx.sfxOut.gain.value = 1;
+    audioCtx.sfxOut.connect(audioCtx.destination);
+  }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
+}
+// #95: the recording's audio tap -- sfxOut feeds a MediaStreamDestination as a second output, created on the first recording
+function recordTap() {
+  const ac = ctx();
+  if (!ac.recDest) { ac.recDest = ac.createMediaStreamDestination(); ac.sfxOut.connect(ac.recDest); }
+  return ac.recDest.stream;
 }
 function playShoot(power) {
   const ac = ctx(), t = ac.currentTime;
@@ -2685,10 +2697,10 @@ function playShoot(power) {
   const g = ac.createGain();
   g.gain.setValueAtTime(0.25 + power * 0.3, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(ac.destination);
+  src.connect(f).connect(g).connect(ac.sfxOut);
   src.start(t);
 }
-function playClank(impact, out = ctx().destination) {
+function playClank(impact, out = ctx().sfxOut) {
   const ac = ctx(), t = ac.currentTime;
   const vol = Math.min(impact / 14, 1) * 0.5;
   // metallic: a few inharmonic partials, fast decay
@@ -2713,7 +2725,7 @@ function playClank(impact, out = ctx().destination) {
   o.connect(g).connect(out);
   o.start(t); o.stop(t + 0.2);
 }
-function playWoodKnock(impact, out = ctx().destination) {
+function playWoodKnock(impact, out = ctx().sfxOut) {
   const ac = ctx(), t = ac.currentTime;
   const vol = Math.min(impact / 12, 1) * 0.55;
   if (vol < 0.02) return;
@@ -2754,7 +2766,7 @@ function playBounce(impact) {
   const g = ac.createGain();
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
-  o.connect(g).connect(ac.destination);
+  o.connect(g).connect(ac.sfxOut);
   o.start(t); o.stop(t + 0.2);
 }
 function startRumble() {
@@ -2765,7 +2777,7 @@ function startRumble() {
   const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
   const filter = ac.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 70;
   const gain = ac.createGain(); gain.gain.value = 0;
-  src.connect(filter).connect(gain).connect(ac.destination);
+  src.connect(filter).connect(gain).connect(ac.sfxOut);
   src.start();
   let stopped = false;
   return {
@@ -2867,7 +2879,7 @@ function playImpactVoice(voice, kind) {
   const ac = ctx();
   const g = ac.createGain();
   g.gain.value = voice.volume * TARGET_LEVEL;
-  g.connect(ac.destination);
+  g.connect(ac.sfxOut);
   IMPACT_VOICES[kind](g);
   impactGains.set(voice.id, g);
   setTimeout(() => { impactGains.delete(voice.id); g.disconnect(); }, IMPACT.kinds[kind].voiceMs + 150);
@@ -2883,7 +2895,7 @@ let magnetoHum = null, humHeld = -1;
 function updateMagnetoHum(held) {
   if (magnetoActive && !magnetoHum) {
     const ac = ctx();
-    magnetoHum = createMagnetoHum(ac, ac.destination);
+    magnetoHum = createMagnetoHum(ac, ac.sfxOut);
     humHeld = -1;
     devAudio?.hum.push({ t: performance.now(), event: 'start' });
   }
