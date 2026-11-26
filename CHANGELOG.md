@@ -35,7 +35,7 @@ All notable changes to this project are documented here, following
 - Chimney bricks look elongated and seamless: every brick block shows two courses of long bricks and is drawn as a wedge, so the blocks of a ring meet without dark gaps from every angle; the chimney's size and how it falls are unchanged (#64, #71)
 - Desktop: the weapon and target lists collapse into the 🎯 and 💥 buttons like on mobile, so the weapon panel no longer covers the chimney foot (#61)
 - Brick chimney is 1.25× wider and 1.5× higher, has no crown and no stone base any more, and stands directly on the ground; it now takes dynamite at the foot to topple it (#58)
-- The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30)
+- The sniper lens fires a bright tracer round that flies dead straight to the crosshair instead of a gold ball that dropped; it hits barrels about as hard as before (#30). It no longer zooms the whole screen: a round scope at the cursor (lifted above the finger on touch screens) shows the target 5× magnified with a reticle, and the shot lands at its centre (#91)
 - Physics now runs on crashcat instead of cannon-es: buildings stand still until hit and break apart piece by piece instead of bursting from a light touch (#9, #20)
 - Brighter scene on every device: stronger sky and sun light, a lighter sky, fog and ground; shadows and barrel colours stay as they were (#40)
 
