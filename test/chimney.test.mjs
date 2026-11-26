@@ -93,7 +93,7 @@ test('brickFaceRects_AnyRows_FrameHalfJointGapFullJoint', () => {
 test('visibleBrickAspect_EveryBody_Elongated', () => {
   for (const b of chimneyLayout()) {
     const a = visibleBrickAspect(b);
-    assert.ok(a >= 2.0 && a <= 4.0, `course ${b.course}: aspect ${a}`);
+    assert.ok(a >= 3.0 && a <= 6.5, `course ${b.course}: aspect ${a}`);   // long bricks, kept on purpose after #71
   }
 });
 test('visibleBrickAspect_FootLongerThanTop', () => {
@@ -101,8 +101,8 @@ test('visibleBrickAspect_FootLongerThanTop', () => {
   const foot = visibleBrickAspect(boxes.find(b => b.course === 0));
   const top = visibleBrickAspect(boxes.find(b => b.course === CHIMNEY.shaftCourses - 1));
   assert.ok(foot > top);
-  assert.ok(Math.abs(foot - 3.805) < 0.01, `foot ${foot}`);
-  assert.ok(Math.abs(top - 2.159) < 0.01, `top ${top}`);
+  assert.ok(Math.abs(foot - 6.102) < 0.01, `foot ${foot}`);
+  assert.ok(Math.abs(top - 3.537) < 0.01, `top ${top}`);
 });
 test('wedgeProfile_InnerWidthDepthHeightUnchanged', () => {
   for (const b of chimneyLayout()) {

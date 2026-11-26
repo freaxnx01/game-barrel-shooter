@@ -82,9 +82,10 @@ export function brickFaceRects(width, height, rows, joint) {
   return rects;
 }
 
-// Visible length : height of one drawn brick of a body (#64).
+// Visible length : height of one drawn brick of a body (#64), measured on the outer face that
+// is drawn: since #71 that is the wedge's outer face, so the texture is stretched by the taper.
 export function visibleBrickAspect(box) {
-  return (2 * box.hx) / ((2 * box.hy) / CHIMNEY.faceRows);
+  return (2 * wedgeProfile(box).outerHx) / ((2 * box.hy) / CHIMNEY.faceRows);
 }
 
 // Render shape of one ring block (#71): the collider stays the box, the mesh is a wedge whose

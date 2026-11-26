@@ -74,3 +74,12 @@ mortar core of PR #73 (superseded).
 - `node --test test/*.test.mjs`: new tests for `wedgeProfile` and `wedgeFaces`.
 - Neighbour test: outer corners of adjacent ring blocks of a real layout meet (gap < 0.01).
 - Manual: chimney in the browser from the side and from above: no dark checkerboard.
+
+## Outcome (PR #74)
+
+The outer face is about 1.6× wider than the box face, and its UVs still run 0..1, so the
+#64 texture is stretched horizontally: drawn bricks are about 6.1:1 at the foot and 3.5:1 at
+the top (instead of 3.8 and 2.2), and head joints are a bit wider than bed joints. A headless
+screenshot showed this reads as natural, elongated brickwork with no checkerboard, and the
+user chose to keep it. `visibleBrickAspect` now measures the drawn outer face, and its tests
+pin 6.10 / 3.54.
