@@ -141,6 +141,10 @@
   #mob-paint-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #f5efe4; box-sizing: border-box; font-size: 13px; line-height: 10px; text-align: center; }
   #mob-paint-dot.dice { border: 0; width: auto; height: auto; line-height: 1; }
   #mob-help, #mob-jenga-shoot { display: none; }   /* desktop: the hint is always visible, #jenga-shoot is its own button */
+  #mob-bar #mob-rec { min-width: 38px; }
+  #mob-bar #mob-rec.rec { color: #ff6a5e; border-color: #ff6a5e; font-variant-numeric: tabular-nums; }
+  #rec-msg { position: fixed; left: 50%; bottom: calc(96px + var(--sa-b)); transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 18px; background: rgba(26,22,17,0.88); border: 1px solid rgba(245,239,228,0.3); color: #f5efe4; font-size: 13px; text-align: center; pointer-events: none; z-index: 20; }
+  #rec-msg[hidden] { display: none; }
   .hint { top: calc(164px + var(--sa-t)); }
 
   /* ---------- Action bar (#63): Pull, Cut, Boom (and Quake on mobile), each shown only while it applies ---------- */
@@ -300,8 +304,10 @@
   <button id="mob-weapon" aria-controls="ammo">💥 <span id="mob-weapon-name">Basketball</span></button>
   <button id="mob-paint" type="button" hidden><span id="mob-paint-dot"></span></button>
   <button id="mob-jenga-shoot" hidden>🔫 Shoot</button>
+  <button id="mob-rec" type="button" title="Record a video (key §)" aria-label="Record a video">⏺</button>
   <button id="mob-help" aria-controls="hint" title="Controls">?</button>
 </div>
+<div id="rec-msg" role="status" aria-live="polite" hidden></div>
 <div id="act-bar">
   <button id="act-quake" title="Hold for an earthquake" hidden>🌋<span>Quake</span></button>
   <button id="act-pull" title="Hold to reel the harpoon or net in (Space)" hidden>🪝<span>Pull</span></button>
@@ -413,6 +419,7 @@ import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
 import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
 import { sheetAfter } from './ui/sheet.js';
+import { MAX_SECONDS, pickRecordFormat, recordFileName, recordBitrate, recordKeyAction, recordNext, recordElapsed, formatClock } from './ui/record.js';
 import { visibleActions, CUT_KEY, shownNumbers, numberRowShown } from './ui/actions.js';
 
 // crashcat comes from the CDN; without it there is no game, so say so instead of a blank page
@@ -2909,6 +2916,92 @@ function updateMagnetoHum(held) {
   magnetoHum.setHeld(held);
   devAudio?.hum.push({ t: performance.now(), event: 'held', held });
 }
+
+// ---------- Video recording (#95) ----------
+// Backquote (§) or the ⏺ button records the #c canvas plus the game sound (recordTap) with a MediaRecorder.
+// HUD, buttons and #rec-msg are DOM, so they are never in the video. A hidden tab pauses the recorder
+// (no frames arrive); a recording stops by itself after MAX_SECONDS because the chunks live in RAM. Rules in ui/record.js.
+const REC = { state: 'idle', rec: null, chunks: [], fmt: null, clock: null, timer: 0, msgTimer: 0 };
+const recBtn = document.getElementById('mob-rec');
+const recMsg = document.getElementById('rec-msg');
+function recNotice(text) {
+  recMsg.textContent = text; recMsg.hidden = false;
+  clearTimeout(REC.msgTimer);
+  REC.msgTimer = setTimeout(() => { recMsg.hidden = true; }, 3500);
+}
+function recPaint() {
+  const on = REC.state !== 'idle';
+  recBtn.classList.toggle('rec', on);
+  recBtn.textContent = on ? '● ' + formatClock(recordElapsed(REC.clock, performance.now())) : '⏺';
+  recBtn.title = on ? 'Stop and save the video (key §)' : 'Record a video (key §)';
+}
+function startRecord() {
+  if (REC.state !== 'idle') return;
+  if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) { recNotice('Video recording is not supported in this browser'); return; }
+  const fmt = pickRecordFormat((m) => MediaRecorder.isTypeSupported(m));
+  if (!fmt) { recNotice('Video recording is not supported in this browser'); return; }
+  let rec;
+  try {
+    const stream = new MediaStream([...canvas.captureStream(60).getVideoTracks(), ...recordTap().getAudioTracks()]);
+    rec = new MediaRecorder(stream, { mimeType: fmt.mime, videoBitsPerSecond: recordBitrate(canvas.width, canvas.height), audioBitsPerSecond: 192000 });
+  } catch (e) { recNotice('Recording failed'); return; }
+  REC.rec = rec; REC.chunks = []; REC.fmt = fmt;
+  REC.clock = { startedAt: performance.now(), pausedAt: null, pausedTotal: 0 };
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) REC.chunks.push(e.data); };
+  rec.onstop = finishRecord;
+  rec.onerror = () => failRecord();
+  rec.start(1000);   // a chunk every second
+  REC.state = recordNext(REC.state, 'start');
+  clearInterval(REC.timer);
+  REC.timer = setInterval(() => {
+    recPaint();
+    if (recordElapsed(REC.clock, performance.now()) >= MAX_SECONDS) { stopRecord(); recNotice('Recording stopped after 10 minutes'); }
+  }, 250);
+  recPaint();
+  recNotice('Recording started');
+}
+function stopRecord() {
+  if (REC.state !== 'recording' && REC.state !== 'paused') return;
+  REC.state = recordNext(REC.state, 'stop');
+  REC.rec.stop();
+}
+function finishRecord() {
+  const fmt = REC.fmt, chunks = REC.chunks;
+  cleanupRecord();
+  if (!chunks.length) { recNotice('Recording failed'); return; }
+  const url = URL.createObjectURL(new Blob(chunks, { type: fmt.mime.split(';')[0] }));
+  const link = document.createElement('a');
+  link.href = url; link.download = recordFileName(new Date(), fmt.ext);
+  document.body.appendChild(link); link.click(); link.remove();   // the anchor in the document; the URL outlives the click
+  setTimeout(() => URL.revokeObjectURL(url), 40000);
+  recNotice('Video saved');
+}
+function failRecord() { cleanupRecord(); recNotice('Recording failed'); }
+function cleanupRecord() {
+  clearInterval(REC.timer);
+  // only the video track: the audio track belongs to the shared recordTap() destination and must stay live
+  if (REC.rec && REC.rec.stream) for (const t of REC.rec.stream.getVideoTracks()) t.stop();
+  REC.rec = null; REC.chunks = []; REC.fmt = null; REC.clock = null;
+  REC.state = recordNext(REC.state, REC.state === 'stopping' ? 'stopped' : 'fail');
+  recPaint();
+}
+function toggleRecord() { if (REC.state === 'idle') startRecord(); else stopRecord(); }
+document.addEventListener('visibilitychange', () => {   // a hidden tab draws no frames: hold the recorder, the timer skips it
+  if (document.hidden && REC.state === 'recording') {
+    REC.rec.pause(); REC.clock.pausedAt = performance.now(); REC.state = recordNext(REC.state, 'pause');
+  } else if (!document.hidden && REC.state === 'paused') {
+    REC.clock.pausedTotal += performance.now() - REC.clock.pausedAt; REC.clock.pausedAt = null;
+    REC.rec.resume(); REC.state = recordNext(REC.state, 'resume');
+  }
+});
+addEventListener('keydown', (e) => {
+  const action = recordKeyAction(e);
+  if (!action) return;
+  e.preventDefault();
+  if (action === 'toggle') toggleRecord();
+});
+recBtn.addEventListener('click', () => { recBtn.blur(); toggleRecord(); });   // blur: a later Space (Pull) must not click the button again
+if (devAudio) window.__bsRec = { start: startRecord, stop: stopRecord, state: () => ({ state: REC.state, bytes: REC.chunks.reduce((n, c) => n + c.size, 0) }) };   // ?dev=1: headless checks
 
 // ---------- Camera orbit (right-drag) ----------
 const orbit = { theta: 0, phi: 0.24, radius: 15.5, target: new THREE.Vector3(0, 2.8, -6) };
