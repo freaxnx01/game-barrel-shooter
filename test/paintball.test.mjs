@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from '../weapons/paintball.js';
+import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, PAINTBALL } from '../weapons/paintball.js';
 
 test('PAINT_COLORS_Palette_SevenWithRedFirst', () => {
   assert.equal(PAINT_COLORS.length, 7);
@@ -39,4 +39,10 @@ test('paintIndexForShot_RandomEveryPrevAndRng_NeverRepeats', () => {
       assert.ok(Number.isInteger(idx) && idx >= 0 && idx < PAINT_COLORS.length);
     }
   }
+});
+
+test('PAINTBALL_MaxMomentum_UnderHalfNewtonSecond', () => {
+  // top launch speed is 18 + 22 = 40 m/s; a stone block must not be knocked over (#82)
+  assert.ok(PAINTBALL.mass * 40 <= 0.5, `momentum ${PAINTBALL.mass * 40}`);
+  assert.ok(PAINTBALL.mass > 0);
 });
