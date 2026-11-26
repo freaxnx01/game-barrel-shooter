@@ -25,6 +25,7 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Detonate** | `K` or the 💥 Boom button (bottom right, shown while remote and cutting charges are placed, with their count) blows up all placed remote and cutting charges. The small ▸ next to it opens buttons `1`..`6` that blow up just that charge; each placed charge shows its number floating above it |
 | **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
 | **Reset** | `R` key or the Reset button |
+| **Record a video** | `§` key (`` ` `` on a US keyboard) or the ⏺ button in the top bar; press again to stop and save an `.mp4` (or `.webm`) with the game sound. Stops by itself after 10 minutes; pauses while the tab is hidden |
 
 The 🎯 and 💥 buttons top-left open the target and weapon lists as a sheet on every screen size; pick an entry, click outside, or press `Escape` to close it.
 
@@ -42,6 +43,7 @@ a mobile mode; the desktop layout is unchanged.
 | **Harpoon / net pull** | Hold the 🪝 Pull button, or tap ✂️ Cut to let the catch go; both show while a harpoon or net holds something |
 | **Detonate** | Tap the 💥 Boom button bottom-left (shown while remote and cutting charges are placed, with their count) to blow up all of them; tap the ▸ next to it, then a number `1`..`6`, to blow up just that charge |
 | **Jenga: push a block** | Tap and hold a block; a second finger cancels the push. The 🔫 Shoot button in the top bar switches to the weapons |
+| **Record a video** | Tap the ⏺ button in the top bar (it turns red and shows the time); tap again to save the video. On an iPhone or iPad the file is an `.mp4` and goes to Files or the share sheet |
 | **Help** | `?` shows the touch controls |
 
 In portrait the camera starts far enough back for wide targets (Fortress, Colosseum, Pyramid, …) to fit
