@@ -16,6 +16,42 @@ export const CHARGE = {
   maxRemote: 6,
 };
 
+// Cutting charge (#87): a small blast for controlled demolition. It breaks the piece it sits on
+// (a strong sideways shove) and barely touches the rest, so the building falls under gravity.
+export const CUT = {
+  radius: 1.2,
+  strength: 260,   // radial impulse at point blank, falls off to 0 at the radius
+  lift: 0,         // no upward kick
+  shove: 160,      // horizontal impulse on the piece the charge is stuck to (about 20 m/s on an 8 kg piece)
+  flashScale: 0.5, // visual flash relative to a normal blast
+};
+export const BLAST_LIFT = 0.3;   // the upward kick every other blast has: impulse * 0.3
+
+export function isRemoteType(type) {
+  return type === 'remotecharge' || type === 'cutcharge';
+}
+
+export function isChargeType(type) {
+  return isRemoteType(type) || type === 'timedcharge';
+}
+
+// Impulse a blast gives a body at `offset` from the charge, or null outside the radius.
+// Same maths explode() always had: radial, linear falloff, distance floored at 0.5, plus `lift` * impulse upward.
+export function blastImpulse(offset, radius, strength, lift = BLAST_LIFT) {
+  const dist = Math.max(Math.hypot(offset.x, offset.y, offset.z), 0.5);
+  if (dist > radius) return null;
+  const imp = strength * (1 - dist / radius);
+  return { x: (offset.x / dist) * imp, y: (offset.y / dist) * imp + imp * lift, z: (offset.z / dist) * imp };
+}
+
+// The sideways shove on the piece a cutting charge is stuck to: horizontal, away from the charge.
+// A piece straight above or below the charge gets a fixed +x shove.
+export function cutShove(offset, strength = CUT.shove) {
+  const h = Math.hypot(offset.x, offset.z);
+  if (h < 0.05) return { x: strength, y: 0, z: 0 };
+  return { x: (offset.x / h) * strength, y: 0, z: (offset.z / h) * strength };
+}
+
 function clamp01(v) {
   return Math.min(Math.max(v, 0), 1);
 }
@@ -52,7 +88,7 @@ export function canPlaceRemote(armedCount) {
 }
 
 export function armedRemotes(records) {
-  return records.filter((r) => r.type === 'remotecharge' && !r.exploded);
+  return records.filter((r) => isRemoteType(r.type) && !r.exploded);
 }
 
 // What a charge does on a contact: 'ignore' once stuck or when it hits another projectile
