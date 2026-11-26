@@ -18,6 +18,13 @@
   }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1611; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
   #c { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  /* Sniper scope inset (#91): the magnified circle is drawn by WebGL; this is the rim and reticle over it */
+  #scope {
+    position: fixed; left: 0; top: 0; pointer-events: none; border-radius: 50%; box-sizing: border-box;
+    border: 3px solid #0b0b0d; box-shadow: 0 0 0 1px rgba(255,255,255,0.35), 0 0 18px rgba(0,0,0,0.7), inset 0 0 14px rgba(0,0,0,0.75);
+  }
+  #scope[hidden] { display: none; }
+  #scope svg { display: block; width: 100%; height: 100%; }
   .hud {
     position: fixed; top: calc(20px + var(--sa-t)); left: calc(20px + var(--sa-l)); color: #f5efe4; user-select: none;
     display: flex; flex-direction: column; gap: 6px; pointer-events: none;
@@ -227,6 +234,16 @@
   <div class="balls" id="balls">Balls: ∞</div>
 </div>
 <div id="power"><div class="fill" id="powerFill"></div></div>
+<div id="scope" hidden aria-hidden="true">   <!-- sniper scope rim and reticle (#91) -->
+  <svg viewBox="0 0 100 100">
+    <g stroke="#000" stroke-width="0.7" fill="none">
+      <path d="M50 2V42M50 58V98M2 50H42M58 50H98"/>
+      <circle cx="50" cy="50" r="22"/>
+      <circle cx="50" cy="50" r="0.9" fill="#000" stroke="none"/>
+    </g>
+    <g fill="#000"><circle cx="50" cy="34" r="0.9"/><circle cx="50" cy="66" r="0.9"/><circle cx="34" cy="50" r="0.9"/><circle cx="66" cy="50" r="0.9"/></g>
+  </svg>
+</div>
 <div class="ammo" id="ammo">
   <div class="ammo-group">
     <div class="glabel">Balls</div>
@@ -389,6 +406,7 @@ import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorne
 import { createBarrelSupport } from './targets/barrel-support.js';
 import { JENGA, jengaTower, blockAxis, pushSign, pushForce, isPulled, hasFallen } from './targets/jenga.js';
 import { SNIPER, sniperSpeed, isOutOfRange, streakLength } from './weapons/sniper.js';
+import { scopeRect, aimToScreen, scopeFov, scopeTextureSize, scopeNdcTransform } from './weapons/scope.js';
 import { IMPACT, createImpactThrottle } from './audio/impact-throttle.js';
 import { createMagnetoHum } from './audio/magneto-hum.js';
 import { FOOTBALL, footballSpeed, footballLaunch, longAxis, flightAngularVelocity } from './weapons/football.js';
@@ -413,6 +431,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;   // animate() flags one shadow pass per frame, shared by the scope and main renders (#91)
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#3b4356');
@@ -2838,6 +2857,7 @@ function aimDir() {
 function setAim(e) {
   mouseNDC.x = (e.clientX / innerWidth) * 2 - 1;
   mouseNDC.y = -(e.clientY / innerHeight) * 2 + 1;
+  aimByTouch = e.pointerType === 'touch';   // a finger covers the aim point, so the scope lifts above it (#91)
 }
 
 // Fingers on the canvas: one aims and fires, a second turns the pair into an orbit/zoom gesture.
@@ -3251,6 +3271,51 @@ let magnetoActive = false;
 const MAGNETO_HOLD_R = 3;   // a piece this close to the aim point counts as held (hum level)
 let quakeActive = false, quakeStart = 0;
 
+// ---------- Sniper scope (#91): second render of the scene through a narrow-FOV camera into a circle ----------
+// The main view keeps DEFAULT_FOV. While the sniper is selected the scene is rendered once more, through
+// scopeCamera (same position as the camera, looking along the aim ray, so the reticle centre is where the
+// tracer goes), into a square render target, which a circle mesh then draws over the main image at the scope
+// rect; #scope (DOM) adds rim and reticle. The shadow map is rendered once per frame for both passes.
+let aimByTouch = false;
+const scopeEl = document.getElementById('scope');
+const scopeCamera = new THREE.PerspectiveCamera(scopeFov(DEFAULT_FOV), 1, 0.1, CAM_FAR);
+const scopeTarget = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
+const scopeScene = new THREE.Scene();
+const scopeOrtho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const scopeDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 72), new THREE.MeshBasicMaterial({ map: scopeTarget.texture, depthTest: false, depthWrite: false }));
+scopeScene.add(scopeDisc);
+const scopeLook = new THREE.Vector3();
+
+function scopeActive() {
+  return ammoType === 'sniper';
+}
+function placeScope(rect) {
+  const px = scopeTextureSize(rect.size, renderer.getPixelRatio());
+  if (scopeTarget.width !== px) scopeTarget.setSize(px, px);
+  const t = scopeNdcTransform(rect, innerWidth, innerHeight);
+  scopeDisc.position.set(t.x, t.y, 0);
+  scopeDisc.scale.set(t.scaleX, t.scaleY, 1);
+  scopeEl.style.width = scopeEl.style.height = rect.size + 'px';
+  scopeEl.style.transform = `translate(${rect.x - rect.size / 2}px, ${rect.y - rect.size / 2}px)`;
+}
+function renderScope() {
+  const aim = aimToScreen(mouseNDC.x, mouseNDC.y, innerWidth, innerHeight);
+  placeScope(scopeRect(aim.x, aim.y, innerWidth, innerHeight, aimByTouch));
+  raycaster.setFromCamera(mouseNDC, camera);
+  scopeCamera.position.copy(camera.position);
+  scopeCamera.far = camera.far;
+  scopeCamera.updateProjectionMatrix();
+  scopeCamera.lookAt(scopeLook.copy(camera.position).add(raycaster.ray.direction));
+  renderer.setRenderTarget(scopeTarget);
+  renderer.render(scene, scopeCamera);
+  renderer.setRenderTarget(null);
+}
+function drawScopeDisc() {
+  renderer.autoClear = false;
+  renderer.render(scopeScene, scopeOrtho);
+  renderer.autoClear = true;
+}
+
 function resize() {
   const w = innerWidth, h = innerHeight;
   if (canvasNeedsResize(canvas.width, canvas.height, w, h, renderer.getPixelRatio())) {
@@ -3548,7 +3613,11 @@ function animate() {
     shake *= Math.pow(0.001, dt);
   }
 
+  renderer.shadowMap.needsUpdate = true;   // one shadow pass per frame, whichever render comes first (#91)
+  const scoped = scopeActive();
+  if (scoped) renderScope();
   renderer.render(scene, camera);
+  if (scoped) drawScopeDisc();
 }
 animate();
 
