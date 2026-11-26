@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga / Chimney · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` to shake the ground |
 | **Pull / Cut** | Hold Space or the 🪝 Pull button to reel a harpoon or net in; `O` or the ✂️ Cut button lets it go. The buttons sit bottom right and show only while a harpoon or net holds something |
-| **Detonate** | `K` or the 💥 Boom button (bottom right, shown while remote charges are placed) blows up all placed remote charges |
+| **Detonate** | `K` or the 💥 Boom button (bottom right, shown while remote charges are placed, with their count) blows up all placed remote charges. The small ▸ next to it opens buttons `1`..`6` that blow up just that charge; each placed charge shows its number floating above it |
 | **Jenga: push a block** | On the Jenga target, hold the left mouse button on a block: it slides slowly out along its length, away from where you pressed; let go to stop. Blocks under the whole tower (the bottom layer) stick. The 🔫 Shoot button under Auto-Play switches to the normal weapons and back (✋ Push) |
 | **Reset** | `R` key or the Reset button |
 
@@ -40,7 +40,7 @@ a mobile mode; the desktop layout is unchanged.
 | **Switch weapon / target** | The 💥 and 🎯 buttons at the top open the list as a sheet; tap an entry to pick it, tap outside to close |
 | **Earthquake** | Hold the 🌋 Quake button bottom-left |
 | **Harpoon / net pull** | Hold the 🪝 Pull button, or tap ✂️ Cut to let the catch go; both show while a harpoon or net holds something |
-| **Detonate** | Tap the 💥 Boom button bottom-left, shown while remote charges are placed |
+| **Detonate** | Tap the 💥 Boom button bottom-left (shown while remote charges are placed, with their count) to blow up all of them; tap the ▸ next to it, then a number `1`..`6`, to blow up just that charge |
 | **Jenga: push a block** | Tap and hold a block; a second finger cancels the push. The 🔫 Shoot button in the top bar switches to the weapons |
 | **Help** | `?` shows the touch controls |
 

@@ -7,6 +7,7 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- Numbered remote charges: every placed remote charge shows a number (1-6) above it, the 💥 Boom button shows how many are armed, and a ▸ toggle next to it opens buttons `1`..`6` that detonate a single charge; Boom and K still detonate all (#79)
 - Action buttons on desktop: Pull, Boom and a new Cut button (key O) that lets go of a harpoon or heavy net, each shown only while it applies; Cut is on mobile too (#63)
 - Camera pad bottom-right (turn, tilt, zoom; hold to keep moving) and arrow keys for the camera, so it can be moved without a right mouse button, e.g. on a Chromebook touchpad or touchscreen
 - Tractor tire weapon (key T): rolls into the target, then tips over and lies flat (#8)
