@@ -357,7 +357,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createCrashcatBackend } from './physics/backend-crashcat.js';
-import { nudgeOrbit, heldNudge, fitOrbitRadius } from './camera/orbit.js';
+import { nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from './camera/orbit.js';
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
@@ -3092,7 +3092,7 @@ let quakeActive = false, quakeStart = 0;
 
 function resize() {
   const w = innerWidth, h = innerHeight;
-  if (canvas.width !== w * renderer.getPixelRatio() || canvas.height !== h * renderer.getPixelRatio()) {
+  if (canvasNeedsResize(canvas.width, canvas.height, w, h, renderer.getPixelRatio())) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     fitCamera();   // re-fit after turning the phone

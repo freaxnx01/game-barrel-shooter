@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ORBIT_LIMITS, CAM_SPEED, FIT_MARGIN, nudgeOrbit, heldNudge, fitOrbitRadius } from '../camera/orbit.js';
+import { ORBIT_LIMITS, CAM_SPEED, FIT_MARGIN, nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from '../camera/orbit.js';
 
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 const orbit = () => ({ theta: 0, phi: 0.24, radius: 15.5 });
@@ -71,4 +71,13 @@ test('fitOrbitRadius_NarrowerScreen_LargerRadius', () => {
 test('fitOrbitRadius_TargetInFrontOfLookAtPoint_AddsNearDepth', () => {
   const flat = fitOrbitRadius(0, { halfWidth: 10, nearDepth: 0 }, 55, 0.5);
   close(fitOrbitRadius(0, { halfWidth: 10, nearDepth: 4 }, 55, 0.5), flat + 4);
+});
+
+test('canvasNeedsResize_WindowsScaling125_MatchesFlooredCanvas', () => {
+  // 1229 × 1.25 = 1536.25; three.js sizes the canvas to the floor, 1536 (#76)
+  assert.equal(canvasNeedsResize(1536, 875, 1229, 700, 1.25), false);
+});
+test('canvasNeedsResize_WindowResized_True', () => {
+  assert.equal(canvasNeedsResize(1536, 875, 1300, 700, 1.25), true);
+  assert.equal(canvasNeedsResize(1280, 720, 1280, 721, 1), true);
 });
