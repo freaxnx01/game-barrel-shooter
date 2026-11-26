@@ -276,7 +276,7 @@
     <button data-type="sniper"><span class="dot" style="background:#ffd76e;border:2px solid #fff;box-sizing:border-box"></span>Sniper lens <span style="opacity:0.5">Q</span></button>
   </div>
 </div>
-<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · 🎯 and 💥 (top left) pick target and weapon, the keys still work · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon and heavy net — hold Space (or Pull) to reel the catch in, O (or Cut) to let it go · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K (or Boom) detonates remote charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon and net: hold Pull to reel the catch in, Cut lets it go · Boom detonates remote charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
+<div class="hint" id="hint"><span class="hint-desk">Aim with mouse, click to fire · 🎯 and 💥 (top left) pick target and weapon, the keys still work · Right-drag, arrow keys or the pad bottom-right to orbit · Scroll or +/− to zoom · Hold Shift = earthquake · Harpoon and heavy net — hold Space (or Pull) to reel the catch in, O (or Cut) to let it go · Jenga: hold the mouse on a block to push it out · P again changes the paint colour · K (or Boom) detonates remote and cutting charges · R to reset</span><span class="hint-touch">Tap and hold to charge, let go to fire · Two fingers: drag to orbit, pinch to zoom · Hold Quake to shake the ground · Harpoon and net: hold Pull to reel the catch in, Cut lets it go · Boom detonates remote and cutting charges · Jenga: hold a block to push it out</span><span class="hint-ios">Play as an app: Share ⬆ → Add to Home Screen</span><button type="button" class="hint-reload" onclick="location.reload()">⟳ Reload</button></div>
 <div id="ioshint" role="note" hidden><span>Play as an app: Share ⬆ → Add to Home Screen</span><button id="ioshintx" type="button" aria-label="Dismiss the home-screen tip">×</button></div>
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
@@ -289,8 +289,8 @@
   <button id="act-quake" title="Hold for an earthquake" hidden>🌋<span>Quake</span></button>
   <button id="act-pull" title="Hold to reel the harpoon or net in (Space)" hidden>🪝<span>Pull</span></button>
   <button id="act-cut" title="Cut the rope (O)" hidden>✂️<span>Cut</span></button>
-  <button id="act-boom" title="Detonate all remote charges (K)" hidden>💥<span>Boom</span></button>
-  <button id="act-boom-more" title="Detonate a single remote charge" aria-expanded="false" hidden>▸</button>
+  <button id="act-boom" title="Detonate all remote and cutting charges (K)" hidden>💥<span>Boom</span></button>
+  <button id="act-boom-more" title="Detonate a single charge" aria-expanded="false" hidden>▸</button>
   <div id="act-nums" hidden>   <!-- one button per CHARGE.maxRemote (weapons/charges.js) -->
     <button data-n="1" title="Detonate charge 1">1</button>
     <button data-n="2" title="Detonate charge 2">2</button>
@@ -1360,7 +1360,7 @@ const netWeightMatl = new THREE.MeshStandardMaterial({ color: '#55585e', roughne
 const chargeBrickGeo = new THREE.BoxGeometry(CHARGE.halfExtents[0] * 2, CHARGE.halfExtents[1] * 2, CHARGE.halfExtents[2] * 2);
 const chargeBoxGeo = new THREE.BoxGeometry(0.12, 0.05, 0.09);
 const chargeLedGeo = new THREE.SphereGeometry(0.018, 8, 6);
-const chargeLedMatls = { '#3fd16a': new THREE.MeshBasicMaterial({ color: '#3fd16a' }), '#ff3b30': new THREE.MeshBasicMaterial({ color: '#ff3b30' }) };
+const chargeLedMatls = { '#3fd16a': new THREE.MeshBasicMaterial({ color: '#3fd16a' }), '#ff3b30': new THREE.MeshBasicMaterial({ color: '#ff3b30' }), '#ff7a3c': new THREE.MeshBasicMaterial({ color: '#ff7a3c' }) };
 const antennaGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6);
 const netStrandGeo = new THREE.CylinderGeometry(NET.ropeRadius, NET.ropeRadius, NET.openSize, 6);   // one rope strand of the open net
 const netWeightGeo = new THREE.SphereGeometry(NET.weightRadius, 10, 8);
@@ -1631,7 +1631,7 @@ const cutBandMatl = new THREE.MeshStandardMaterial({ color: '#c2371f', roughness
 const cutBandGeo = new THREE.BoxGeometry(0.05, CHARGE.halfExtents[1] * 2 + 0.01, CHARGE.halfExtents[2] * 2 + 0.01);
 // cutting charge (#87): the charge brick with two red bands, like a linear shaped charge; no antenna
 function makeCutChargeMesh(number) {
-  const g = makeChargeMesh('#ff3b30');
+  const g = makeChargeMesh('#ff7a3c');   // orange LED like its picker dot; the timed charge has red
   for (const x of [-0.08, 0.08]) {
     const band = new THREE.Mesh(cutBandGeo, cutBandMatl);
     band.position.x = x;
