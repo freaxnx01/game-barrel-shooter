@@ -399,7 +399,7 @@ import { nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from './came
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
-import { DEMO, demolitionLayout, distToColumnAxis, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from './targets/demolition.js';
+import { DEMO, demolitionLayout, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff, columnToCrush } from './targets/demolition.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
@@ -1072,9 +1072,9 @@ function clearDebris() {
   debris.length = dusts.length = 0;
 }
 function crushNear(p) {
-  for (const b of barrels) {
-    if (b.demo?.part === 'column' && !b.crushed && distToColumnAxis(p, b.body.position, b.demo.hy) < DEMO.breakRadius) crushColumn(b);
-  }
+  const cols = barrels.filter((b) => b.demo?.part === 'column' && !b.crushed).map((b) => ({ b, position: b.body.position, hy: b.demo.hy }));
+  const hit = columnToCrush(p, cols);
+  if (hit) crushColumn(hit.b);
 }
 function updateDemolition() {
   for (const s of barrels) {

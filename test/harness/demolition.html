@@ -31,7 +31,8 @@
 <pre id="out">running…</pre>
 <script type="module">
 import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
-import { DEMO, demolitionLayout, slabHalf, distToColumnAxis, slabLanded } from '../../targets/demolition.js';
+import { DEMO, demolitionLayout, slabHalf, columnToCrush, slabLanded } from '../../targets/demolition.js';
+import { CHARGE, CUT, BLAST_LIFT } from '../../weapons/charges.js';
 import { massFor } from '../../targets/apk-layouts.js';
 
 const out = document.getElementById('out');
@@ -45,8 +46,10 @@ function row(pass, name, detail, required = true) {
 }
 
 const DT = 1 / 60, S = 2, MASONRY_MASS_SCALE = 0.25, ZC = -6;
-const REMOTE = { radius: 4, strength: 500, lift: 0.3 };   // weapons/charges.js CHARGE, explode()
-const CUTTING = { radius: 1.2, strength: 500, lift: 0 };   // #87 cutting charge as planned there
+// the shipped numbers, imported so the harness follows any retune (review on #97); the cutting
+// charge's sideways shove of its stuck piece is not modelled here: rule 1 crushes that column anyway
+const REMOTE = { radius: CHARGE.blastRadius, strength: CHARGE.blastStrength, lift: BLAST_LIFT };
+const CUTTING = { radius: CUT.radius, strength: CUT.strength, lift: CUT.lift };
 let cc;
 
 async function fresh() {
@@ -79,9 +82,9 @@ function crush(ctx, b) {
 }
 
 function explodeAt(ctx, p, { radius, strength, lift }) {
-  for (const b of ctx.blocks) {
-    if (b.part === 'column' && !b.crushed && distToColumnAxis(p, b.body.position, b.hy * S) < DEMO.breakRadius) crush(ctx, b);
-  }
+  const cols = ctx.blocks.filter(b => b.part === 'column' && !b.crushed).map(b => ({ b, position: b.body.position, hy: b.hy * S }));
+  const hit = columnToCrush(p, cols);
+  if (hit) crush(ctx, hit.b);
   for (const body of ctx.phys.bodies()) {
     if (body.mass <= 0) continue;
     let dx = body.position.x - p.x, dy = body.position.y - p.y, dz = body.position.z - p.z;
@@ -160,6 +163,20 @@ async function checkFrontOnly() {
   row(r.xz > 2, 'front-only', `front two columns only: top slab ${r.xz.toFixed(2)} from home (it falls forward)`, false);
 }
 
+// a hard ball on the roof must not set off the slab-landing chain (spec anti-goal; review on #97)
+async function checkRoofHit() {
+  const ctx = await fresh();
+  const top = topSlab(ctx);
+  const ball = ctx.phys.addBody({ shape: { kind: 'sphere', radius: 0.4 }, mass: 9, material: 'ball',
+    position: { x: top.home.x, y: top.home.y + 3, z: top.home.z } });
+  ctx.phys.setVelocity(ball, 0, -30, 0);
+  step(ctx, 6);
+  const yFrac = top.body.position.y / top.home.y;
+  const crushed = ctx.blocks.filter(b => b.crushed).length;
+  row(yFrac > 0.95 && crushed === 0, 'roof-hit', `9 kg ball at 30 m/s on the roof: top slab at ${(100 * yFrac).toFixed(0)} % of its height, ${crushed} columns crushed (expected: stands, 0)`, false);
+  ctx.phys.destroy();
+}
+
 async function main() {
   await checkStable();
   await checkPancake('remote-mid', REMOTE, 0.5);
@@ -168,6 +185,7 @@ async function main() {
   await checkPancake('cutting', CUTTING, 0.5);
   await checkOneCharge();
   await checkFrontOnly();
+  await checkRoofHit();
   out.innerHTML = lines.join('\n');
   document.title = allPass ? 'DEMOLITION PASS' : 'DEMOLITION FAIL';
 }

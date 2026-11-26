@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO, DEBRIS, demolitionLayout, storeyPitch, slabHalf, distToColumnAxis, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
+import { DEMO, DEBRIS, demolitionLayout, storeyPitch, slabHalf, distToColumnAxis, columnToCrush, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
 import { massFor } from '../targets/apk-layouts.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
@@ -137,4 +137,17 @@ test('dustPuff_GrowsAndFades_ThenGone', () => {
   assert.equal(a.opacity, DEBRIS.dustOpacity);
   assert.ok(b.scale > a.scale && b.opacity < a.opacity);
   assert.equal(dustPuff(DEBRIS.dustLife), null);
+});
+test('columnToCrush_ChargeHighOnGroundColumn_OnlyThatColumn', () => {
+  // review on #97: the slab gap (0.5) is under breakRadius (1.0), so a charge high on a ground
+  // column was also within reach of the column above; one charge must crush one column
+  const ground = { position: { x: 0, y: 1.25, z: 0 }, hy: 1.25 };
+  const above = { position: { x: 0, y: 4.25, z: 0 }, hy: 1.25 };
+  const p = { x: 0.38, y: 2.4, z: 0 };
+  assert.ok(distToColumnAxis(p, above.position, above.hy) < DEMO.breakRadius);   // both are in reach
+  assert.equal(columnToCrush(p, [above, ground]), ground);
+});
+
+test('columnToCrush_NothingInReach_Null', () => {
+  assert.equal(columnToCrush({ x: 5, y: 1, z: 0 }, [{ position: { x: 0, y: 1.25, z: 0 }, hy: 1.25 }]), null);
 });

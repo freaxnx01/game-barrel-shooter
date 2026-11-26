@@ -54,6 +54,18 @@ export function distToColumnAxis(p, c, hy) {
   return Math.hypot(p.x - c.x, dy, p.z - c.z);
 }
 
+// The one column an explosion at p crushes: the nearest whose axis is within breakRadius, or null.
+// columns: [{ position, hy }] in world units. Only one, so a charge high on a ground column does not
+// also take out the column standing on the slab above it (review on #97).
+export function columnToCrush(p, columns) {
+  let best = null, bestD = DEMO.breakRadius;
+  for (const c of columns) {
+    const d = distToColumnAxis(p, c.position, c.hy);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
 // Per-slab landing detector. Call once per frame with the slab's vertical velocity; returns
 // true exactly once: on the first frame a slab that fell faster than fallSpeed is slower than
 // landSpeed again. state is a plain object owned by the caller ({} at build time).
