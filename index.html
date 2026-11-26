@@ -130,6 +130,9 @@
     padding: 7px 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; touch-action: manipulation;
   }
   #mob-bar button:hover { background: rgba(245,239,228,0.18); }
+  #mob-bar #mob-paint { padding: 7px 9px; line-height: 1; }
+  #mob-paint-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #f5efe4; box-sizing: border-box; font-size: 13px; line-height: 10px; text-align: center; }
+  #mob-paint-dot.dice { border: 0; width: auto; height: auto; line-height: 1; }
   #mob-help, #mob-jenga-shoot { display: none; }   /* desktop: the hint is always visible, #jenga-shoot is its own button */
   .hint { top: calc(164px + var(--sa-t)); }
 
@@ -277,6 +280,7 @@
 <div id="mob-bar">
   <button id="mob-target" aria-controls="target">🎯 <span id="mob-target-name">Barrels</span></button>
   <button id="mob-weapon" aria-controls="ammo">💥 <span id="mob-weapon-name">Basketball</span></button>
+  <button id="mob-paint" type="button" hidden><span id="mob-paint-dot"></span></button>
   <button id="mob-jenga-shoot" hidden>🔫 Shoot</button>
   <button id="mob-help" aria-controls="hint" title="Controls">?</button>
 </div>
@@ -377,7 +381,7 @@ import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
-import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot } from './weapons/paintball.js';
+import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
@@ -1388,9 +1392,21 @@ function buildPaintSwatches() {
     paintColorsEl.append(s);
   }
 }
+function syncPaintDot() {
+  const btn = document.getElementById('mob-paint');
+  const dot = document.getElementById('mob-paint-dot');
+  btn.hidden = ammoType !== 'paintball';
+  const d = paintDotInfo(paintChoice);
+  dot.style.background = d.color || 'none';
+  dot.classList.toggle('dice', d.glyph !== '');
+  dot.textContent = d.glyph;
+  btn.title = d.title;
+  btn.setAttribute('aria-label', d.title);
+}
 function setPaintChoice(choice) {
   paintChoice = choice;
   for (const s of paintColorsEl.children) s.classList.toggle('on', s.dataset.paint === String(choice));
+  syncPaintDot();
 }
 buildPaintSwatches();
 setPaintChoice(0);
@@ -1399,10 +1415,15 @@ paintColorsEl.addEventListener('click', (e) => {
   if (!s || autoPlay) return;
   setPaintChoice(s.dataset.paint === RANDOM_PAINT ? RANDOM_PAINT : Number(s.dataset.paint));
 });
+document.getElementById('mob-paint').addEventListener('click', () => {
+  if (autoPlay) return;
+  setPaintChoice(nextPaintChoice(paintChoice));   // like the P key; does not open the sheet
+});
 function setAmmo(type) {
   ammoType = type;
   for (const b of ammoEl.querySelectorAll('button[data-type]')) b.classList.toggle('sel', b.dataset.type === type);
   paintColorsEl.hidden = type !== 'paintball';
+  syncPaintDot();
   // Sniper lens zooms the view for precision; other ammo restores the default FOV.
   const fov = type === 'sniper' ? 26 : DEFAULT_FOV;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -3087,7 +3108,12 @@ document.getElementById('mob-target').addEventListener('click', () => applySheet
 document.getElementById('mob-help').addEventListener('click', () => hintEl.classList.toggle('show'));
 sheetBackdrop.addEventListener('click', () => applySheet('backdrop'));
 for (const el of [ammoEl, targetEl]) {
-  el.addEventListener('click', (e) => { if (e.target.closest('button:not(.swatch)')) applySheet('pick'); });
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    // Paintball keeps the sheet open so its swatches show; a swatch (or any other pick) closes it (#81).
+    applySheet(b.dataset.type === 'paintball' ? 'pick-keep-open' : 'pick');
+  });
   new MutationObserver(syncSheetLabels).observe(el, { subtree: true, attributeFilter: ['class'] });
 }
 mobileQuery.addEventListener('change', () => applySheet('layout-change'));
