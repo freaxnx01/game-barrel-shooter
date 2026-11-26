@@ -7,6 +7,7 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- Cutting charge (key Y): a remote charge for controlled demolition, numbered and detonated like the others (K, Boom, number buttons, same limit of 6), but with a small 1.2 m blast and no upward kick that knocks the piece it sits on sideways, so the rest of a building falls under gravity; bomb, dynamite, remote and timed charge are unchanged (#87)
 - Paintball colour picker is visible again: choosing Paintball keeps the weapon list open so the colour swatches show, and a colour dot next to the 💥 button (🎲 for random) shows the colour and cycles it with a click, like the P key (#81)
 - Numbered remote charges: every placed remote charge shows a number (1-6) above it, the 💥 Boom button shows how many are armed, and a ▸ toggle next to it opens buttons `1`..`6` that detonate a single charge; Boom and K still detonate all (#79)
 - Action buttons on desktop: Pull, Boom and a new Cut button (key O) that lets go of a harpoon or heavy net, each shown only while it applies; Cut is on mobile too (#63)
