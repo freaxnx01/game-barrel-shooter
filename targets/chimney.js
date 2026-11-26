@@ -86,3 +86,41 @@ export function brickFaceRects(width, height, rows, joint) {
 export function visibleBrickAspect(box) {
   return (2 * box.hx) / ((2 * box.hy) / CHIMNEY.faceRows);
 }
+
+// Render shape of one ring block (#71): the collider stays the box, the mesh is a wedge whose
+// inner face is the box width and whose outer face reaches the outer circumference, so
+// neighbours meet along their side faces (minus the clearance). Local z is radial outward,
+// hz = wall, so the outer face is 2 * hz further out than the inner one.
+export function wedgeProfile(box) {
+  const t = Math.tan(Math.PI / CHIMNEY.segments);
+  const outerHx = box.hx + 2 * box.hz * t;
+  return { innerHx: box.hx, outerHx, hy: box.hy, hz: box.hz, taper: outerHx / box.hx };
+}
+
+// Non-indexed triangles of the wedge in the unit frame of the box mesh (index.html scales it
+// by 2hx, 2hy, 2hz): x, y, z in [-0.5, 0.5] at the inner face (z = -0.5), outer face at
+// z = +0.5 with half-width 0.5 * taper. Counter-clockwise from outside; every face has
+// UVs 0..1 like BoxGeometry, so the outer face shows the brick texture as the box did.
+export function wedgeFaces(taper) {
+  const h = 0.5 * taper;
+  const A = [-0.5, -0.5, -0.5], B = [0.5, -0.5, -0.5], C = [0.5, 0.5, -0.5], D = [-0.5, 0.5, -0.5];
+  const E = [-h, -0.5, 0.5], F = [h, -0.5, 0.5], G = [h, 0.5, 0.5], H = [-h, 0.5, 0.5];
+  const side = Math.hypot(1, 0.5 * (taper - 1));
+  const nx = 1 / side, nz = -0.5 * (taper - 1) / side;   // +x side face normal
+  const faces = [
+    { q: [E, F, G, H], n: [0, 0, 1] },        // outer
+    { q: [B, A, D, C], n: [0, 0, -1] },       // inner
+    { q: [F, B, C, G], n: [nx, 0, nz] },      // +x side
+    { q: [A, E, H, D], n: [-nx, 0, nz] },     // -x side
+    { q: [H, G, C, D], n: [0, 1, 0] },        // top
+    { q: [A, B, F, E], n: [0, -1, 0] },       // bottom
+  ];
+  const quadUv = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  const positions = [], normals = [], uvs = [];
+  for (const { q, n } of faces) {
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      positions.push(...q[i]); normals.push(...n); uvs.push(...quadUv[i]);
+    }
+  }
+  return { positions, normals, uvs };
+}

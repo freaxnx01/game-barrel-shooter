@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot, brickFaceRects, visibleBrickAspect } from '../targets/chimney.js';
+import { CHIMNEY, chimneyLayout, coursePitch, shaftRadius, shaftWall, isSoot, brickFaceRects, visibleBrickAspect, wedgeProfile, wedgeFaces } from '../targets/chimney.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const shaft = () => chimneyLayout().filter(b => b.part === 'shaft');
@@ -103,4 +103,74 @@ test('visibleBrickAspect_FootLongerThanTop', () => {
   assert.ok(foot > top);
   assert.ok(Math.abs(foot - 3.805) < 0.01, `foot ${foot}`);
   assert.ok(Math.abs(top - 2.159) < 0.01, `top ${top}`);
+});
+test('wedgeProfile_InnerWidthDepthHeightUnchanged', () => {
+  for (const b of chimneyLayout()) {
+    const w = wedgeProfile(b);
+    assert.equal(w.innerHx, b.hx);
+    assert.equal(w.hy, b.hy);
+    assert.equal(w.hz, b.hz);
+  }
+});
+test('wedgeProfile_OuterWidthMatchesOuterCircumference', () => {
+  const t = Math.tan(Math.PI / CHIMNEY.segments);
+  for (const c of [0, 20, 42]) {
+    const b = shaft().find(x => x.course === c);
+    const w = wedgeProfile(b);
+    const expected = (shaftRadius(c) + shaftWall(c)) * t - CHIMNEY.clearance;
+    assert.ok(Math.abs(w.outerHx - expected) < 1e-9, `course ${c}`);
+    assert.ok(w.taper > 1);
+    assert.ok(Math.abs(w.taper - w.outerHx / w.innerHx) < 1e-12);
+  }
+});
+test('wedgeProfile_NeighbourOuterCornersMeet', () => {
+  // world position of a block's outer corner: centre + yaw-rotated (lx, lz)
+  const corner = (b, sx) => {
+    const w = wedgeProfile(b);
+    const lx = sx * w.outerHx, lz = b.hz;
+    return [b.x + lx * Math.cos(b.ry) + lz * Math.sin(b.ry), b.z - lx * Math.sin(b.ry) + lz * Math.cos(b.ry)];
+  };
+  for (const c of [0, 1, 42]) {
+    const ring = shaft().filter(b => b.course === c);
+    for (let j = 0; j < ring.length; j++) {
+      const a = corner(ring[j], +1);
+      const n = corner(ring[(j + 1) % ring.length], -1);
+      assert.ok(Math.hypot(a[0] - n[0], a[1] - n[1]) < 0.01, `course ${c} block ${j}`);
+    }
+  }
+});
+test('wedgeFaces_ShapeAndOuterFace', () => {
+  const taper = 1.6;
+  const f = wedgeFaces(taper);
+  assert.equal(f.positions.length, 36 * 3);
+  assert.equal(f.normals.length, 36 * 3);
+  assert.equal(f.uvs.length, 36 * 2);
+  const xs = [];
+  for (let i = 0; i < 36; i++) {
+    if (f.normals[i * 3 + 2] === 1) xs.push(Math.abs(f.positions[i * 3]));
+    assert.ok(Math.abs(f.positions[i * 3 + 1]) <= 0.5 + 1e-12);
+    assert.ok(Math.abs(f.positions[i * 3 + 2]) <= 0.5 + 1e-12);
+  }
+  assert.equal(xs.length, 6);                       // outer face is two triangles
+  assert.ok(Math.abs(Math.max(...xs) - 0.5 * taper) < 1e-12);
+  // inner face (z = -0.5) is exactly the unit box width
+  const inner = [];
+  for (let i = 0; i < 36; i++) if (f.normals[i * 3 + 2] === -1) inner.push(Math.abs(f.positions[i * 3]));
+  assert.equal(inner.length, 6);
+  assert.equal(Math.max(...inner), 0.5);
+});
+test('wedgeFaces_NormalsMatchWindingAndPointOutwards', () => {
+  const f = wedgeFaces(1.6);
+  const p = (i) => [f.positions[i * 3], f.positions[i * 3 + 1], f.positions[i * 3 + 2]];
+  for (let t = 0; t < 12; t++) {
+    const [a, b, c] = [p(t * 3), p(t * 3 + 1), p(t * 3 + 2)];
+    const u = b.map((v, k) => v - a[k]), w = c.map((v, k) => v - a[k]);
+    const cr = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+    const n = [0, 1, 2].map(k => f.normals[t * 9 + k]);
+    assert.ok(Math.abs(Math.hypot(...n) - 1) < 1e-9, `unit normal tri ${t}`);
+    const dot = cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2];
+    assert.ok(dot > 0, `winding tri ${t}`);
+    const centroid = [0, 1, 2].map(k => (a[k] + b[k] + c[k]) / 3);
+    assert.ok(centroid[0] * n[0] + centroid[1] * n[1] + (centroid[2]) * n[2] > 0, `outward tri ${t}`);
+  }
 });
