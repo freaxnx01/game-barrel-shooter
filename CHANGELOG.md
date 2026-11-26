@@ -35,6 +35,7 @@ All notable changes to this project are documented here, following
 - Brighter scene on every device: stronger sky and sun light, a lighter sky, fog and ground; shadows and barrel colours stay as they were (#40)
 
 ### Fixed
+- Zoom (camera pad + / −, mouse wheel) works again on Windows with display scaling (125 %, 150 %); the camera was re-fitted every frame and the zoom undone (#76)
 - Barrels that lose their support now slide off and fall instead of hanging in mid-air (#28)
 - Pieces no longer hang in the air when what held them up is knocked away, and the Eiffel spire stands on a crossbar instead of floating (#9)
 - The house of cards no longer slumps once it is hit, and Spiral Stair stands until hit instead of shedding its treads (#9)

@@ -27,3 +27,11 @@ export function heldNudge(held, dt) {
   if (!held.theta && !held.phi && !held.zoom) return null;
   return { dTheta: held.theta * CAM_SPEED.theta * dt, dPhi: held.phi * CAM_SPEED.phi * dt, dRadius: 0 - held.zoom * CAM_SPEED.zoom * dt };
 }
+
+// Whether the drawing buffer no longer matches the window. three.js sizes the canvas to
+// floor(css size × pixel ratio), so compare against the same floor: with Windows display
+// scaling the raw product is fractional and would never match, re-fitting (and un-zooming)
+// the camera every frame (#76).
+export function canvasNeedsResize(canvasW, canvasH, cssW, cssH, pixelRatio) {
+  return canvasW !== Math.floor(cssW * pixelRatio) || canvasH !== Math.floor(cssH * pixelRatio);
+}
