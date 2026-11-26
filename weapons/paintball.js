@@ -13,6 +13,9 @@ export const PAINT_COLORS = [
 
 export const RANDOM_PAINT = 'random';
 
+// Nearly massless: a paintball only colours what it hits and must not knock stone over (#82).
+export const PAINTBALL = { mass: 0.01, radius: 0.15 };
+
 export function nextPaintChoice(choice) {
   if (choice === RANDOM_PAINT) return 0;
   return choice + 1 < PAINT_COLORS.length ? choice + 1 : RANDOM_PAINT;
