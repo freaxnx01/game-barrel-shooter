@@ -84,6 +84,19 @@ export function flushPose(point, normal) {
   };
 }
 
+// The number a new remote charge gets (#79): the lowest free one of 1..maxRemote among `used`
+// (the numbers of the armed remotes). 0 only if all are taken, which the cap prevents.
+export function nextChargeNumber(used) {
+  for (let n = 1; n <= CHARGE.maxRemote; n++) if (!used.includes(n)) return n;
+  return 0;
+}
+
+// World size of a charge's number sprite (#79): grows with the camera distance so the digit stays
+// readable from the chimney camera (about 52 units away) without being huge up close.
+export function chargeLabelScale(dist) {
+  return Math.min(Math.max(dist * 0.035, 0.5), 2);
+}
+
 // The target piece whose drawn mesh is `object` or one of its ancestors, or null (#78).
 // pieces: [{ mesh, ... }] (the game's `barrels`); a raycast hit can land on a child mesh of a group.
 export function pieceOf(object, pieces) {
