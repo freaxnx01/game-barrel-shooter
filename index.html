@@ -405,7 +405,7 @@ import { nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from './came
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
-import { DEMO, demolitionLayout, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff, columnToCrush } from './targets/demolition.js';
+import { DEMO, demolitionLayout, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff, columnsToCrush } from './targets/demolition.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
@@ -1008,7 +1008,7 @@ function setupChimney() {
 }
 
 // Demolition tower (#86): heavy concrete slabs on slim columns. Rigid boxes never crush, so two
-// rules make it pancake: an explosion next to a column crushes that column (crushNear, from
+// rules make it pancake: an explosion crushes the columns in reach on one storey (crushNear, from
 // explode), and a slab that falls and lands crushes the columns standing on it (updateDemolition).
 const demoColumnMatl = new THREE.MeshStandardMaterial({ color: '#8f8b84', roughness: 0.95, flatShading: true });
 const demoSlabMatl = new THREE.MeshStandardMaterial({ color: '#c4c0b8', roughness: 0.9, flatShading: true });
@@ -1079,9 +1079,8 @@ function clearDebris() {
   debris.length = dusts.length = 0;
 }
 function crushNear(p) {
-  const cols = barrels.filter((b) => b.demo?.part === 'column' && !b.crushed).map((b) => ({ b, position: b.body.position, hy: b.demo.hy }));
-  const hit = columnToCrush(p, cols);
-  if (hit) crushColumn(hit.b);
+  const cols = barrels.filter((b) => b.demo?.part === 'column' && !b.crushed).map((b) => ({ b, position: b.body.position, hy: b.demo.hy, storey: b.demo.storey }));
+  for (const hit of columnsToCrush(p, cols)) crushColumn(hit.b);
 }
 function updateDemolition() {
   for (const s of barrels) {
