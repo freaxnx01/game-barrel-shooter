@@ -1,5 +1,5 @@
 // Pure layout and collapse rules for the demolition tower target (#86): heavy floor slabs on
-// slim columns, six storeys; the ground floor stands on 3×3 columns (#99). No THREE, no DOM.
+// slim columns, six storeys; the ground floor stands on two rows of three columns (#99). No THREE, no DOM.
 // Boxes: { hx, hy, hz, x, y, z, ry, part, storey }  // half extents + centre in base units,
 // ry = yaw; part is 'column' or 'slab'; storey 0-based from the ground.
 // Centred on x = 0, z = 0 with the ground at y = 0; index.html scales by TSCALE 2.
@@ -12,7 +12,8 @@
 export const DEMO = {
   storeys: 6,
   grid: 2,              // columns per side, storeys 1 and up
-  groundGrid: 3,        // columns per side on the ground floor (#99), same outer columns
+  groundGridX: 3,       // ground floor (#99): columns across (x), same outer columns, one in the middle
+  groundGridZ: 2,       // ground floor: rows front to back (z)
   pitch: 3,             // column centre distance
   column: 0.3,          // square column cross-section
   storeyHeight: 1.25,   // column length (clear storey height)
@@ -33,7 +34,7 @@ export function slabHalf() {
 }
 
 export function demolitionLayout() {
-  const { storeys, grid, groundGrid, pitch, column, storeyHeight, slabThickness } = DEMO;
+  const { storeys, grid, groundGridX, groundGridZ, pitch, column, storeyHeight, slabThickness } = DEMO;
   const span = (grid - 1) * pitch;   // outer column centre to outer column centre, every storey
   const points = (n) => {
     const pts = [];
@@ -44,9 +45,10 @@ export function demolitionLayout() {
   const boxes = [];
   for (let storey = 0; storey < storeys; storey++) {
     const base = storey * storeyPitch();
-    const pts = points(storey === 0 ? groundGrid : grid);
-    for (const x of pts) {
-      for (const z of pts) {
+    const xs = points(storey === 0 ? groundGridX : grid);
+    const zs = points(storey === 0 ? groundGridZ : grid);
+    for (const x of xs) {
+      for (const z of zs) {
         boxes.push({ hx: column / 2, hy: storeyHeight / 2, hz: column / 2, x, y: base + storeyHeight / 2, z, ry: 0, part: 'column', storey });
       }
     }

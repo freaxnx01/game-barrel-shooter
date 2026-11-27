@@ -1,5 +1,12 @@
 # Demolition tower: ground floor on 3×3 columns (#99)
 
+> **Changed 2026-11-27 after the first merge:** the user meant **two rows of three** columns seen
+> from above, not 3×3. The ground floor has 6 columns at x ∈ {-1.5, 0, 1.5}, z ∈ {-1.5, 1.5}
+> (`DEMO.groundGridX: 3`, `groundGridZ: 2`), 26 columns and 32 blocks in all. The crush rule
+> below is unchanged. 4 charges bring it down (one between two columns of each row and one on
+> the third). The all-column harness rows use 6 charges, and the x/z limit of 2.5 holds again.
+> The 3×3 text below is the original design.
+
 Builds on the demolition tower of #86
 (`2026-11-26-issue-86-demolition-highrise-design.md`).
 
