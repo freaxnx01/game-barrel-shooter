@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, armedRemotes, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from '../weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, quatFromUp, flushPose, pieceOf, isFuseDone, blinkPeriod, ledOn, canPlaceRemote, maxRemoteFor, armedRemotes, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from '../weapons/charges.js';
 
 test('chargeLaunch_PowerRange_Speed40To60', () => {
   assert.equal(chargeLaunch({ x: 0, y: 0, z: -1 }, 0).speed, 40);
@@ -62,6 +62,18 @@ test('ledOn_FirstAndSecondHalfOfPeriod_OnThenOff', () => {
 test('canPlaceRemote_BelowAndAtCap_TrueThenFalse', () => {
   assert.equal(canPlaceRemote(CHARGE.maxRemote - 1), true);
   assert.equal(canPlaceRemote(CHARGE.maxRemote), false);
+});
+
+test('maxRemoteFor_DemolitionTower12_Others6', () => {
+  // #99: one charge per ground column of the six-bay demolition tower
+  assert.equal(maxRemoteFor('demolition'), 12);
+  assert.equal(maxRemoteFor('chimney'), 6);
+  assert.equal(maxRemoteFor('barrels'), 6);
+});
+
+test('canPlaceRemote_WithDemolitionCap_Allows12', () => {
+  assert.equal(canPlaceRemote(11, 12), true);
+  assert.equal(canPlaceRemote(12, 12), false);
 });
 
 test('armedRemotes_MixedRecords_OnlyUnexplodedRemotes', () => {

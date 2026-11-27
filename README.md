@@ -75,7 +75,7 @@ audible, does not clip, rises with held pieces and fades out within 0.2 s (title
 `test/harness/football-flight.html` checks the American football: nose along the flight path, spin,
 irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
 `test/harness/chimney.html` checks the brick chimney: it stands still, one dynamite charge at the foot brings it down and a light ball does not (title `CHIMNEY PASS`/`FAIL`).
-`test/harness/demolition.html` checks the demolition tower: it stands still, charges on all ground-floor columns pancake it into its footprint (remote and cutting charge), four charges (two of them between pairs of columns) bring the six-column ground floor down, one charge does not (title `DEMOLITION PASS`/`FAIL`).
+`test/harness/demolition.html` checks the demolition tower: it stands still, charges on all twelve ground-floor columns pancake it into its footprint (remote and cutting charge), one charge does not (title `DEMOLITION PASS`/`FAIL`).
 
 ## Game Content
 
@@ -93,10 +93,10 @@ and castle gates; hollow brick box and brick tower; four post-and-beam frame bui
 tower; Jenga tower of 18 crosswise layers of 3 wooden blocks, where you push blocks out
 instead of shooting (the HUD counts blocks pulled; the round ends when the tower falls);
 tall brick industrial chimney, tapering to a soot-blackened top, that tips over and breaks apart
-when hit at the foot; a six-storey demolition tower of concrete slabs on slim columns, six of
-them on the ground floor (two rows of three), that pancakes into its own footprint, its columns bursting into rubble
-and dust, when charges take out all six ground-floor columns at once (a charge placed between
-two columns takes both).
+when hit at the foot; a six-storey demolition tower of concrete slabs on slim columns, six
+bays wide (three across, two deep, twelve columns per storey), that pancakes into its own
+footprint, its columns bursting into rubble and dust, when charges take out all twelve
+ground-floor columns at once (up to 12 remote charges on this target, 6 elsewhere).
 
 **Feedback:** score HUD (targets knocked down / total), shot counter, and synthesized
 Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thunder, wind).
