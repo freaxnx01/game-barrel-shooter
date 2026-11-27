@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<!-- Demolition tower harness (#86; six bays, 4 × 3 columns per storey #99). Builds the tower on the real crashcat backend with the same
+<!-- Demolition tower harness (#86; since #99 both targets: the slim tower and the six-bay block, rows prefixed by mode). Builds the tower on the real crashcat backend with the same
      body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE) and the same two
      collapse rules as index.html (an explosion crushes the columns within DEMO.breakRadius on the
      storey of the nearest one; with breakRadius 1.0 and columns 6 apart that is one column; a
@@ -20,12 +20,12 @@
      gravity and is parked below the ground, like crushColumn() in the game. Unlike addBlock it adds
      the centre offset ZC after scaling. Title becomes DEMOLITION PASS/FAIL.
      Charges go off on the +z face (the side facing the default camera) of each ground column,
-     0.08 off the face like a stuck charge. Since #99 every storey has 12 columns (three bays
-     across, two deep), so the all-column rows use 12 charges, the demolition tower's cap.
-     Measured 2026-11-27 (#99, DEMOLITION PASS): stable 0.0042; remote-mid / -low / -high: top
+     0.08 off the face like a stuck charge. The block (demolitionwide, #99) has 12 columns per
+     storey (three bays across, two deep), so its all-column rows use 12 charges, its cap.
+     Measured 2026-11-27 for the block (#99, DEMOLITION PASS): stable 0.0042; remote-mid / -low / -high: top
        slab 1.89 / 1.90 / 1.07 from home, 15 % of its height, 78/78 down; cutting 1.09;
        one-charge 100 %; front-only 0.02 (stands).
-     Measured 2026-11-26 (#86, 2×2 ground floor) during enrichment with this file (DEMOLITION PASS, 2.3 s headless):
+     Measured 2026-11-26 for the slim tower (#86; the same numbers again on 2026-11-27) during enrichment with this file (DEMOLITION PASS, 2.3 s headless):
        stable 0.0027; remote-mid / -low / -high: top slab 0.90 / 1.34 / 1.94 from home, 15 % of its
        height, 30/30 down; cutting 0.50; one-charge 100 %; front-only 4.73 (falls forward).
      And in a scratch harness with the same rules, 24 random placements per row (charge height
@@ -36,18 +36,20 @@
 <pre id="out">running…</pre>
 <script type="module">
 import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
-import { DEMO, demolitionLayout, slabHalves, columnsToCrush, slabLanded } from '../../targets/demolition.js';
+import { DEMO, DEMO_GRIDS, demolitionLayout, slabHalves, columnsToCrush, slabLanded } from '../../targets/demolition.js';
 import { CHARGE, CUT, BLAST_LIFT } from '../../weapons/charges.js';
 import { massFor } from '../../targets/apk-layouts.js';
 
 const out = document.getElementById('out');
 const lines = [];
 let allPass = true;
+// both targets (#99): the slim tower of #86 and the wide six-bay block; main() runs each in turn
+let suite = '', GRID = DEMO_GRIDS.demolition;
 function row(pass, name, detail, required = true) {
   const cls = pass ? 'pass' : (required ? 'fail' : 'info');
   const tag = pass ? 'PASS' : (required ? 'FAIL' : 'INFO');
   if (!pass && required) allPass = false;
-  lines.push(`<span class="${cls}">[${tag}] ${name}: ${detail}</span>`);
+  lines.push(`<span class="${cls}">[${tag}] ${suite} ${name}: ${detail}</span>`);
 }
 
 const DT = 1 / 60, S = 2, MASONRY_MASS_SCALE = 0.25, ZC = -6;
@@ -61,7 +63,7 @@ async function fresh() {
   cc ??= await import('https://esm.sh/crashcat@0.0.5');
   const phys = createCrashcatBackend(cc);
   phys.addBody({ shape: { kind: 'ground' }, mass: 0, material: 'ground', position: { x: 0, y: 0, z: 0 }, isStatic: true });
-  const blocks = demolitionLayout().map(b => {
+  const blocks = demolitionLayout(GRID).map(b => {
     const home = { x: b.x * S, y: b.y * S, z: b.z * S + ZC };
     return {
       ...b, home, state: {}, crushed: false,
@@ -117,7 +119,7 @@ function moved(b) {
 }
 // how far a piece lies outside the slab footprint (negative: inside)
 function beyond(b) {
-  const p = b.body.position, h = slabHalves();
+  const p = b.body.position, h = slabHalves(GRID);
   return Math.max(Math.abs(p.x) - h.x * S, Math.abs(p.z - ZC) - h.z * S);
 }
 const topSlab = (ctx) => ctx.blocks.find(b => b.part === 'slab' && b.storey === DEMO.storeys - 1);
@@ -162,13 +164,13 @@ async function checkPancake(label, charge, fy) {
 }
 
 async function checkOneCharge() {
-  const r = await blast(REMOTE, 0.5, (b) => b.x === -4.5 && b.z === 3);
-  row(r.yFrac > 0.95, 'one-charge', `one remote charge: top slab at ${(100 * r.yFrac).toFixed(0)} % of its height (> 95 %, the other eleven columns hold it)`);
+  const r = await blast(REMOTE, 0.5, (b) => b.x === Math.min(...xsOf()) && b.z === Math.max(...zsOf()));   // one corner column
+  row(r.yFrac > 0.95, 'one-charge', `one remote charge: top slab at ${(100 * r.yFrac).toFixed(0)} % of its height (> 95 %, the other columns hold it)`);
 }
 
 async function checkFrontOnly() {
   const r = await blast(REMOTE, 0.5, (b) => b.z > 0);
-  row(r.xz > 2, 'front-only', `front four columns only: top slab ${r.xz.toFixed(2)} from home (the other eight hold it)`, false);
+  row(r.xz > 2, 'front-only', `front row only: top slab ${r.xz.toFixed(2)} from home`, false);
 }
 
 // a hard ball on the roof must not set off the slab-landing chain (spec anti-goal; review on #97)
@@ -185,7 +187,19 @@ async function checkRoofHit() {
   ctx.phys.destroy();
 }
 
+const xsOf = () => demolitionLayout(GRID).map(b => b.x);
+const zsOf = () => demolitionLayout(GRID).map(b => b.z);
+
 async function main() {
+  for (const mode of ['demolition', 'demolitionwide']) {
+    suite = mode; GRID = DEMO_GRIDS[mode];
+    await runSuite();
+  }
+  out.innerHTML = lines.join('\n');
+  document.title = allPass ? 'DEMOLITION PASS' : 'DEMOLITION FAIL';
+}
+
+async function runSuite() {
   await checkStable();
   await checkPancake('remote-mid', REMOTE, 0.5);
   await checkPancake('remote-low', REMOTE, 0.25);
@@ -194,8 +208,6 @@ async function main() {
   await checkOneCharge();
   await checkFrontOnly();
   await checkRoofHit();
-  out.innerHTML = lines.join('\n');
-  document.title = allPass ? 'DEMOLITION PASS' : 'DEMOLITION FAIL';
 }
 main().catch(e => { out.textContent = 'ERROR ' + e.stack; document.title = 'DEMOLITION FAIL'; });
 </script>

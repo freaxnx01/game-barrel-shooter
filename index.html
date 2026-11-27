@@ -381,6 +381,7 @@
       <button data-mode="jenga">Jenga</button>
       <button data-mode="chimney">Chimney</button>
       <button data-mode="demolition">Demolition Tower</button>
+      <button data-mode="demolitionwide">Demolition Block</button>
     </div>
   </div>
   <div class="target-group">
@@ -412,7 +413,7 @@ import { nudgeOrbit, heldNudge, fitOrbitRadius, canvasNeedsResize } from './came
 import { touchPair, pairNudge } from './camera/gestures.js';
 import { LAYOUTS, massFor } from './targets/apk-layouts.js';
 import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFaces } from './targets/chimney.js';
-import { DEMO, demolitionLayout, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff, columnsToCrush } from './targets/demolition.js';
+import { DEMO, DEMO_GRIDS, isDemolitionMode, demolitionLayout, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff, columnsToCrush } from './targets/demolition.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
 import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, maxRemoteFor, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
@@ -1020,8 +1021,9 @@ function setupChimney() {
 const demoColumnMatl = new THREE.MeshStandardMaterial({ color: '#8f8b84', roughness: 0.95, flatShading: true });
 const demoSlabMatl = new THREE.MeshStandardMaterial({ color: '#c4c0b8', roughness: 0.9, flatShading: true });
 function setupDemolition() {
+  const grid = DEMO_GRIDS[targetMode];
   const zC = -6;
-  for (const b of demolitionLayout()) {
+  for (const b of demolitionLayout(grid)) {
     addBlock(b.hx, b.hy, b.hz, b.part === 'slab' ? demoSlabMatl : demoColumnMatl, massFor(b), b.x, b.y, b.z + zC, b.ry, 0);
     barrels[barrels.length - 1].demo = { part: b.part, storey: b.storey, hy: b.hy * TSCALE, state: {} };
   }
@@ -1386,7 +1388,8 @@ const camCfg = {
   castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
   jenga:     { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupJenga },
   chimney:   { r: 28,   ty: 6.5, tz: -6, plat: false, build: setupChimney },
-  demolition: { r: 34, ty: 4.5, tz: -6, plat: false, build: setupDemolition },   // six bays wide (#99)
+  demolition: { r: 24, ty: 4.5, tz: -6, plat: false, build: setupDemolition },
+  demolitionwide: { r: 34, ty: 4.5, tz: -6, plat: false, build: setupDemolition },   // six bays wide (#99)
 };
 function buildTargets() {
   stopPush();        // a held Jenga block is about to be removed
@@ -1830,7 +1833,7 @@ function shootBall(dir, power) {
   if (type === 'laser') { fireLaser(); shots++; updateHud(); return; }
   if (type === 'disruptor') { disruptorBlast(); shots++; updateHud(); return; }
   if (type === 'tire') { shootTire(dir, power); return; }
-  if (isRemoteType(type) && !canPlaceRemote(armedRemotes(balls).length, maxRemoteFor(targetMode))) return;   // cap: 6 armed, 12 on the demolition tower (#99)
+  if (isRemoteType(type) && !canPlaceRemote(armedRemotes(balls).length, maxRemoteFor(targetMode))) return;   // cap: 6 armed, 12 on the demolition block (#99)
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
@@ -2168,7 +2171,7 @@ function explode(rec, RADIUS = 3, STRENGTH = 320, opts = {}) {
   const flashScale = opts.flash ?? 1;
   rec.exploded = true;
   const p = { x: rec.body.position.x, y: rec.body.position.y, z: rec.body.position.z };
-  if (targetMode === 'demolition') crushNear(p);   // before the impulse: a crushed column is gone
+  if (isDemolitionMode(targetMode)) crushNear(p);   // before the impulse: a crushed column is gone
   // cutting charge: shove the piece it sits on out of the line of support, even beyond the radius
   const partner = rec.stickBody;
   if (opts.shove && partner && partner.mass > 0) {
@@ -3583,7 +3586,7 @@ function animate() {
     powerFill.style.width = (t * 100) + '%';
   }
 
-  if (targetMode === 'demolition') updateDemolition();
+  if (isDemolitionMode(targetMode)) updateDemolition();
   if (debris.length || dusts.length) updateDebris(dt);
 
   // sync barrels + detect knocked-over

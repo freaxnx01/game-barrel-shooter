@@ -1,6 +1,7 @@
 // Pure layout and collapse rules for the demolition tower target (#86): heavy floor slabs on
-// slim columns, six storeys; six bays of 3 × 3 (three across, two deep), so 4 × 3 columns on
-// every storey under one slab (#99). No THREE, no DOM.
+// slim columns, six storeys. Two targets: the slim tower of #86 (one bay, 2 × 2 columns per
+// storey) and the wide block of #99 (six bays, three across and two deep, 4 × 3 columns per
+// storey). No THREE, no DOM.
 // Boxes: { hx, hy, hz, x, y, z, ry, part, storey }  // half extents + centre in base units,
 // ry = yaw; part is 'column' or 'slab'; storey 0-based from the ground.
 // Centred on x = 0, z = 0 with the ground at y = 0; index.html scales by TSCALE 2.
@@ -12,8 +13,6 @@
 
 export const DEMO = {
   storeys: 6,
-  gridX: 4,             // columns across (x): three bays (#99)
-  gridZ: 3,             // columns front to back (z): two bays, three rows
   pitch: 3,             // column centre distance
   column: 0.3,          // square column cross-section
   storeyHeight: 1.25,   // column length (clear storey height)
@@ -28,17 +27,27 @@ export function storeyPitch() {
   return DEMO.storeyHeight + DEMO.slabThickness;
 }
 
-// Half size of a slab in x and z: the outer columns plus the overhang.
-export function slabHalves() {
-  const half = (n) => (n - 1) / 2 * DEMO.pitch + DEMO.column / 2 + DEMO.overhang;
-  return { x: half(DEMO.gridX), z: half(DEMO.gridZ) };
+// Columns across (x) and front to back (z) per storey, by target mode.
+export const DEMO_GRIDS = {
+  demolition: { x: 2, z: 2 },       // slim tower (#86)
+  demolitionwide: { x: 4, z: 3 },   // wide block, six bays (#99)
+};
+
+export function isDemolitionMode(mode) {
+  return mode in DEMO_GRIDS;
 }
 
-export function demolitionLayout() {
-  const { storeys, gridX, gridZ, pitch, column, storeyHeight, slabThickness } = DEMO;
+// Half size of a slab in x and z: the outer columns plus the overhang.
+export function slabHalves(grid) {
+  const half = (n) => (n - 1) / 2 * DEMO.pitch + DEMO.column / 2 + DEMO.overhang;
+  return { x: half(grid.x), z: half(grid.z) };
+}
+
+export function demolitionLayout(grid) {
+  const { storeys, pitch, column, storeyHeight, slabThickness } = DEMO;
   const points = (n) => Array.from({ length: n }, (_, k) => (k - (n - 1) / 2) * pitch);
-  const xs = points(gridX), zs = points(gridZ);
-  const half = slabHalves();
+  const xs = points(grid.x), zs = points(grid.z);
+  const half = slabHalves(grid);
   const boxes = [];
   for (let storey = 0; storey < storeys; storey++) {
     const base = storey * storeyPitch();

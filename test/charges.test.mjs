@@ -64,9 +64,10 @@ test('canPlaceRemote_BelowAndAtCap_TrueThenFalse', () => {
   assert.equal(canPlaceRemote(CHARGE.maxRemote), false);
 });
 
-test('maxRemoteFor_DemolitionTower12_Others6', () => {
-  // #99: one charge per ground column of the six-bay demolition tower
-  assert.equal(maxRemoteFor('demolition'), 12);
+test('maxRemoteFor_WideBlock12_Others6', () => {
+  // #99: one charge per ground column of the six-bay demolition block; the slim tower keeps 6
+  assert.equal(maxRemoteFor('demolitionwide'), 12);
+  assert.equal(maxRemoteFor('demolition'), 6);
   assert.equal(maxRemoteFor('chimney'), 6);
   assert.equal(maxRemoteFor('barrels'), 6);
 });

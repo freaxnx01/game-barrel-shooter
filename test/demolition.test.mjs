@@ -1,24 +1,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO, DEBRIS, demolitionLayout, storeyPitch, slabHalves, distToColumnAxis, columnsToCrush, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
+import { DEMO, DEMO_GRIDS, isDemolitionMode, DEBRIS, demolitionLayout, storeyPitch, slabHalves, distToColumnAxis, columnsToCrush, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
 import { massFor } from '../targets/apk-layouts.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
-const columns = () => demolitionLayout().filter(b => b.part === 'column');
-const slabs = () => demolitionLayout().filter(b => b.part === 'slab');
+// the wide block (#99, six bays); the slim tower of #86 has its own tests below
+const WIDE = DEMO_GRIDS.demolitionwide, SLIM = DEMO_GRIDS.demolition;
+const columns = (g = WIDE) => demolitionLayout(g).filter(b => b.part === 'column');
+const slabs = (g = WIDE) => demolitionLayout(g).filter(b => b.part === 'slab');
 
 // Seen from above: six bays of the old square footprint, three across (x) and two deep (z),
 // so a 4 × 3 grid of columns at pitch 3 on every storey under one slab (#99).
 test('demolitionLayout_Has78Blocks_72ColumnsAnd6Slabs', () => {
-  assert.equal(demolitionLayout().length, 78);
+  assert.equal(demolitionLayout(WIDE).length, 78);
   assert.equal(columns().length, 72);
   assert.equal(slabs().length, 6);
 });
 test('demolitionLayout_NoOverlaps', () => {
-  assert.deepEqual(overlappingPairs(demolitionLayout()), []);
+  assert.deepEqual(overlappingPairs(demolitionLayout(WIDE)), []);
 });
 test('demolitionLayout_EveryBlockSupported', () => {
-  assert.deepEqual(unsupported(demolitionLayout()), []);
+  assert.deepEqual(unsupported(demolitionLayout(WIDE)), []);
 });
 test('demolitionLayout_GroundColumnsStandOnGround', () => {
   const ground = columns().filter(b => b.storey === 0);
@@ -39,7 +41,7 @@ test('demolitionLayout_EveryStorey4x3ColumnsAtPitch3AndSlim', () => {
   }
 });
 test('demolitionLayout_OneSlabPerStoreyOnItsColumns', () => {
-  const h = slabHalves();
+  const h = slabHalves(WIDE);
   for (const s of slabs()) {
     const below = columns().filter(b => b.storey === s.storey);
     assert.equal(below.length, 12);
@@ -48,9 +50,32 @@ test('demolitionLayout_OneSlabPerStoreyOnItsColumns', () => {
   }
 });
 test('slabHalves_ThreeBaysByTwo', () => {
-  const h = slabHalves();
+  const h = slabHalves(WIDE);
   assert.ok(Math.abs(h.x - (4.5 + 0.15 + DEMO.overhang)) < 1e-9);
   assert.ok(Math.abs(h.z - (3 + 0.15 + DEMO.overhang)) < 1e-9);
+});
+// The slim tower of #86 is back as its own target next to the wide block (#99).
+test('slimTower_Has30Blocks_2x2ColumnsPerStorey', () => {
+  assert.equal(demolitionLayout(SLIM).length, 30);
+  assert.equal(columns(SLIM).length, 24);
+  for (let storey = 0; storey < DEMO.storeys; storey++) {
+    const cs = columns(SLIM).filter(b => b.storey === storey);
+    assert.deepEqual([...new Set(cs.map(b => b.x))].sort((a, b) => a - b), [-1.5, 1.5]);
+    assert.deepEqual([...new Set(cs.map(b => b.z))].sort((a, b) => a - b), [-1.5, 1.5]);
+  }
+});
+test('slimTower_NoOverlaps_EveryBlockSupported_SquareSlab', () => {
+  assert.deepEqual(overlappingPairs(demolitionLayout(SLIM)), []);
+  assert.deepEqual(unsupported(demolitionLayout(SLIM)), []);
+  const h = slabHalves(SLIM);
+  assert.ok(Math.abs(h.x - 1.9) < 1e-9 && Math.abs(h.z - 1.9) < 1e-9);
+  const top = Math.max(...demolitionLayout(SLIM).map(b => b.y + b.hy));
+  assert.ok(Math.abs(top - 9) < 1e-9);
+});
+test('isDemolitionMode_BothTowers', () => {
+  assert.equal(isDemolitionMode('demolition'), true);
+  assert.equal(isDemolitionMode('demolitionwide'), true);
+  assert.equal(isDemolitionMode('chimney'), false);
 });
 test('demolitionLayout_SlabOverhangsColumns', () => {
   const s = slabs()[0], c = columns()[0];
@@ -58,7 +83,7 @@ test('demolitionLayout_SlabOverhangsColumns', () => {
   assert.ok(Math.abs(s.hz - (Math.abs(c.z) + c.hz + DEMO.overhang)) < 1e-9);
 });
 test('demolitionLayout_TopAt9BaseUnits', () => {
-  const top = Math.max(...demolitionLayout().map(b => b.y + b.hy));
+  const top = Math.max(...demolitionLayout(WIDE).map(b => b.y + b.hy));
   assert.ok(Math.abs(top - DEMO.storeys * storeyPitch()) < 1e-9);
   assert.ok(Math.abs(top - 9) < 1e-9);
 });
