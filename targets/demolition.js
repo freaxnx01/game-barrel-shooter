@@ -1,5 +1,6 @@
 // Pure layout and collapse rules for the demolition tower target (#86): heavy floor slabs on
-// slim columns, six storeys; the ground floor stands on two rows of three columns (#99). No THREE, no DOM.
+// slim columns, six storeys; six bays of 3 × 3 (three across, two deep), so 4 × 3 columns on
+// every storey under one slab (#99). No THREE, no DOM.
 // Boxes: { hx, hy, hz, x, y, z, ry, part, storey }  // half extents + centre in base units,
 // ry = yaw; part is 'column' or 'slab'; storey 0-based from the ground.
 // Centred on x = 0, z = 0 with the ground at y = 0; index.html scales by TSCALE 2.
@@ -11,16 +12,14 @@
 
 export const DEMO = {
   storeys: 6,
-  grid: 2,              // columns per side, storeys 1 and up
-  groundGridX: 3,       // ground floor (#99): columns across (x), same outer columns, one in the middle
-  groundGridZ: 2,       // ground floor: rows front to back (z)
+  gridX: 4,             // columns across (x): three bays (#99)
+  gridZ: 3,             // columns front to back (z): two bays, three rows
   pitch: 3,             // column centre distance
   column: 0.3,          // square column cross-section
   storeyHeight: 1.25,   // column length (clear storey height)
   slabThickness: 0.25,
   overhang: 0.25,       // slab edge beyond the outer column faces
-  breakRadius: 1.8,     // world units: an explosion this close to a column's axis crushes it (#99:
-                        // reaches both columns from midway between two ground columns, 3.0 apart)
+  breakRadius: 1.0,     // world units: an explosion this close to a column's axis crushes it
   fallSpeed: 1.5,       // world units/s: a slab sinking faster than this is falling
   landSpeed: 0.5,       // world units/s: a falling slab slower than this again has landed
 };
@@ -29,30 +28,26 @@ export function storeyPitch() {
   return DEMO.storeyHeight + DEMO.slabThickness;
 }
 
-export function slabHalf() {
-  return (DEMO.grid - 1) / 2 * DEMO.pitch + DEMO.column / 2 + DEMO.overhang;
+// Half size of a slab in x and z: the outer columns plus the overhang.
+export function slabHalves() {
+  const half = (n) => (n - 1) / 2 * DEMO.pitch + DEMO.column / 2 + DEMO.overhang;
+  return { x: half(DEMO.gridX), z: half(DEMO.gridZ) };
 }
 
 export function demolitionLayout() {
-  const { storeys, grid, groundGridX, groundGridZ, pitch, column, storeyHeight, slabThickness } = DEMO;
-  const span = (grid - 1) * pitch;   // outer column centre to outer column centre, every storey
-  const points = (n) => {
-    const pts = [];
-    for (let k = 0; k < n; k++) pts.push(n === 1 ? 0 : -span / 2 + k * span / (n - 1));
-    return pts;
-  };
-  const half = slabHalf();
+  const { storeys, gridX, gridZ, pitch, column, storeyHeight, slabThickness } = DEMO;
+  const points = (n) => Array.from({ length: n }, (_, k) => (k - (n - 1) / 2) * pitch);
+  const xs = points(gridX), zs = points(gridZ);
+  const half = slabHalves();
   const boxes = [];
   for (let storey = 0; storey < storeys; storey++) {
     const base = storey * storeyPitch();
-    const xs = points(storey === 0 ? groundGridX : grid);
-    const zs = points(storey === 0 ? groundGridZ : grid);
     for (const x of xs) {
       for (const z of zs) {
         boxes.push({ hx: column / 2, hy: storeyHeight / 2, hz: column / 2, x, y: base + storeyHeight / 2, z, ry: 0, part: 'column', storey });
       }
     }
-    boxes.push({ hx: half, hy: slabThickness / 2, hz: half, x: 0, y: base + storeyHeight + slabThickness / 2, z: 0, ry: 0, part: 'slab', storey });
+    boxes.push({ hx: half.x, hy: slabThickness / 2, hz: half.z, x: 0, y: base + storeyHeight + slabThickness / 2, z: 0, ry: 0, part: 'slab', storey });
   }
   return boxes;
 }

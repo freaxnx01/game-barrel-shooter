@@ -32,3 +32,15 @@ test('numberRowShown_NeedsOpenAndArmed', () => {
   assert.equal(numberRowShown(true, 0), false);
   assert.equal(numberRowShown(false, 3), false);
 });
+
+test('nextChargeNumber_WithCap12_GivesNumbersAbove6', () => {
+  // #99: the demolition tower allows 12 charges
+  assert.equal(nextChargeNumber([1, 2, 3, 4, 5, 6], 12), 7);
+  assert.equal(nextChargeNumber([1, 2, 3, 4, 5, 6]), 0);
+  assert.equal(nextChargeNumber([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 12), 0);
+});
+
+test('shownNumbers_WithCap12_KeepsNumbersAbove6', () => {
+  assert.deepEqual(shownNumbers([12, 7, 3], 12), [3, 7, 12]);
+  assert.deepEqual(shownNumbers([12, 7, 3]), [3]);
+});

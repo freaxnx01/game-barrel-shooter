@@ -12,20 +12,19 @@
 </style>
 </head>
 <body>
-<!-- Demolition tower harness (#86; ground floor of two rows of three columns #99). Builds the tower on the real crashcat backend with the same
+<!-- Demolition tower harness (#86; six bays, 4 × 3 columns per storey #99). Builds the tower on the real crashcat backend with the same
      body spec as addBlock in index.html (TSCALE 2, masonry, MASONRY_MASS_SCALE) and the same two
      collapse rules as index.html (an explosion crushes the columns within DEMO.breakRadius on the
-     storey of the nearest one; a
+     storey of the nearest one; with breakRadius 1.0 and columns 6 apart that is one column; a
      slab that falls and lands crushes the columns on it). A crushed column stops colliding, loses
      gravity and is parked below the ground, like crushColumn() in the game. Unlike addBlock it adds
      the centre offset ZC after scaling. Title becomes DEMOLITION PASS/FAIL.
      Charges go off on the +z face (the side facing the default camera) of each ground column,
-     0.08 off the face like a stuck charge. Since #99 the ground floor has 6 columns (two rows of
-     three), so the all-column rows use 6 charges, the most a player can place; four-charge puts
-     one charge midway between two columns of each row and one on the third.
-     Measured 2026-11-27 (#99, DEMOLITION PASS): stable 0.0027; remote-mid / -low / -high: top
-       slab 1.12 / 0.87 / 1.45 from home, 15 % of its height, 32/32 down; cutting 0.50;
-       four-charge 15 %, 32/32; one-charge 100 %; front-only 2.96.
+     0.08 off the face like a stuck charge. Since #99 every storey has 12 columns (three bays
+     across, two deep), so the all-column rows use 12 charges, the demolition tower's cap.
+     Measured 2026-11-27 (#99, DEMOLITION PASS): stable 0.0042; remote-mid / -low / -high: top
+       slab 1.89 / 1.90 / 1.07 from home, 15 % of its height, 78/78 down; cutting 1.09;
+       one-charge 100 %; front-only 0.02 (stands).
      Measured 2026-11-26 (#86, 2×2 ground floor) during enrichment with this file (DEMOLITION PASS, 2.3 s headless):
        stable 0.0027; remote-mid / -low / -high: top slab 0.90 / 1.34 / 1.94 from home, 15 % of its
        height, 30/30 down; cutting 0.50; one-charge 100 %; front-only 4.73 (falls forward).
@@ -37,7 +36,7 @@
 <pre id="out">running…</pre>
 <script type="module">
 import { createCrashcatBackend } from '../../physics/backend-crashcat.js';
-import { DEMO, demolitionLayout, slabHalf, columnsToCrush, slabLanded } from '../../targets/demolition.js';
+import { DEMO, demolitionLayout, slabHalves, columnsToCrush, slabLanded } from '../../targets/demolition.js';
 import { CHARGE, CUT, BLAST_LIFT } from '../../weapons/charges.js';
 import { massFor } from '../../targets/apk-layouts.js';
 
@@ -118,8 +117,8 @@ function moved(b) {
 }
 // how far a piece lies outside the slab footprint (negative: inside)
 function beyond(b) {
-  const p = b.body.position, h = slabHalf() * S;
-  return Math.max(Math.abs(p.x) - h, Math.abs(p.z - ZC) - h);
+  const p = b.body.position, h = slabHalves();
+  return Math.max(Math.abs(p.x) - h.x * S, Math.abs(p.z - ZC) - h.z * S);
 }
 const topSlab = (ctx) => ctx.blocks.find(b => b.part === 'slab' && b.storey === DEMO.storeys - 1);
 
@@ -163,36 +162,13 @@ async function checkPancake(label, charge, fy) {
 }
 
 async function checkOneCharge() {
-  const r = await blast(REMOTE, 0.5, (b) => b.x < 0 && b.z > 0);
-  row(r.yFrac > 0.95, 'one-charge', `one remote charge: top slab at ${(100 * r.yFrac).toFixed(0)} % of its height (> 95 %, the other five columns hold it)`);
+  const r = await blast(REMOTE, 0.5, (b) => b.x === -4.5 && b.z === 3);
+  row(r.yFrac > 0.95, 'one-charge', `one remote charge: top slab at ${(100 * r.yFrac).toFixed(0)} % of its height (> 95 %, the other eleven columns hold it)`);
 }
 
 async function checkFrontOnly() {
   const r = await blast(REMOTE, 0.5, (b) => b.z > 0);
-  row(r.xz > 2, 'front-only', `front three columns only: top slab ${r.xz.toFixed(2)} from home (it falls forward)`, false);
-}
-
-async function blastAt(charge, points) {
-  const ctx = await fresh();
-  for (const p of points) explodeAt(ctx, p, charge);
-  step(ctx, 10);
-  return settle(ctx);
-}
-
-// world positions of the ground columns: x in {-G, 0, G}, z in {-G, G} (1.5 base × S)
-const G = 1.5 * S;
-async function checkFourCharges() {
-  // per row: 1 charge on the ground midway between the left and middle column, 1 on the +z face
-  // of the right column
-  const y = 0.3, face = DEMO.column / 2 * S + 0.08;
-  const pts = [];
-  for (const z of [ZC - G, ZC + G]) {
-    pts.push({ x: -G / 2, y, z });              // (-G,z) + (0,z)
-    pts.push({ x: G, y: 1.2, z: z + face });    // (G,z) alone
-  }
-  const r = await blastAt(REMOTE, pts);
-  const pass = r.yFrac < 0.3 && r.slabOut < 0.5 && r.down === r.total;
-  row(pass, 'four-charge', `4 remote charges (2 between pairs): top slab at ${(100 * r.yFrac).toFixed(0)} % of its height (< 30 %), slabs outside footprint ${r.slabOut.toFixed(2)} (< 0.5), blocks down ${r.down}/${r.total}`);
+  row(r.xz > 2, 'front-only', `front four columns only: top slab ${r.xz.toFixed(2)} from home (the other eight hold it)`, false);
 }
 
 // a hard ball on the roof must not set off the slab-landing chain (spec anti-goal; review on #97)
@@ -215,7 +191,6 @@ async function main() {
   await checkPancake('remote-low', REMOTE, 0.25);
   await checkPancake('remote-high', REMOTE, 0.75);
   await checkPancake('cutting', CUTTING, 0.5);
-  await checkFourCharges();
   await checkOneCharge();
   await checkFrontOnly();
   await checkRoofHit();

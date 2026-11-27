@@ -12,8 +12,8 @@ export function visibleActions({ tethered, armed }) {
 }
 
 // The number buttons to show (#79): the armed charges' numbers, valid ones only, sorted, no duplicates.
-export function shownNumbers(numbers) {
-  return [...new Set(numbers)].filter((n) => Number.isInteger(n) && n >= 1 && n <= CHARGE.maxRemote).sort((a, b) => a - b);
+export function shownNumbers(numbers, max = CHARGE.maxRemote) {
+  return [...new Set(numbers)].filter((n) => Number.isInteger(n) && n >= 1 && n <= max).sort((a, b) => a - b);
 }
 
 // The number row shows while the toggle is open and at least one charge is armed (#79).

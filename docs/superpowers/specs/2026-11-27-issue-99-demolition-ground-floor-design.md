@@ -1,11 +1,14 @@
 # Demolition tower: ground floor on 3×3 columns (#99)
 
-> **Changed 2026-11-27 after the first merge:** the user meant **two rows of three** columns seen
-> from above, not 3×3. The ground floor has 6 columns at x ∈ {-1.5, 0, 1.5}, z ∈ {-1.5, 1.5}
-> (`DEMO.groundGridX: 3`, `groundGridZ: 2`), 26 columns and 32 blocks in all. The crush rule
-> below is unchanged. 4 charges bring it down (one between two columns of each row and one on
-> the third). The all-column harness rows use 6 charges, and the x/z limit of 2.5 holds again.
-> The 3×3 text below is the original design.
+> **Final design (2026-11-27, after two misreadings):** the user meant **six bays** of the old
+> square footprint: three across (x) and two deep (z), on **every** storey, same height. That is
+> 4 × 3 columns at pitch 3 per storey (`DEMO.gridX: 4`, `gridZ: 3`), one slab of 9.8 × 6.8
+> base units per storey, 72 columns and 78 blocks. `breakRadius` is back at 1.0 (columns are
+> 6 world units apart, so a blast crushes one column). The remote-charge cap is **12 on the
+> demolition tower** (`maxRemoteFor('demolition')`), 6 everywhere else, and the number row
+> has buttons up to 12 (six per row). The camera radius is 34. Harness: all-column rows use 12
+> charges and keep the #86 limits.
+> The 3×3 text below is the first, superseded design.
 
 Builds on the demolition tower of #86
 (`2026-11-26-issue-86-demolition-highrise-design.md`).

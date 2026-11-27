@@ -161,7 +161,8 @@
   #act-bar button.held { background: rgba(245,239,228,0.32); border-color: rgba(245,239,228,0.7); }
   /* #79: toggle next to Boom and the row of per-charge buttons, floating above the bar */
   #act-bar #act-boom-more { width: 28px; font-size: 16px; }
-  #act-nums { position: absolute; right: 0; bottom: 100%; margin-bottom: 8px; display: flex; gap: 6px; }
+  #act-nums { position: absolute; right: 0; bottom: 100%; margin-bottom: 8px; display: flex; gap: 6px;
+    flex-wrap: wrap-reverse; justify-content: flex-end; width: max-content; max-width: 294px; }   /* 6 per row (#99: up to 12) */
   #act-nums[hidden] { display: none; }
   #act-bar #act-nums button { width: 44px; height: 44px; font-size: 18px; font-weight: bold; }
 
@@ -197,7 +198,7 @@
     #ioshint { top: calc(128px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: auto; max-width: calc(100% - 24px - var(--sa-l) - var(--sa-r)); border-radius: 22px; font-size: 12px; }
 
     #act-bar { left: calc(12px + var(--sa-l)); right: auto; bottom: calc(46px + var(--sa-b)); }
-    #act-nums { left: 0; right: auto; }
+    #act-nums { left: 0; right: auto; justify-content: flex-start; }
 
     #cam-pad { right: calc(12px + var(--sa-r)); bottom: calc(46px + var(--sa-b)); gap: 6px; }
     #cam-pad .dpad { grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px); }
@@ -314,13 +315,19 @@
   <button id="act-cut" title="Cut the rope (O)" hidden>✂️<span>Cut</span></button>
   <button id="act-boom" title="Detonate all remote and cutting charges (K)" hidden>💥<span>Boom</span></button>
   <button id="act-boom-more" title="Detonate a single charge" aria-expanded="false" hidden>▸</button>
-  <div id="act-nums" hidden>   <!-- one button per CHARGE.maxRemote (weapons/charges.js) -->
+  <div id="act-nums" hidden>   <!-- one button per charge number up to CHARGE.maxRemoteDemolition (weapons/charges.js) -->
     <button data-n="1" title="Detonate charge 1">1</button>
     <button data-n="2" title="Detonate charge 2">2</button>
     <button data-n="3" title="Detonate charge 3">3</button>
     <button data-n="4" title="Detonate charge 4">4</button>
     <button data-n="5" title="Detonate charge 5">5</button>
     <button data-n="6" title="Detonate charge 6">6</button>
+    <button data-n="7" title="Detonate charge 7">7</button>
+    <button data-n="8" title="Detonate charge 8">8</button>
+    <button data-n="9" title="Detonate charge 9">9</button>
+    <button data-n="10" title="Detonate charge 10">10</button>
+    <button data-n="11" title="Detonate charge 11">11</button>
+    <button data-n="12" title="Detonate charge 12">12</button>
   </div>
 </div>
 <div id="sheet-backdrop"></div>
@@ -408,7 +415,7 @@ import { CHIMNEY, chimneyLayout, isSoot, brickFaceRects, wedgeProfile, wedgeFace
 import { DEMO, demolitionLayout, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff, columnsToCrush } from './targets/demolition.js';
 import { TIRE, tireLaunch, rollingStep, axleTilt, shouldTip, tipSpin, leanStep, restHeight } from './weapons/tire.js';
 import { PAINT_COLORS, RANDOM_PAINT, nextPaintChoice, paintIndexForShot, paintDotInfo, PAINTBALL } from './weapons/paintball.js';
-import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
+import { CHARGE, chargeLaunch, chargeStickPlan, chargeReach, chargeOutOfRange, flushPose, pieceOf, isFuseDone, ledOn, canPlaceRemote, maxRemoteFor, armedRemotes, nextChargeNumber, chargeLabelScale, CUT, BLAST_LIFT, blastImpulse, cutShove, isRemoteType, isChargeType } from './weapons/charges.js';
 import { NET, netLaunch, selectCaught, centroid, pullForce, isReeledIn, strandOffsets, openScale } from './weapons/net.js';
 import { createCloth, resetCloth, stepCloth, proxyFor, cornerNodes, nearestCorner } from './weapons/cloth.js';
 import { createBarrelSupport } from './targets/barrel-support.js';
@@ -1007,7 +1014,7 @@ function setupChimney() {
   chimneyLayout().forEach((b, i) => addBlock(b.hx, b.hy, b.hz, chimneyMatl(b, i), massFor(b), b.x, b.y, b.z + zC, b.ry, 0, wedgeGeo(wedgeProfile(b).taper)));
 }
 
-// Demolition tower (#86): heavy concrete slabs on slim columns. Rigid boxes never crush, so two
+// Demolition tower (#86, six bays #99): heavy concrete slabs on slim columns. Rigid boxes never crush, so two
 // rules make it pancake: an explosion crushes the columns in reach on one storey (crushNear, from
 // explode), and a slab that falls and lands crushes the columns standing on it (updateDemolition).
 const demoColumnMatl = new THREE.MeshStandardMaterial({ color: '#8f8b84', roughness: 0.95, flatShading: true });
@@ -1379,7 +1386,7 @@ const camCfg = {
   castlegatesmall: { r: 22, ty: 2,   tz: -6, plat: false, build: () => placeLayout(LAYOUTS.castleGateSmall(), -6) },
   jenga:     { r: 26,   ty: 4.5, tz: -6, plat: false, build: setupJenga },
   chimney:   { r: 28,   ty: 6.5, tz: -6, plat: false, build: setupChimney },
-  demolition: { r: 24, ty: 4.5, tz: -6, plat: false, build: setupDemolition },
+  demolition: { r: 34, ty: 4.5, tz: -6, plat: false, build: setupDemolition },   // six bays wide (#99)
 };
 function buildTargets() {
   stopPush();        // a held Jenga block is about to be removed
@@ -1823,7 +1830,7 @@ function shootBall(dir, power) {
   if (type === 'laser') { fireLaser(); shots++; updateHud(); return; }
   if (type === 'disruptor') { disruptorBlast(); shots++; updateHud(); return; }
   if (type === 'tire') { shootTire(dir, power); return; }
-  if (isRemoteType(type) && !canPlaceRemote(armedRemotes(balls).length)) return;   // cap: 6 armed
+  if (isRemoteType(type) && !canPlaceRemote(armedRemotes(balls).length, maxRemoteFor(targetMode))) return;   // cap: 6 armed, 12 on the demolition tower (#99)
   const start = camera.position.clone().add(dir.clone().multiplyScalar(1.2));
   const cfg = {
     basketball:  { mass: 2.4, r: BALL_R },
@@ -2099,9 +2106,9 @@ function shootBall(dir, power) {
     mesh.add(streak);
     mesh.userData.streak = streak;
   } else if (type === 'remotecharge') {
-    mesh = makeRemoteChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number)));   // the new rec is not in balls yet (#79)
+    mesh = makeRemoteChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number), maxRemoteFor(targetMode)));   // the new rec is not in balls yet (#79)
   } else if (type === 'cutcharge') {
-    mesh = makeCutChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number)));
+    mesh = makeCutChargeMesh(nextChargeNumber(armedRemotes(balls).map((r) => r.number), maxRemoteFor(targetMode)));
   } else if (type === 'timedcharge') {
     mesh = makeTimedChargeMesh();
   } else if (type === 'net') {
@@ -2409,7 +2416,7 @@ function syncActionBar() {
   setHidden(cutBtn, !v.cut);
   setHidden(boomBtn, !v.boom);
   setHidden(boomMoreBtn, !v.boom);
-  const nums = shownNumbers(armedRemotes(balls).map((r) => r.number));
+  const nums = shownNumbers(armedRemotes(balls).map((r) => r.number), maxRemoteFor(targetMode));
   if (!nums.length) numsOpen = false;
   const key = nums.join(',') + (numsOpen ? 'o' : 'c');
   if (key !== boomKey) {                      // touch the DOM only when something changed

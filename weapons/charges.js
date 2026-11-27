@@ -14,7 +14,13 @@ export const CHARGE = {
   blinkSlowMs: 600,
   blinkFastMs: 100,
   maxRemote: 6,
+  maxRemoteDemolition: 12,   // #99: one per ground column of the six-bay demolition tower
 };
+
+// How many remote and cutting charges may be armed at once on a target.
+export function maxRemoteFor(mode) {
+  return mode === 'demolition' ? CHARGE.maxRemoteDemolition : CHARGE.maxRemote;
+}
 
 // Cutting charge (#87): a small blast for controlled demolition. It breaks the piece it sits on
 // (a strong sideways shove) and barely touches the rest, so the building falls under gravity.
@@ -83,8 +89,8 @@ export function ledOn(elapsedMs) {
   return Math.max(elapsedMs, 0) % period < period / 2;
 }
 
-export function canPlaceRemote(armedCount) {
-  return armedCount < CHARGE.maxRemote;
+export function canPlaceRemote(armedCount, max = CHARGE.maxRemote) {
+  return armedCount < max;
 }
 
 export function armedRemotes(records) {
@@ -125,10 +131,10 @@ export function flushPose(point, normal) {
   };
 }
 
-// The number a new remote charge gets (#79): the lowest free one of 1..maxRemote among `used`
+// The number a new remote charge gets (#79): the lowest free one of 1..max among `used`
 // (the numbers of the armed remotes). 0 only if all are taken, which the cap prevents.
-export function nextChargeNumber(used) {
-  for (let n = 1; n <= CHARGE.maxRemote; n++) if (!used.includes(n)) return n;
+export function nextChargeNumber(used, max = CHARGE.maxRemote) {
+  for (let n = 1; n <= max; n++) if (!used.includes(n)) return n;
   return 0;
 }
 
