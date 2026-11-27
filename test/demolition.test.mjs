@@ -1,15 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO, DEBRIS, demolitionLayout, storeyPitch, slabHalf, distToColumnAxis, columnToCrush, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
+import { DEMO, DEBRIS, demolitionLayout, storeyPitch, slabHalf, distToColumnAxis, columnsToCrush, slabLanded, debrisChunks, stepChunk, chunkScale, dustPuff } from '../targets/demolition.js';
 import { massFor } from '../targets/apk-layouts.js';
 import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 
 const columns = () => demolitionLayout().filter(b => b.part === 'column');
 const slabs = () => demolitionLayout().filter(b => b.part === 'slab');
 
-test('demolitionLayout_Has30Blocks_24ColumnsAnd6Slabs', () => {
-  assert.equal(demolitionLayout().length, 30);
-  assert.equal(columns().length, 24);
+test('demolitionLayout_Has35Blocks_29ColumnsAnd6Slabs', () => {
+  assert.equal(demolitionLayout().length, 35);
+  assert.equal(columns().length, 29);
   assert.equal(slabs().length, 6);
 });
 test('demolitionLayout_NoOverlaps', () => {
@@ -18,13 +18,19 @@ test('demolitionLayout_NoOverlaps', () => {
 test('demolitionLayout_EveryBlockSupported', () => {
   assert.deepEqual(unsupported(demolitionLayout()), []);
 });
-test('demolitionLayout_GroundColumnsStandOnGround', () => {
+test('demolitionLayout_GroundColumnsStandOnGround_3x3', () => {
   const ground = columns().filter(b => b.storey === 0);
-  assert.equal(ground.length, 4);
+  assert.equal(ground.length, 9);
   for (const b of ground) assert.ok(Math.abs(b.y - b.hy) < 1e-9);
+  const xs = [...new Set(ground.map(b => b.x))].sort((a, b) => a - b);
+  const zs = [...new Set(ground.map(b => b.z))].sort((a, b) => a - b);
+  assert.deepEqual(xs, [-1.5, 0, 1.5]);
+  assert.deepEqual(zs, [-1.5, 0, 1.5]);
 });
-test('demolitionLayout_ColumnsAtPitch3AndSlim', () => {
-  const xs = [...new Set(columns().map(b => b.x))].sort((a, b) => a - b);
+test('demolitionLayout_UpperColumnsAtPitch3AndAllSlim', () => {
+  const upper = columns().filter(b => b.storey >= 1);
+  assert.equal(upper.length, 20);
+  const xs = [...new Set(upper.map(b => b.x))].sort((a, b) => a - b);
   assert.deepEqual(xs, [-1.5, 1.5]);
   for (const b of columns()) {
     assert.ok(Math.abs(b.hx - 0.15) < 1e-9 && Math.abs(b.hz - 0.15) < 1e-9);
@@ -34,7 +40,7 @@ test('demolitionLayout_ColumnsAtPitch3AndSlim', () => {
 test('demolitionLayout_OneSlabPerStoreyOnItsColumns', () => {
   for (const s of slabs()) {
     const below = columns().filter(b => b.storey === s.storey);
-    assert.equal(below.length, 4);
+    assert.equal(below.length, s.storey === 0 ? 9 : 4);
     for (const c of below) assert.ok(Math.abs(c.y + c.hy - (s.y - s.hy)) < 1e-9);
     assert.ok(Math.abs(s.hx - slabHalf()) < 1e-9 && Math.abs(s.hz - slabHalf()) < 1e-9);
   }
@@ -138,16 +144,32 @@ test('dustPuff_GrowsAndFades_ThenGone', () => {
   assert.ok(b.scale > a.scale && b.opacity < a.opacity);
   assert.equal(dustPuff(DEBRIS.dustLife), null);
 });
-test('columnToCrush_ChargeHighOnGroundColumn_OnlyThatColumn', () => {
-  // review on #97: the slab gap (0.5) is under breakRadius (1.0), so a charge high on a ground
-  // column was also within reach of the column above; one charge must crush one column
-  const ground = { position: { x: 0, y: 1.25, z: 0 }, hy: 1.25 };
-  const above = { position: { x: 0, y: 4.25, z: 0 }, hy: 1.25 };
+// world units: ground columns 3.0 apart (1.5 base x TSCALE 2), hy 1.25, axis centre y 1.25
+const gcol = (x, z) => ({ position: { x, y: 1.25, z }, hy: 1.25, storey: 0 });
+const row3 = () => [gcol(-3, 0), gcol(0, 0), gcol(3, 0)];
+
+test('columnsToCrush_OnFace_OnlyThatColumn', () => {
+  const cols = row3();
+  assert.deepEqual(columnsToCrush({ x: 0, y: 1.2, z: 0.38 }, cols), [cols[1]]);
+});
+test('columnsToCrush_MidwayBetweenTwo_Both', () => {
+  const cols = row3();
+  const hit = columnsToCrush({ x: -1.5, y: 0.3, z: 0 }, cols);
+  assert.equal(hit.length, 2);
+  assert.ok(hit.includes(cols[0]) && hit.includes(cols[1]));
+});
+test('columnsToCrush_CentreOfFour_None', () => {
+  const cols = [gcol(0, 0), gcol(3, 0), gcol(0, 3), gcol(3, 3)];
+  assert.deepEqual(columnsToCrush({ x: 1.5, y: 0.3, z: 1.5 }, cols), []);
+});
+test('columnsToCrush_ChargeHighOnGroundColumn_NeverTheOneAbove', () => {
+  // review on #97: the column above is within reach too; only the nearest column's storey goes
+  const ground = { position: { x: 0, y: 1.25, z: 0 }, hy: 1.25, storey: 0 };
+  const above = { position: { x: 0, y: 4.25, z: 0 }, hy: 1.25, storey: 1 };
   const p = { x: 0.38, y: 2.4, z: 0 };
   assert.ok(distToColumnAxis(p, above.position, above.hy) < DEMO.breakRadius);   // both are in reach
-  assert.equal(columnToCrush(p, [above, ground]), ground);
+  assert.deepEqual(columnsToCrush(p, [above, ground]), [ground]);
 });
-
-test('columnToCrush_NothingInReach_Null', () => {
-  assert.equal(columnToCrush({ x: 5, y: 1, z: 0 }, [{ position: { x: 0, y: 1.25, z: 0 }, hy: 1.25 }]), null);
+test('columnsToCrush_NothingInReach_Empty', () => {
+  assert.deepEqual(columnsToCrush({ x: 5, y: 1, z: 0 }, [gcol(0, 0)]), []);
 });

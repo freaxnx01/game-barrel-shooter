@@ -1,22 +1,25 @@
 // Pure layout and collapse rules for the demolition tower target (#86): heavy floor slabs on
-// slim columns, six storeys. No THREE, no DOM.
+// slim columns, six storeys; the ground floor stands on 3×3 columns (#99). No THREE, no DOM.
 // Boxes: { hx, hy, hz, x, y, z, ry, part, storey }  // half extents + centre in base units,
 // ry = yaw; part is 'column' or 'slab'; storey 0-based from the ground.
 // Centred on x = 0, z = 0 with the ground at y = 0; index.html scales by TSCALE 2.
 // Rigid boxes never crush, so a stack of slabs on columns only sits down one storey or tips
-// over. Two rules make it pancake: an explosion next to a column crushes that column, and a
-// slab that falls and lands crushes the columns standing on it.
+// over. Two rules make it pancake: an explosion crushes the columns in reach on one storey, and
+// a slab that falls and lands crushes the columns standing on it.
 // Spec: docs/superpowers/specs/2026-11-26-issue-86-demolition-highrise-design.md
+// Ground floor: docs/superpowers/specs/2026-11-27-issue-99-demolition-ground-floor-design.md
 
 export const DEMO = {
   storeys: 6,
-  grid: 2,              // columns per side
+  grid: 2,              // columns per side, storeys 1 and up
+  groundGrid: 3,        // columns per side on the ground floor (#99), same outer columns
   pitch: 3,             // column centre distance
   column: 0.3,          // square column cross-section
   storeyHeight: 1.25,   // column length (clear storey height)
   slabThickness: 0.25,
   overhang: 0.25,       // slab edge beyond the outer column faces
-  breakRadius: 1.0,     // world units: an explosion this close to a column's axis crushes it
+  breakRadius: 1.8,     // world units: an explosion this close to a column's axis crushes it (#99:
+                        // reaches both columns from midway between two ground columns, 3.0 apart)
   fallSpeed: 1.5,       // world units/s: a slab sinking faster than this is falling
   landSpeed: 0.5,       // world units/s: a falling slab slower than this again has landed
 };
@@ -30,13 +33,18 @@ export function slabHalf() {
 }
 
 export function demolitionLayout() {
-  const { storeys, grid, pitch, column, storeyHeight, slabThickness } = DEMO;
-  const pts = [];
-  for (let k = 0; k < grid; k++) pts.push((k - (grid - 1) / 2) * pitch);
+  const { storeys, grid, groundGrid, pitch, column, storeyHeight, slabThickness } = DEMO;
+  const span = (grid - 1) * pitch;   // outer column centre to outer column centre, every storey
+  const points = (n) => {
+    const pts = [];
+    for (let k = 0; k < n; k++) pts.push(n === 1 ? 0 : -span / 2 + k * span / (n - 1));
+    return pts;
+  };
   const half = slabHalf();
   const boxes = [];
   for (let storey = 0; storey < storeys; storey++) {
     const base = storey * storeyPitch();
+    const pts = points(storey === 0 ? groundGrid : grid);
     for (const x of pts) {
       for (const z of pts) {
         boxes.push({ hx: column / 2, hy: storeyHeight / 2, hz: column / 2, x, y: base + storeyHeight / 2, z, ry: 0, part: 'column', storey });
@@ -54,16 +62,18 @@ export function distToColumnAxis(p, c, hy) {
   return Math.hypot(p.x - c.x, dy, p.z - c.z);
 }
 
-// The one column an explosion at p crushes: the nearest whose axis is within breakRadius, or null.
-// columns: [{ position, hy }] in world units. Only one, so a charge high on a ground column does not
-// also take out the column standing on the slab above it (review on #97).
-export function columnToCrush(p, columns) {
-  let best = null, bestD = DEMO.breakRadius;
+// The columns an explosion at p crushes: every column on the storey of the nearest column in
+// reach whose axis is within breakRadius, or []. Never a column on another storey, so a charge
+// high on a ground column does not also take out the column standing on the slab above it
+// (review on #97). columns: [{ position, hy, storey }] in world units; returns those objects.
+export function columnsToCrush(p, columns) {
+  let nearest = null, bestD = DEMO.breakRadius;
   for (const c of columns) {
     const d = distToColumnAxis(p, c.position, c.hy);
-    if (d < bestD) { bestD = d; best = c; }
+    if (d < bestD) { bestD = d; nearest = c; }
   }
-  return best;
+  if (!nearest) return [];
+  return columns.filter(c => c.storey === nearest.storey && distToColumnAxis(p, c.position, c.hy) < DEMO.breakRadius);
 }
 
 // Per-slab landing detector. Call once per frame with the slab's vertical velocity; returns
