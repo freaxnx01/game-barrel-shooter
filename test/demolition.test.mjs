@@ -7,9 +7,9 @@ import { overlappingPairs, unsupported } from './layout-geometry.mjs';
 const columns = () => demolitionLayout().filter(b => b.part === 'column');
 const slabs = () => demolitionLayout().filter(b => b.part === 'slab');
 
-test('demolitionLayout_Has35Blocks_29ColumnsAnd6Slabs', () => {
-  assert.equal(demolitionLayout().length, 35);
-  assert.equal(columns().length, 29);
+test('demolitionLayout_Has32Blocks_26ColumnsAnd6Slabs', () => {
+  assert.equal(demolitionLayout().length, 32);
+  assert.equal(columns().length, 26);
   assert.equal(slabs().length, 6);
 });
 test('demolitionLayout_NoOverlaps', () => {
@@ -18,14 +18,15 @@ test('demolitionLayout_NoOverlaps', () => {
 test('demolitionLayout_EveryBlockSupported', () => {
   assert.deepEqual(unsupported(demolitionLayout()), []);
 });
-test('demolitionLayout_GroundColumnsStandOnGround_3x3', () => {
+test('demolitionLayout_GroundColumnsStandOnGround_TwoRowsOfThree', () => {
+  // seen from above: three columns across (x), two rows front and back (z), same width
   const ground = columns().filter(b => b.storey === 0);
-  assert.equal(ground.length, 9);
+  assert.equal(ground.length, 6);
   for (const b of ground) assert.ok(Math.abs(b.y - b.hy) < 1e-9);
   const xs = [...new Set(ground.map(b => b.x))].sort((a, b) => a - b);
   const zs = [...new Set(ground.map(b => b.z))].sort((a, b) => a - b);
   assert.deepEqual(xs, [-1.5, 0, 1.5]);
-  assert.deepEqual(zs, [-1.5, 0, 1.5]);
+  assert.deepEqual(zs, [-1.5, 1.5]);
 });
 test('demolitionLayout_UpperColumnsAtPitch3AndAllSlim', () => {
   const upper = columns().filter(b => b.storey >= 1);
@@ -40,7 +41,7 @@ test('demolitionLayout_UpperColumnsAtPitch3AndAllSlim', () => {
 test('demolitionLayout_OneSlabPerStoreyOnItsColumns', () => {
   for (const s of slabs()) {
     const below = columns().filter(b => b.storey === s.storey);
-    assert.equal(below.length, s.storey === 0 ? 9 : 4);
+    assert.equal(below.length, s.storey === 0 ? 6 : 4);
     for (const c of below) assert.ok(Math.abs(c.y + c.hy - (s.y - s.hy)) < 1e-9);
     assert.ok(Math.abs(s.hx - slabHalf()) < 1e-9 && Math.abs(s.hz - slabHalf()) < 1e-9);
   }
