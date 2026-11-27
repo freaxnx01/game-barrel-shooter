@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/2247cfbd-09b6-453b-85c5-6ce47a650d7b
 | **Fire** | Hold left mouse button to charge power, release to shoot |
 | **Orbit camera** | Right-click + drag, arrow keys, or the pad bottom-right (hold to keep turning); scroll wheel or the pad's `+`/`−` to zoom. On a Chromebook touchpad, Alt + press and drag works as right-drag |
 | **Switch ammo** | The 💥 button top-left opens the weapon list (🎯 for targets), or keys `1`–`9`, `0`, plus `S` (soccerball), `P` (paintball; `P` again cycles the colour; picking Paintball in the list keeps it open for the colour swatches, and the dot next to 💥 shows the colour and cycles it), `L` (lightning), `U` (hurricane), `M` (magneto), `G` (grenade), `H` (hammer), `T` (tractor tire), `F` (American football), `B` (remote charge), `Y` (cutting charge), `Z` (timed charge), `N` (heavy net) |
-| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga / Chimney / Demolition Tower · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
+| **Switch target** | Grouped buttons top-right — *Stacks:* Barrels / Wooden Barrels / Cards / Bowling · *Stone:* Fortress / Colosseum / Pyramid / Gate / Tower Gate / Arch Gate / Double Gate / Castle Gate / Small Castle Gate · *Towers:* Cylinder / Octagon / Pole Tower / Brick Box / Brick Tower / Jenga / Chimney / Demolition Tower / Demolition Block · *Frames:* Spiral Stair / Spiral Tower / Frame Tower / Frame Block / Frame High-rise / Frame Hall / Crosses / Eiffel |
 | **Earthquake** | Hold `Shift` or the 🌋 Quake button bottom right to shake the ground |
 | **Pull / Cut** | Hold Space or the 🪝 Pull button to reel a harpoon or net in; `O` or the ✂️ Cut button lets it go. The buttons sit bottom right and show only while a harpoon or net holds something |
 | **Detonate** | `K` or the 💥 Boom button (bottom right, shown while remote and cutting charges are placed, with their count) blows up all placed remote and cutting charges. The small ▸ next to it opens buttons `1`..`6` that blow up just that charge; each placed charge shows its number floating above it |
@@ -75,7 +75,7 @@ audible, does not clip, rises with held pieces and fades out within 0.2 s (title
 `test/harness/football-flight.html` checks the American football: nose along the flight path, spin,
 irregular bounces, mass and barrels per hit (title `FOOTBALL PASS`/`FAIL`).
 `test/harness/chimney.html` checks the brick chimney: it stands still, one dynamite charge at the foot brings it down and a light ball does not (title `CHIMNEY PASS`/`FAIL`).
-`test/harness/demolition.html` checks the demolition tower: it stands still, charges on all twelve ground-floor columns pancake it into its footprint (remote and cutting charge), one charge does not (title `DEMOLITION PASS`/`FAIL`).
+`test/harness/demolition.html` checks the demolition tower and the demolition block: each stands still, charges on all ground-floor columns pancake it into its footprint (remote and cutting charge), one charge does not (title `DEMOLITION PASS`/`FAIL`).
 
 ## Game Content
 
@@ -93,10 +93,11 @@ and castle gates; hollow brick box and brick tower; four post-and-beam frame bui
 tower; Jenga tower of 18 crosswise layers of 3 wooden blocks, where you push blocks out
 instead of shooting (the HUD counts blocks pulled; the round ends when the tower falls);
 tall brick industrial chimney, tapering to a soot-blackened top, that tips over and breaks apart
-when hit at the foot; a six-storey demolition tower of concrete slabs on slim columns, six
-bays wide (three across, two deep, twelve columns per storey), that pancakes into its own
-footprint, its columns bursting into rubble and dust, when charges take out all twelve
-ground-floor columns at once (up to 12 remote charges on this target, 6 elsewhere).
+when hit at the foot; a six-storey demolition tower of concrete slabs on slim columns that
+pancakes into its own footprint, its columns bursting into rubble and dust, when charges take out
+all four ground-floor columns at once; and a demolition block of the same height, six bays wide
+(three across, two deep, twelve columns per storey), that comes down the same way when all
+twelve ground-floor columns go (up to 12 remote charges on this target, 6 elsewhere).
 
 **Feedback:** score HUD (targets knocked down / total), shot counter, and synthesized
 Web Audio sounds (launch whoosh, metal clank, bounce thud, explosion boom, thunder, wind).

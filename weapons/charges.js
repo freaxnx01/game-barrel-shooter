@@ -14,12 +14,12 @@ export const CHARGE = {
   blinkSlowMs: 600,
   blinkFastMs: 100,
   maxRemote: 6,
-  maxRemoteDemolition: 12,   // #99: one per ground column of the six-bay demolition tower
+  maxRemoteDemolition: 12,   // #99: one per ground column of the six-bay demolition block
 };
 
 // How many remote and cutting charges may be armed at once on a target.
 export function maxRemoteFor(mode) {
-  return mode === 'demolition' ? CHARGE.maxRemoteDemolition : CHARGE.maxRemote;
+  return mode === 'demolitionwide' ? CHARGE.maxRemoteDemolition : CHARGE.maxRemote;
 }
 
 // Cutting charge (#87): a small blast for controlled demolition. It breaks the piece it sits on
